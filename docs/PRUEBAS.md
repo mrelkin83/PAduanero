@@ -293,6 +293,11 @@ driver. Si aparece «No code coverage driver available», es eso.
 ## 8. Antes de cada despliegue
 
 - [ ] `composer test:criticas` en verde.
+- [ ] **Cobertura por zona contra los mínimos de §7.** No basta con que la
+      suite pase: una zona entera puede quedarse sin cubrir sin que ninguna
+      prueba se ponga roja. Pasó — al terminar el panel, `src/Panel/` estaba
+      al **0 %** con 154 pruebas en verde, porque solo lo ejercitaba un script
+      de navegador. Se degrada en silencio, así que se mide en cada despliegue.
 - [ ] Si cambió un prompt: `composer test:golden` en verde y aprobación de Pedro.
 - [ ] Si cambió el esquema: migración probada sobre copia del respaldo de anoche.
 - [ ] Si cambió algo de pagos: transacción real en entorno de pruebas de la pasarela.

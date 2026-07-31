@@ -22,10 +22,18 @@ use PHPUnit\Framework\TestCase;
 #[Group('critica')]
 final class ProbadorWompiTest extends TestCase
 {
-    private const PUB_PROD = 'pub_prod_Kw4aC0rZVgLZQn209NbEKPuXLzBD28Zx';
-    private const PRV_PROD = 'prv_prod_434092Xa65F54dd6a181D1f87DFa03CzS';
-    private const PUB_TEST = 'pub_test_Kw4aC0rZVgLZQn209NbEKPuXLzBD28Zx';
-    private const PRV_TEST = 'prv_test_434092Xa65F54dd6a181D1f87DFa03CzS';
+    // Inequívocamente falsas. Lo único que importa de ellas es el prefijo,
+    // que es lo que el probador valida antes de salir a la red.
+    //
+    // Antes aquí había cadenas copiadas de la documentación de Wompi, que
+    // parecían llaves de producción de verdad. No lo eran —y este proyecto
+    // nunca ha tenido credenciales reales de la pasarela—, pero una cadena
+    // con pinta de secreto dentro del repositorio es una alarma esperando a
+    // sonar, o peor, un secreto de verdad que alguien confunda con esto.
+    private const PUB_PROD = 'pub_prod_ESTO_NO_ES_UNA_LLAVE_REAL_000000';
+    private const PRV_PROD = 'prv_prod_ESTO_NO_ES_UNA_LLAVE_REAL_000000';
+    private const PUB_TEST = 'pub_test_ESTO_NO_ES_UNA_LLAVE_REAL_000000';
+    private const PRV_TEST = 'prv_test_ESTO_NO_ES_UNA_LLAVE_REAL_000000';
 
     /** @param list<RespuestaHttp> $respuestas en orden de llamada */
     private function http(array $respuestas): Http
@@ -267,6 +275,6 @@ final class ProbadorWompiTest extends TestCase
 
         self::assertIsString($json);
         self::assertStringNotContainsString(self::PRV_PROD, $json);
-        self::assertStringNotContainsString('434092', $json);
+        self::assertStringNotContainsString('ESTO_NO_ES_UNA_LLAVE_REAL', $json);
     }
 }

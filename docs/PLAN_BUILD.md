@@ -133,6 +133,29 @@ Cero violaciones de las reglas inviolables (§4 del CLAUDE.md) — sobre todo ce
 menciones de plazos, términos o normas numeradas. Si aparece una sola, se ajusta
 el prompt y se reinicia el conteo.
 
+### Condiciones del PO, desde el primer commit
+
+Esta es la etapa donde el proyecto deja de parecerse a los anteriores. Hasta
+aquí todo era verificable de forma binaria: una migración corre o no corre, un
+webhook valida o no valida. A partir de ahora el criterio de cierre es que una
+persona lea treinta respuestas y no encuentre una sola violación.
+
+1. **`motor_modo_sombra` arranca en `true` y no lo cambia Claude Code.** Ni
+   para probar. El paso a envío automático es la Etapa 6 y lo autoriza el PO.
+2. **`motor/index.js` es referencia conceptual, no fuente a traducir.** Se
+   reescribe idiomático en PHP. Señales de que se está transliterando en vez
+   de reescribiendo: aparece `async`, promesas emuladas, o un método llamado
+   `process()`.
+3. **La regla 14 (R1 vs R5) va desde el principio, no como parche.** En un
+   escalamiento sin consentimiento vigente se persiste teléfono, motivo, marca
+   de tiempo y `chatwoot_conv_id`. **Cero contenido del mensaje.**
+
+Y el catálogo de tipos de caso: **`CLAUDE.md` §5 es normativo**. El array
+`TIPOS_CASO` del `index.js` tiene 21 valores y ninguno tributario — ese es el
+que está desactualizado, no la especificación.
+
+**Arranca cuando el PO confirme el verde de Wompi** (`docs/CIERRE_ETAPA_3.md`).
+
 ---
 
 ## Etapa 5 — Cobro y agenda

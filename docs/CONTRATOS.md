@@ -405,3 +405,14 @@ compilada en el servidor.
     búsqueda por hash fallaría en silencio (ADR-012).
 13. Confiar solo en el índice `slot_unico` para evitar la doble reserva. Es la
     segunda línea; la primera es la validación de solapamiento (ADR-015).
+14. **Escribir sintaxis de MariaDB creyendo que es de MySQL.** La que más
+    engaña es `ALTER TABLE … ADD COLUMN IF NOT EXISTS`: existe en MariaDB, y
+    MySQL la rechaza con un error de sintaxis. Para una migración idempotente
+    hay que consultar `information_schema` y preparar la sentencia solo si
+    hace falta — el patrón está en `db/migraciones/0005_totp_endurecido.sql`.
+    Otras de la misma familia: `DROP INDEX IF EXISTS`, `RENAME COLUMN` en
+    versiones viejas, `SEQUENCE` y `RETURNING`.
+15. Devolver un booleano donde el estándar exige más información. `Totp`
+    devuelve el contador con el que casó, no un `true`: sin ese dato no se
+    puede aplicar el antirreplay del RFC 6238 §5.2, y el fallo es silencioso
+    — todo parece funcionar y un código robado sirve treinta segundos.
