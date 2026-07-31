@@ -71,6 +71,20 @@ bin/salud.sh
 Las migraciones sustituyen a cargar los `.sql` a mano: llevan control de versión y
 verifican el hash de cada archivo ya aplicado.
 
+### Pruebas
+
+```bash
+cp .env.pruebas.example .env.pruebas
+mysql -u root -p -e "CREATE DATABASE pedro_pruebas
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+
+composer test              # todo
+composer test:criticas     # solo nivel 1 — antes de cada despliegue
+```
+
+La base de pruebas se recrea desde `db/migraciones/` en cada corrida. Si `DB_NAME`
+no termina en `_pruebas`, el arranque aborta: las pruebas truncan tablas.
+
 ---
 
 ## Reglas que no se negocian

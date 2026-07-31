@@ -3,6 +3,7 @@
 .env
 .env.*
 !.env.example
+!.env.pruebas.example
 
 /vendor/
 /node_modules/
@@ -17,6 +18,8 @@
 /public/css/app.css
 /public/build/
 
+# PHPUnit 11 usa un directorio, no el .phpunit.result.cache de la 10.
+/.phpunit.cache/
 .phpunit.result.cache
 /tests/cobertura/
 

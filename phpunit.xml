@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/arranque.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+         failOnWarning="true"
+         failOnRisky="true">
+
+  <testsuites>
+    <testsuite name="unidad">
+      <directory>tests/Unidad</directory>
+    </testsuite>
+    <testsuite name="integracion">
+      <directory>tests/Integracion</directory>
+    </testsuite>
+  </testsuites>
+
+  <source>
+    <include>
+      <directory>src</directory>
+    </include>
+  </source>
+
+  <php>
+    <!-- La guarda de tests/arranque.php aborta si DB_NAME no termina en
+         _pruebas. Nunca apuntar las pruebas a producción. -->
+    <env name="APP_ENV" value="pruebas"/>
+    <env name="DB_NAME" value="pedro_pruebas"/>
+  </php>
+</phpunit>

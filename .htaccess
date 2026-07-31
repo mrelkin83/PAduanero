@@ -1,0 +1,38 @@
+# Front controller. Requiere AllowOverride All en el vhost.
+# En el VPS el servidor es Nginx + PHP-FPM y esto no se usa: la regla
+# equivalente va en el server block. Este archivo existe para el Apache de
+# desarrollo (Laragon).
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Los estáticos viven en public/ pero se sirven en la raíz de la URL:
+    # `landing_ruta_imagenes` vale /img porque es lo que va en el atributo
+    # src, mientras que en disco están en public/img (CLAUDE.md §12.6).
+    # En el VPS lo equivalente es un `location /img { alias …/public/img; }`
+    # en Nginx; esta regla es para el Apache de desarrollo.
+    RewriteRule ^(img|css|js)/(.*)$ public/$1/$2 [L]
+
+    # Cualquier otro archivo o directorio real se sirve directo.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Nada de esto debe ser alcanzable por HTTP. Si el rewrite falla, esta es la
+# red: el .env contiene MASTER_KEY y PEPPER_TELEFONO.
+<FilesMatch "^\.env|^composer\.(json|lock)$|^phpunit\.xml$">
+    Require all denied
+</FilesMatch>
+
+RedirectMatch 404 ^/(src|db|docs|bin|tests|storage|motor|vendor|\.git)(/|$)
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+Options -Indexes

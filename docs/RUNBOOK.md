@@ -247,6 +247,49 @@ Evolution en ventana acordada con Pedro, nunca en día hábil por la mañana.
 
 ---
 
+## 4 bis. Bloque de Nginx
+
+Los estáticos viven en `public/` pero se sirven desde la raíz de la URL:
+`landing_ruta_imagenes` vale `/img` porque es lo que acaba en el atributo
+`src`, mientras que en disco están en `public/img` (`CLAUDE.md` §12.6). Sin el
+`alias`, las fotos dan 404 y la landing sale sin imágenes.
+
+```nginx
+server {
+    server_name pedroabogadoaduanero.com;
+    root /var/www/pedro;
+    index index.php;
+
+    location ~ ^/(img|css|js)/ {
+        alias /var/www/pedro/public/;
+        try_files $uri =404;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # El .env lleva MASTER_KEY y PEPPER_TELEFONO.
+    location ~ ^/(src|db|docs|bin|tests|storage|motor|vendor|\.git|\.env) {
+        deny all;
+        return 404;
+    }
+
+    location / {
+        try_files $uri /index.php$is_args$args;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root/index.php;
+    }
+}
+```
+
+El `.htaccess` del repositorio hace lo mismo para el Apache de desarrollo
+(Laragon). En el VPS no se usa.
+
+---
+
 ## 5. Despliegue
 
 ```bash

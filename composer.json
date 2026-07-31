@@ -1,0 +1,42 @@
+{
+  "name": "pedro/aduanero",
+  "description": "Plataforma digital — Pedro, abogado aduanero y tributario",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.2",
+    "ext-pdo": "*",
+    "ext-pdo_mysql": "*",
+    "ext-openssl": "*",
+    "ext-mbstring": "*",
+    "ext-json": "*",
+    "ext-curl": "*"
+  },
+  "suggest": {
+    "ext-apcu": "Caché de configuración en producción. Sin ella, Config cae a caché de archivo, pensada para desarrollo."
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Pruebas\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "test:criticas": "phpunit --group critica",
+    "test:golden": "phpunit --group golden",
+    "migrar": "php bin/migrar.php"
+  },
+  "config": {
+    "sort-packages": true,
+    "optimize-autoloader": true
+  },
+  "minimum-stability": "stable"
+}
