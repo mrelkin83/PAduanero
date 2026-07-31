@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+@source "../../plantillas/panel/**/*.php";
+
+/* =====================================================================
+   Panel administrativo.
+   Hereda la paleta de la landing —tinta de sello sobre papel de oficio—
+   pero en registro de herramienta: densidad alta, cero adorno, todo
+   legible de un vistazo. Aquí no hay que convencer a nadie, hay que
+   trabajar.
+   ===================================================================== */
+
+@theme {
+  --color-tinta: #16213A;
+  --color-tinta-alta: #0E1628;
+  --color-tinta-suave: #9AA6B8;
+
+  --color-papel: #F2F3F1;
+  --color-papel-puro: #FBFBFA;
+
+  --color-sello: #B4341F;
+  --color-ambar: #B87A12;
+  --color-verde: #0F7D42;
+  --color-acero: #5A6478;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-papel);
+    color: var(--color-tinta);
+    font-family: var(--font-sans);
+    line-height: 1.55;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-sello);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer components {
+  .rotulo {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-acero);
+  }
+
+  .tarjeta {
+    background-color: var(--color-papel-puro);
+    border: 1px solid color-mix(in srgb, var(--color-acero) 20%, transparent);
+    border-radius: 3px;
+  }
+
+  .campo {
+    width: 100%;
+    background-color: #fff;
+    border: 1px solid color-mix(in srgb, var(--color-acero) 35%, transparent);
+    border-radius: 2px;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.9375rem;
+    color: var(--color-tinta);
+  }
+  .campo:focus { border-color: var(--color-tinta); outline-offset: 0; }
+  .campo:disabled { background-color: var(--color-papel); color: var(--color-acero); }
+
+  .boton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    background-color: var(--color-tinta);
+    color: var(--color-papel-puro);
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: 2px;
+    transition: background-color 120ms ease;
+  }
+  .boton:hover { background-color: var(--color-tinta-alta); }
+
+  .boton-secundario {
+    background-color: transparent;
+    color: var(--color-tinta);
+    border: 1px solid color-mix(in srgb, var(--color-acero) 40%, transparent);
+  }
+  .boton-secundario:hover { background-color: var(--color-papel); }
+
+  /* Credenciales: el valor real nunca sale por HTTP, así que estos campos
+     son de solo escritura. La máscara se muestra al lado, en mono. */
+  .mascara {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--color-acero);
+    letter-spacing: 0.04em;
+  }
+
+  .aviso {
+    border-left: 3px solid;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.9375rem;
+    border-radius: 0 2px 2px 0;
+  }
+  .aviso-ok    { border-color: var(--color-verde); background-color: #0F7D420F; }
+  .aviso-error { border-color: var(--color-sello); background-color: #B4341F0F; }
+  .aviso-atencion { border-color: var(--color-ambar); background-color: #B87A120F; }
+
+  .tabla { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .tabla th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-acero);
+    font-weight: 500;
+    padding: 0.5rem 0.625rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-acero) 25%, transparent);
+  }
+  .tabla td {
+    padding: 0.5rem 0.625rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-acero) 12%, transparent);
+    vertical-align: top;
+  }
+
+  .nav-enlace {
+    display: block;
+    padding: 0.4rem 0.75rem;
+    border-radius: 2px;
+    font-size: 0.9375rem;
+    color: var(--color-tinta-suave);
+  }
+  .nav-enlace:hover { background-color: #ffffff14; color: var(--color-papel-puro); }
+  .nav-activo { background-color: #ffffff1F; color: var(--color-papel-puro); font-weight: 600; }
+}

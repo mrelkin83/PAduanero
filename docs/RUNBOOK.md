@@ -51,7 +51,12 @@ Los tres crones:
 */5  * * * *  php /var/www/pedro/bin/cron-expirar-reservas.php
 */10 * * * *  /var/www/pedro/bin/salud.sh
 15   3 * * *  /var/www/pedro/bin/respaldo.sh
+30   4 * * *  php /var/www/pedro/bin/cron-purgar.php
 ```
+
+`cron-purgar.php` no es mantenimiento opcional: `intentos_acceso` guarda
+direcciones IP, que son dato personal bajo la Ley 1581 de 2012. Retención de
+30 días, igual que los logs.
 
 ---
 
@@ -251,12 +256,66 @@ Y tres comprobaciones de los canales, todas de fallo silencioso:
 - `php bin/verificar-canales.php`: las cuatro bandejas siguen ahí.
 - **Instagram y Messenger**: los tokens de Meta caducan y la bandeja deja de
   recibir sin avisar. Se reconecta desde Chatwoot.
-- **¿Salió ya la 2.4.0 estable de Evolution?**
-  `https://github.com/evolution-foundation/evolution-api/releases`.
-  Estamos en v2.3.7, que es la última estable pero envejece: Baileys sigue el
-  protocolo de WhatsApp y quedarse atrás acaba en conexión caída. Al subir,
-  esa versión **sí** pide activación de licencia: leer `CLAUDE.md` §1.3 y
-  poner `EVOLUTION_OPERATOR_EMAIL` **después** de registrar el correo a mano.
+- **¿Salió ya la 2.4.x estable de Evolution?** Ver §6.
+
+---
+
+## 6. Actualización de Evolution — ensayar antes de necesitarlo
+
+Estamos pineados en **v2.3.7**, la última estable. Envejece: Baileys sigue el
+protocolo de WhatsApp, que cambia sin avisar, y una versión atrasada acaba
+perdiendo la conexión.
+
+El problema no es actualizar. Es **cuándo se descubre cómo se actualiza**: si
+se deja para el día que Baileys rompa, la primera vez que alguien vea el flujo
+de activación de licencia será con el canal caído, Pedro sin recibir clientes y
+prisa. Ese es el peor momento posible para aprender algo.
+
+### 6.1 Ensayo, en cuanto salga la 2.4.x estable
+
+Con calma, en una instancia aparte y con un número de prueba —**nunca** el del
+negocio:
+
+```bash
+mkdir -p /opt/evolution-ensayo && cd /opt/evolution-ensayo
+# Mismo compose, otra etiqueta, otro puerto, otros volúmenes.
+```
+
+1. Levantar con la 2.4.x y comprobar que responde 503 (es lo esperado).
+2. Hacer la activación completa por el Manager, con el correo del despacho.
+3. Poner `EVOLUTION_OPERATOR_EMAIL` y **recrear el contenedor a propósito**
+   (`docker compose down && docker compose up -d`) para ver si la
+   autoactivación funciona de verdad.
+4. **Cronometrar el proceso completo** y anotarlo aquí abajo.
+5. Crear una instancia, escanear el QR con el número de prueba, mandar un
+   mensaje y ver que llega a una bandeja de Chatwoot de prueba.
+
+| Fecha del ensayo | Versión | Duración | Resultado |
+|---|---|---|---|
+| _(pendiente)_ | | | |
+
+Un ensayo con calma vale más que doce revisiones mensuales.
+
+### 6.2 Cuándo se actualiza — disparador, no calendario
+
+Se actualiza cuando ocurra **lo que pase primero**:
+
+- **(a)** la 2.4.x lleva **un mes estable** sin issues abiertos de conexión, o
+- **(b)** aparecen **errores de protocolo en los logs** de Evolution
+  (desconexiones repetidas, fallos de handshake de Baileys, `connectionState`
+  oscilando).
+
+La condición (b) manda sobre la (a): si el protocolo ya está rompiendo, se
+actualiza aunque la versión sea joven, porque la alternativa es el canal caído.
+
+### 6.3 Ventana
+
+Nunca en día hábil por la mañana, y nunca con asesorías agendadas en la hora
+siguiente — la regla general de §5 aplica igual aquí. Con el ensayo hecho, la
+duración ya se conoce y se puede escoger la ventana en consecuencia.
+
+Al subir, esa versión **sí** pide activación: leer `CLAUDE.md` §1.3 y poner
+`EVOLUTION_OPERATOR_EMAIL` **después** de registrar el correo a mano.
 
 ---
 
@@ -317,6 +376,43 @@ limit_req_zone $binary_remote_addr zone=eventos:10m rate=30r/m;
 El `.htaccess` del repositorio hace lo mismo para el Apache de desarrollo
 (Laragon). En el VPS no se usa. Para el servidor embebido de PHP existe
 `bin/servidor-dev.php`, que no lee ninguno de los dos.
+
+### El panel en su propio subdominio
+
+`docs/PANEL_ADMIN.md` §4.6 pide que el panel no comparta origen con la
+landing. Mismo `root`, otro `server_name`, y ahí sí se puede restringir por IP
+o dejarlo detrás de VPN:
+
+```nginx
+server {
+    server_name panel.pedroabogadoaduanero.com;
+    root /var/www/pedro;
+
+    # allow 190.85.x.x;   ← si hay IP fija; complementa a PANEL_IPS_PERMITIDAS
+    # deny all;
+
+    location / { try_files $uri /index.php$is_args$args; }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root/index.php;
+    }
+
+    # El login es el objetivo obvio de una fuerza bruta. El bloqueo por
+    # cuenta y el rate limit por IP de la aplicación son la segunda línea.
+    location = /panel/entrar {
+        limit_req zone=login burst=5 nodelay;
+        try_files $uri /index.php$is_args$args;
+    }
+}
+```
+
+En el `http {}` de `nginx.conf`:
+
+```nginx
+limit_req_zone $binary_remote_addr zone=login:10m rate=10r/m;
+```
 
 ### Certificado TLS
 

@@ -10,8 +10,9 @@ Paquete de especificación completo. **Leer en este orden.**
 | 4 | `docs/PLAN_BUILD.md` | Nueve etapas con criterios de cierre |
 | 5 | `docs/PRUEBAS.md` | Qué se prueba, con qué severidad |
 | 6 | `docs/DESPLIEGUE_CANALES.md` | Etapa 2: Chatwoot, Evolution y los cuatro canales |
-| 7 | `docs/RUNBOOK.md` | Operación e incidentes |
-| 8 | `docs/RESPALDOS.md` | Respaldos, cifrado y recuperación |
+| 7 | `docs/CIERRE_ETAPA_3.md` | Etapa 3: verificación manual del panel |
+| 8 | `docs/RUNBOOK.md` | Operación e incidentes |
+| 9 | `docs/RESPALDOS.md` | Respaldos, cifrado y recuperación |
 | 9 | `db/migraciones/` | Esquema MySQL 8 y semillas con los datos reales |
 | 10 | `infra/` | Compose de Chatwoot y Evolution, para `/opt/` en el VPS |
 | 11 | `motor/index.js` | Referencia conceptual. **Se traduce en la Etapa 4, no antes** |

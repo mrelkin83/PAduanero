@@ -43,11 +43,48 @@ final readonly class Respuesta
             throw new \RuntimeException("No existe la plantilla «{$plantilla}».");
         }
 
-        extract($datos, EXTR_SKIP);
-        ob_start();
-        require $ruta;
+        return self::html(self::renderizar($ruta, $datos), $estado);
+    }
 
-        return self::html((string) ob_get_clean(), $estado);
+    /**
+     * Renderiza en un ámbito aislado.
+     *
+     * El aislamiento no es cosmético. Haciendo el `extract()` directamente en
+     * `vista()`, sus propias variables locales —`$plantilla`, `$datos`,
+     * `$estado`— chocan con los datos de la plantilla, y con `EXTR_SKIP` el
+     * dato se descarta **en silencio**: una plantilla que espera `$estado`
+     * recibe el código HTTP y pinta la página vacía sin un solo error.
+     *
+     * Aquí solo existen dos locales, con nombres que ninguna plantilla usaría,
+     * y si aun así alguien los usa se falla en voz alta en vez de callar.
+     *
+     * @param array<string,mixed> $datos
+     */
+    private static function renderizar(string $__ruta, array $__datos): string
+    {
+        foreach (['__ruta', '__datos'] as $__reservado) {
+            if (array_key_exists($__reservado, $__datos)) {
+                throw new \InvalidArgumentException(
+                    "«{$__reservado}» es un nombre reservado del renderizador."
+                );
+            }
+        }
+
+        extract($__datos, EXTR_OVERWRITE);
+
+        ob_start();
+
+        try {
+            require $__ruta;
+
+            return (string) ob_get_clean();
+        } catch (\Throwable $e) {
+            // Sin esto, una plantilla que revienta a mitad deja el búfer
+            // abierto y la salida sale mezclada con la de la página de error.
+            ob_end_clean();
+
+            throw $e;
+        }
     }
 
     public function enviar(): void

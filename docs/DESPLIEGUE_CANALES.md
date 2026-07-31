@@ -11,17 +11,22 @@
 
 ---
 
-## 0. Antes de empezar
+## 0. Antes de empezar — quién hace qué
 
-| Requisito | Estado |
-|---|---|
-| VPS con Docker ≥ 20.10 y Compose ≥ 2.14 | — |
-| 8 GB de RAM | Chatwoot solo ya pide 4 (`CLAUDE.md` §1.1) |
-| DNS: `chat.pedroabogadoaduanero.com` → IP del VPS | — |
-| Número de WhatsApp **dedicado** | `573159923676`, confirmado por el PO |
-| Un celular con ese número a mano | Para escanear el QR |
-| Cuenta de Meta Business con Instagram y la página de Facebook | Pendiente de Pedro |
-| Credenciales SMTP | Pendiente |
+No son requisitos que falten: son tareas con dueño. La infraestructura existe;
+lo que queda es ejecutar este documento.
+
+| Tarea | Dueño | Notas |
+|---|---|---|
+| VPS con Docker ≥ 20.10 y Compose ≥ 2.14, 8 GB de RAM | **PO** | Chatwoot solo ya pide 4 (`CLAUDE.md` §1.1) |
+| DNS `chat.pedroabogadoaduanero.com` → IP, y TLS | **PO** | §1.1 |
+| Credenciales SMTP | **PO** | §6 |
+| Escanear el QR de WhatsApp | **Pedro** | Presencial, ~10 min, celular del `573159923676` |
+| Meta Business: Instagram profesional + página de Facebook | **Pedro** | §4. **Es lo que más tarda**: empezar por aquí |
+
+Solo dos tareas dependen de Pedro, y una son diez minutos con el celular. La
+de Meta es la de camino crítico: los permisos de Instagram y la vinculación
+con la página pueden tomar días si la cuenta no está ya como profesional.
 
 **El número no puede ser el personal de Pedro.** No es una preferencia: si
 Meta bloquea el número —y Baileys no es API oficial, así que puede pasar—
@@ -303,6 +308,11 @@ El criterio de cierre dice «un mensaje enviado por cada uno de los cuatro
 canales aparece en la bandeja». Hace falta una persona con un teléfono y las
 cuentas. Anotar el resultado:
 
+- [ ] **`ENABLE_ACCOUNT_SIGNUP=false`** y Chatwoot reiniciado. Comprobarlo
+      abriendo `/app/auth/signup` en una ventana privada: **no debe dejar
+      crear cuenta**. Viene en `true` de fábrica, y dejarlo así permite que
+      cualquiera con la URL entre a una bandeja con expedientes bajo secreto
+      profesional. Va primero en esta lista a propósito.
 - [ ] **WhatsApp** — escribir a `573159923676` desde otro teléfono.
 - [ ] **Instagram** — mandar un DM a la cuenta del despacho desde otra cuenta.
 - [ ] **Messenger** — escribir a la página de Facebook desde otro perfil.

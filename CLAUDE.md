@@ -140,6 +140,33 @@ partir de esa versión, en este orden:
 4. `bin/salud.sh` distingue el estado «pendiente de activación» del resto de
    fallos, porque el remedio es distinto.
 
+### Obligación de atribución — verificada en el LICENSE de la v2.3.7
+
+El `LICENSE` del tag `2.3.7` (Apache 2.0 **más condiciones adicionales**) trae
+esta cláusula, que **nos obliga**:
+
+> **b. Usage Notification Requirement:** If Evolution API is used as part of
+> any project, including closed-source systems (e.g., proprietary software),
+> the user is required to display a clear notification within the system that
+> Evolution API is being utilized. This notification should be visible to
+> system administrators and accessible from the system's documentation or
+> settings page.
+
+Se cumple en el **pie del panel administrativo y en su página de Configuración**
+(Etapa 3), que es literalmente lo que pide la letra: visible para los
+administradores del sistema, accesible desde la página de ajustes. **No va en
+la landing**: ahí no hay administradores, y sería publicidad de un proveedor
+en la página de un abogado.
+
+La cláusula **1.a** (no quitar logos ni avisos de copyright) **no aplica**:
+dice expresamente que es *«inapplicable to uses of Evolution API that do not
+involve its frontend components»*, y aquí se consume la API sin embeber el
+Manager. Si alguna vez se embebe o se rebrandea el Manager, vuelve a aplicar.
+
+En el tag `2.3.7` no existen `NOTICE` ni `TRADEMARKS.md` — se añadieron
+después, con el cambio a Evolution Foundation. La imagen de Docker tampoco
+incluye archivos de licencia propios.
+
 Alternativas 100 % libres si algún día la licencia deja de convencer:
 `evolution-api-lite` (solo conectividad, sin integración nativa con Chatwoot —
 habría que escribir el puente), o construir directo sobre `whatsmeow` (Go) o

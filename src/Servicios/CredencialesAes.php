@@ -6,6 +6,7 @@ namespace App\Servicios;
 
 use App\Core\BD;
 use App\Excepciones\CredencialNoEncontradaException;
+use App\Servicios\Probadores\Probador;
 use App\Soporte\Cifrado;
 use App\Soporte\Logger;
 
@@ -18,11 +19,19 @@ use App\Soporte\Logger;
  */
 final class CredencialesAes implements Credenciales
 {
+    /** @var array<string,Probador> por clave de servicio */
+    private array $probadores = [];
+
+    /** @param list<Probador> $probadores */
     public function __construct(
         private readonly BD $bd,
         private readonly Cifrado $cifrado,
         private readonly Logger $log,
+        array $probadores = [],
     ) {
+        foreach ($probadores as $probador) {
+            $this->probadores[$probador->servicio()] = $probador;
+        }
     }
 
     public function obtener(string $servicio, string $clave, string $entorno = 'produccion'): string
@@ -101,16 +110,49 @@ final class CredencialesAes implements Credenciales
     /**
      * Conectividad real contra el proveedor.
      *
-     * Etapa 0: la infraestructura de auditoría y registro está lista, pero los
-     * probadores concretos llegan con cada integración — Wompi en la Etapa 3,
-     * Chatwoot y Evolution en la 2, el LLM en la 4. Registrar un `ok: true`
-     * inventado sería peor que no tener el botón.
+     * El probador recibe las credenciales ya descifradas y nunca toca la base
+     * ni el cifrado. El valor descifrado vive en memoria lo justo y **no
+     * aparece en el resultado**: lo que vuelve al panel es un booleano y un
+     * mensaje redactado.
      *
-     * @return array{ok:bool,mensaje:string}
+     * @return array{ok:bool,mensaje:string,detalle?:array<string,mixed>}
      */
     public function probar(string $servicio, string $entorno): array
     {
-        $resultado = ['ok' => false, 'mensaje' => "Todavía no hay probador para «{$servicio}»."];
+        $probador = $this->probadores[$servicio] ?? null;
+
+        if ($probador === null) {
+            // Sin probador no se escribe `ultima_prueba_ok`: dejar un rojo
+            // registrado por una integración que aún no llega confundiría más
+            // que ayudar.
+            return [
+                'ok' => false,
+                'mensaje' => "Todavía no hay probador para «{$servicio}». "
+                    . 'Chatwoot y Evolution llegan en la Etapa 2, el LLM en la 4.',
+            ];
+        }
+
+        try {
+            $credenciales = [];
+            foreach ($probador->clavesRequeridas() as $clave) {
+                $credenciales[$clave] = $this->obtener($servicio, $clave, $entorno);
+            }
+        } catch (CredencialNoEncontradaException $e) {
+            return ['ok' => false, 'mensaje' => 'Faltan credenciales por guardar: ' . $e->getMessage()];
+        }
+
+        try {
+            $resultado = $probador->probar($credenciales, $entorno);
+        } catch (\Throwable $e) {
+            // Un probador que revienta no puede tumbar el panel, y su mensaje
+            // podría llevar la credencial dentro.
+            $this->log->error('credenciales.probador_fallido', [
+                'servicio' => $servicio,
+                'excepcion' => $e::class,
+            ]);
+
+            $resultado = ['ok' => false, 'mensaje' => 'El probador falló de forma inesperada. Revisar el log.'];
+        }
 
         $stmt = $this->bd->pdo()->prepare(
             'UPDATE credenciales SET ultima_prueba_en = UTC_TIMESTAMP(), ultima_prueba_ok = ?

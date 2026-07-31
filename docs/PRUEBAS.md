@@ -243,9 +243,14 @@ composer test:golden       # conjunto dorado contra el LLM real (cuesta dinero)
 }
 ```
 
-Base de datos de pruebas separada (`pedro_pruebas`), recreada desde
-`db/schema.sql` en cada corrida. **Nunca** apuntar las pruebas a producción: hay un
-test que verifica que `DB_NAME` termine en `_pruebas` y aborta si no.
+Base de datos de pruebas separada (`pedro_pruebas`), recreada en cada corrida
+aplicando `db/migraciones/` con `App\Core\Migrador` — el mismo runner que el
+despliegue. Lo hace `tests/CasoBaseBd::recrear()`: elimina todas las tablas y
+migra desde cero, así que una migración que falle rompe las pruebas antes que
+la producción.
+
+**Nunca** apuntar las pruebas a producción: `tests/arranque.php` verifica que
+`DB_NAME` termine en `_pruebas` y aborta el arranque si no.
 
 ---
 

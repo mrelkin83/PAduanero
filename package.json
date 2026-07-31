@@ -5,7 +5,10 @@
   "license": "UNLICENSED",
   "description": "Compilación del CSS de la landing. Es la única razón por la que este proyecto tiene node: no hay framework de front ni JavaScript de build.",
   "scripts": {
-    "build:css": "tailwindcss -i resources/css/app.css -o public/css/app.css --minify",
+    "build": "npm run build:landing && npm run build:panel",
+    "build:landing": "tailwindcss -i resources/css/app.css -o public/css/app.css --minify",
+    "build:panel": "tailwindcss -i resources/css/panel.css -o public/css/panel.css --minify",
+    "build:css": "npm run build",
     "watch:css": "tailwindcss -i resources/css/app.css -o public/css/app.css --watch"
   },
   "devDependencies": {

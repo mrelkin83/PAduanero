@@ -87,11 +87,82 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Soporte\Http::class,
+            static fn (): \App\Soporte\Http => new \App\Soporte\Http(),
+        );
+
+        $this->contenedor->registrar(
             Credenciales::class,
             static fn (Contenedor $c): Credenciales => new CredencialesAes(
                 $c->obtener(BD::class),
                 $c->obtener(Cifrado::class),
                 $c->obtener(Logger::class),
+                [
+                    // Los probadores llegan con su integración: Wompi en la
+                    // Etapa 3, Chatwoot y Evolution en la 2, el LLM en la 4.
+                    new \App\Servicios\Probadores\ProbadorWompi($c->obtener(\App\Soporte\Http::class)),
+                ],
+            ),
+        );
+
+        // ── Panel (Etapa 3) ──────────────────────────────────────────────
+        $this->contenedor->registrar(
+            \App\Repositorios\UsuarioRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\UsuarioRepo => new \App\Repositorios\UsuarioRepo(
+                $c->obtener(BD::class),
+                $c->obtener(Cifrado::class),
+            ),
+        );
+
+        $this->contenedor->registrar(
+            \App\Repositorios\SesionRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\SesionRepo
+                => new \App\Repositorios\SesionRepo($c->obtener(BD::class)),
+        );
+
+        $this->contenedor->registrar(
+            \App\Repositorios\IntentoAccesoRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\IntentoAccesoRepo
+                => new \App\Repositorios\IntentoAccesoRepo($c->obtener(BD::class)),
+        );
+
+        $this->contenedor->registrar(
+            \App\Repositorios\AuditoriaRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\AuditoriaRepo
+                => new \App\Repositorios\AuditoriaRepo($c->obtener(BD::class)),
+        );
+
+        $this->contenedor->registrar(
+            \App\Repositorios\CredencialRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\CredencialRepo
+                => new \App\Repositorios\CredencialRepo($c->obtener(BD::class)),
+        );
+
+        $this->contenedor->registrar(
+            \App\Servicios\Permisos::class,
+            static fn (Contenedor $c): \App\Servicios\Permisos
+                => new \App\Servicios\Permisos($c->obtener(BD::class)),
+        );
+
+        $this->contenedor->registrar(
+            \App\Servicios\Autenticacion::class,
+            static fn (Contenedor $c): \App\Servicios\Autenticacion => new \App\Servicios\Autenticacion(
+                $c->obtener(\App\Repositorios\UsuarioRepo::class),
+                $c->obtener(\App\Repositorios\SesionRepo::class),
+                $c->obtener(\App\Repositorios\IntentoAccesoRepo::class),
+                $c->obtener(\App\Repositorios\AuditoriaRepo::class),
+                (int) (Entorno::obtener('SESSION_DURACION_MIN', '120') ?? '120'),
+            ),
+        );
+
+        $this->contenedor->registrar(
+            \App\Servicios\ChatwootAgentes::class,
+            static fn (Contenedor $c): \App\Servicios\ChatwootAgentes => new \App\Servicios\ChatwootAgentes(
+                $c->obtener(\App\Soporte\Http::class),
+                $c->obtener(Logger::class),
+                rtrim(Entorno::obtener('CHATWOOT_URL', '') ?? '', '/'),
+                Entorno::obtener('CHATWOOT_ACCOUNT_ID', '1') ?? '1',
+                Entorno::obtener('CHATWOOT_BOT_TOKEN', '') ?? '',
             ),
         );
 
@@ -143,6 +214,16 @@ final class Aplicacion
             return $this->contenedor->obtener(Seo::class)->sitemap();
         });
 
+        // El panel entero cuelga de un solo patrón; el enrutado fino lo hace
+        // App\Panel\Panel, que además aplica sesión, CSRF y permisos antes de
+        // llegar a ningún módulo.
+        foreach (['', '/{a}', '/{a}/{b}', '/{a}/{b}/{c}'] as $sufijo) {
+            $patron = '/panel' . $sufijo;
+
+            $this->router->get($patron, fn (Peticion $p): Respuesta => $this->panel($p));
+            $this->router->post($patron, fn (Peticion $p): Respuesta => $this->panel($p));
+        }
+
         $this->router->post('/api/evento', function (Peticion $peticion): Respuesta {
             // Endpoint público y de escritura. Se responde 204 pase lo que
             // pase: decirle a un cliente que su evento se descartó no le
@@ -176,6 +257,11 @@ final class Aplicacion
                 'momento' => Fechas::ahora()->format('c'),
             ], $bd ? 200 : 503);
         });
+    }
+
+    private function panel(Peticion $peticion): Respuesta
+    {
+        return (new \App\Panel\Panel($this->contenedor))->manejar($peticion);
     }
 
     public function manejar(Peticion $peticion): Respuesta

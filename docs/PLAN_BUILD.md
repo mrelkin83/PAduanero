@@ -4,6 +4,31 @@
 > avanza a la siguiente sin cerrar la anterior.** Al arrancar cada sesión, Claude
 > Code debe leer `CLAUDE.md`, `docs/CONTRATOS.md` y este archivo.
 
+## Dos estados por etapa
+
+Varias etapas dependen de credenciales de terceros o de infraestructura que
+solo el PO puede tocar. Eso no es una excepción ni un bloqueo: es cómo son
+estas etapas. Se distinguen dos estados, con dueños distintos:
+
+| Estado | Qué significa | Quién lo declara |
+|---|---|---|
+| **Código completo** | Todo el artefacto de repositorio hecho, probado y verificable | Claude Code |
+| **Etapa cerrada** | El criterio de cierre verificado en el entorno real | El PO, tras ejecutar la lista manual |
+
+Aplica a las etapas **2, 3, 5 y 6**. Las etapas 0, 1, 4, 7 y 8 se cierran de
+una sola vez porque no dependen de nada externo.
+
+Cada etapa con dos estados entrega una **lista de verificación manual** con
+casillas, y donde sea posible un script que compruebe la parte automatizable
+(`bin/verificar-canales.php` para la 2, y el equivalente en cada una).
+
+Consecuencia práctica: «código completo» no autoriza a pasar a la etapa
+siguiente si esta depende funcionalmente de la anterior. La Etapa 3 se puede
+construir sobre una Etapa 2 no cerrada porque no la necesita corriendo; la
+Etapa 4 sí necesita los canales vivos.
+
+---
+
 ## Regla de supervisión
 
 Requieren aprobación explícita del PO antes de ejecutarse:
@@ -85,6 +110,10 @@ tocar código, y las reservas vivas conservan el precio congelado en
 
 **Cierre:** Pedro entra al panel, guarda las credenciales de Wompi, pulsa **Probar
 conexión** y obtiene verde. La bitácora registra cada cambio con su autor.
+
+El verde depende de credenciales de comercio reales, así que esta etapa tiene
+dos estados. Lista de verificación manual en `docs/CIERRE_ETAPA_3.md`; la
+parte automatizable, en `composer test:criticas` y `node bin/verificar-panel.mjs`.
 
 ---
 
