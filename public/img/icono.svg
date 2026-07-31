@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Sello de tinta sobre papel: la marca de la página en 32 px.
+       Dos filetes y una inicial, como la cabecera de un acto administrativo. -->
+  <rect width="32" height="32" rx="3" fill="#16213A"/>
+  <rect x="7" y="7" width="18" height="1.5" fill="#E8A33D"/>
+  <rect x="7" y="10" width="18" height="1" fill="#E8A33D"/>
+  <text x="16" y="25" font-family="ui-monospace, Consolas, monospace" font-size="13"
+        font-weight="700" fill="#F2F3F1" text-anchor="middle">PA</text>
+</svg>

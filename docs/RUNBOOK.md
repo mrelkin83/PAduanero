@@ -267,6 +267,14 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
+    # El endpoint de métricas es público y escribe en base. El tope por
+    # sesión de `MetricasLanding` frena los bucles del JavaScript, pero no a
+    # quien rote el identificador a propósito: eso se ataja aquí.
+    location = /api/evento {
+        limit_req zone=eventos burst=20 nodelay;
+        try_files $uri /index.php$is_args$args;
+    }
+
     # El .env lleva MASTER_KEY y PEPPER_TELEFONO.
     location ~ ^/(src|db|docs|bin|tests|storage|motor|vendor|\.git|\.env) {
         deny all;
@@ -285,8 +293,31 @@ server {
 }
 ```
 
+La zona del `limit_req` se declara fuera del `server`, en el `http {}` de
+`nginx.conf`:
+
+```nginx
+limit_req_zone $binary_remote_addr zone=eventos:10m rate=30r/m;
+```
+
 El `.htaccess` del repositorio hace lo mismo para el Apache de desarrollo
-(Laragon). En el VPS no se usa.
+(Laragon). En el VPS no se usa. Para el servidor embebido de PHP existe
+`bin/servidor-dev.php`, que no lee ninguno de los dos.
+
+### Certificado TLS
+
+```bash
+apt install certbot python3-certbot-nginx
+certbot --nginx -d pedroabogadoaduanero.com -d www.pedroabogadoaduanero.com
+systemctl status certbot.timer      # la renovación automática debe estar activa
+```
+
+Comprobar que renueva **antes** de que haga falta; un certificado vencido deja
+la landing inaccesible y los anuncios de Meta siguen pagando clics:
+
+```bash
+certbot renew --dry-run
+```
 
 ---
 
@@ -298,11 +329,19 @@ php bin/mantenimiento.php on          # el bot avisa que hay mantenimiento
 git pull --ff-only
 composer install --no-dev --optimize-autoloader
 php bin/migrar.php                    # migraciones idempotentes
+rm -f storage/cache/landing.html      # el HTML de la landing se regenera solo
 systemctl restart pedro-outbox
 systemctl reload php8.2-fpm
 php bin/mantenimiento.php off
 bin/salud.sh
 ```
+
+**El VPS no necesita node.** `public/css/app.css` y las variantes AVIF/WebP de
+`public/img/` se versionan ya compiladas. Se regeneran en la máquina de
+desarrollo con `npm run build:css` y `php bin/optimizar-imagenes.php`, y se
+commitean. Instalar node y Tailwind en producción para regenerar en cada
+despliegue añadiría una dependencia de red y un punto de fallo a cambio de
+nada.
 
 Nunca desplegar viernes por la tarde ni con asesorías agendadas en la hora
 siguiente. Antes de cualquier migración de esquema: respaldo manual.

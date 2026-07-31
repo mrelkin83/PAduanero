@@ -1,0 +1,17 @@
+{
+  "name": "pedro-aduanero",
+  "version": "1.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Compilación del CSS de la landing. Es la única razón por la que este proyecto tiene node: no hay framework de front ni JavaScript de build.",
+  "scripts": {
+    "build:css": "tailwindcss -i resources/css/app.css -o public/css/app.css --minify",
+    "watch:css": "tailwindcss -i resources/css/app.css -o public/css/app.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "lighthouse": "^13.4.1",
+    "puppeteer-core": "^25.4.0",
+    "tailwindcss": "^4.3.3"
+  }
+}

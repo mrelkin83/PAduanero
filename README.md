@@ -71,6 +71,27 @@ bin/salud.sh
 Las migraciones sustituyen a cargar los `.sql` a mano: llevan control de versión y
 verifican el hash de cada archivo ya aplicado.
 
+### Landing (Etapa 1)
+
+```bash
+npm install
+npm run build:css                      # → public/css/app.css, se incrusta en el <head>
+php bin/optimizar-imagenes.php         # variantes AVIF/WebP; solo al subir fotos nuevas
+
+php -S 127.0.0.1:8000 bin/servidor-dev.php   # el servidor embebido no lee .htaccess
+```
+
+Node existe **solo** para compilar el CSS. No hay framework de front ni
+JavaScript de build: `public/js/landing.js` es vanilla y se sirve tal cual.
+
+Verificación del rendimiento y de la atribución, con el Chrome ya instalado:
+
+```bash
+node bin/auditar-landing.mjs           # Lighthouse móvil, peso y desbordamiento
+node bin/verificar-atribucion.mjs      # un clic en WhatsApp registra su utm_campaign
+node bin/capturar.mjs                  # capturas en móvil y escritorio
+```
+
 ### Pruebas
 
 ```bash

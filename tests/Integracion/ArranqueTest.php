@@ -85,8 +85,12 @@ final class ArranqueTest extends TestCase
 
         $respuesta = $app->manejar(new Peticion(metodo: 'GET', ruta: '/'));
 
+        // Esta prueba mira el arranque, no la landing: afirmar sobre textos
+        // concretos la ataría al contenido editable desde el panel y la haría
+        // fallar cada vez que Pedro cambie un titular.
         self::assertSame(200, $respuesta->estado);
-        self::assertStringContainsString('Etapa 0', $respuesta->cuerpo);
+        self::assertStringStartsWith('<!doctype html>', trim($respuesta->cuerpo));
+        self::assertStringContainsString('lang="es-CO"', $respuesta->cuerpo);
     }
 
     #[Test]

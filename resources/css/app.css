@@ -1,0 +1,217 @@
+@import "tailwindcss";
+
+@source "../../plantillas/**/*.php";
+@source "../../src/Soporte/Vista.php";
+
+/* =====================================================================
+   Sistema visual — Pedro, abogado aduanero y tributario
+   ---------------------------------------------------------------------
+   El mundo de la aduana es un mundo de documentos: el acta de aprehensión,
+   la declaración de importación, la subpartida arancelaria, el radicado.
+   Todo va codificado, numerado y con casillas. De ahí sale la paleta —
+   tinta de sello sobre papel de oficio — y de ahí sale el uso de la
+   monoespaciada para todo lo que es administrativamente real: los tipos de
+   caso, el precio, la numeración de los pasos.
+
+   Dos acentos, cada uno dueño de una superficie:
+     · rojo de sello sobre papel   (la almohadilla de tinta oficial)
+     · ámbar sobre tinta           (las lámparas de sodio del puerto,
+                                    que ya están en la foto del hero)
+
+   Cero fuentes web: el criterio de cierre pide LCP < 2 s y «sin fuentes
+   bloqueantes». La personalidad tipográfica sale del tratamiento —escala,
+   peso, tracking y el contraste sans/mono— no de descargar una familia.
+   ===================================================================== */
+
+@theme {
+  --color-tinta: #16213A;
+  --color-tinta-alta: #0E1628;
+  --color-tinta-suave: #9AA6B8;
+
+  --color-papel: #F2F3F1;
+  --color-papel-puro: #FBFBFA;
+
+  --color-sello: #B4341F;
+  --color-ambar: #E8A33D;
+  --color-acero: #5A6478;
+
+  /* Verde de WhatsApp, oscurecido. Se conserva el color porque la gente lo
+     reconoce y sabe qué aplicación va a abrir —eso pesa más que la coherencia
+     cromática en el único botón que hay que pulsar—, pero el tono de marca
+     (#25D366) y su versión oscura (#128C4A) dan 2.4:1 y 4.3:1 con texto
+     blanco, ambos por debajo del 4.5:1 que exige la WCAG AA. Este da 5.2:1. */
+  --color-whatsapp: #0F7D42;
+  --color-whatsapp-hover: #0B6234;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --text-eyebrow: 0.6875rem;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  body {
+    background-color: var(--color-papel);
+    color: var(--color-tinta);
+    font-family: var(--font-sans);
+    line-height: 1.65;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* El foco tiene que verse sobre las dos superficies. */
+  :focus-visible {
+    outline: 2px solid var(--color-sello);
+    outline-offset: 3px;
+  }
+  .sobre-tinta :focus-visible {
+    outline-color: var(--color-ambar);
+  }
+}
+
+@layer components {
+  /* --- Rótulo monoespaciado ------------------------------------------
+     El «eyebrow». Va en mono porque etiqueta, y en este mundo las
+     etiquetas son códigos. */
+  .rotulo {
+    font-family: var(--font-mono);
+    font-size: var(--text-eyebrow);
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-sello);
+  }
+  .sobre-tinta .rotulo { color: var(--color-ambar); }
+
+  /* --- Titulares -----------------------------------------------------
+     Tracking negativo y line-height apretado: a tamaño grande el texto
+     por defecto se ve suelto y blando, y esto es un despacho de litigio. */
+  .titular {
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+
+  .titular-seccion {
+    font-weight: 700;
+    letter-spacing: -0.018em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  /* --- La regla de sello ---------------------------------------------
+     Doble filete, como la cabecera de un acto administrativo. Es el
+     elemento que se repite y cose la página. */
+  .filete {
+    border: 0;
+    height: 3px;
+    width: 3.5rem;
+    background-image: linear-gradient(
+      to bottom,
+      var(--color-sello) 0 1px,
+      transparent 1px 2px,
+      var(--color-sello) 2px 3px
+    );
+  }
+  .sobre-tinta .filete {
+    background-image: linear-gradient(
+      to bottom,
+      var(--color-ambar) 0 1px,
+      transparent 1px 2px,
+      var(--color-ambar) 2px 3px
+    );
+  }
+
+  /* --- Índice de situaciones (elemento distintivo) --------------------
+     Se lee como el índice de un arancel: filas monoespaciadas separadas
+     por filetes finos. El lector busca SU situación en la lista, y esa
+     búsqueda es justo el paso previo a escribir. */
+  .indice-fila {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.5rem 0 0.5rem 0.875rem;
+    border-top: 1px solid color-mix(in srgb, var(--color-acero) 22%, transparent);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    position: relative;
+  }
+
+  /* Marcador de sello: aparece a la izquierda, como quien va tachando la
+     lista hasta encontrarse. */
+  .indice-fila::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.85rem;
+    width: 0.3125rem;
+    height: 0.3125rem;
+    background-color: var(--color-sello);
+    opacity: 0.32;
+    transition: opacity 140ms ease, transform 140ms ease;
+  }
+  .indice-fila:hover::before {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+
+  /* --- Botón de WhatsApp ---------------------------------------------- */
+  .boton-wa {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    background-color: var(--color-whatsapp);
+    color: #fff;
+    font-weight: 650;
+    font-size: 1rem;
+    line-height: 1.2;
+    padding: 0.9375rem 1.5rem;
+    border-radius: 2px;
+    text-align: center;
+    transition: background-color 140ms ease, transform 140ms ease;
+  }
+  .boton-wa:hover { background-color: var(--color-whatsapp-hover); }
+  .boton-wa:active { transform: translateY(1px); }
+
+  .boton-fantasma {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    padding: 0.9375rem 0.25rem;
+    color: var(--color-tinta);
+    border-bottom: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+    transition: border-color 140ms ease;
+  }
+  .boton-fantasma:hover { border-bottom-color: currentColor; }
+  .sobre-tinta .boton-fantasma { color: var(--color-papel); }
+
+  /* --- Casilla numerada del proceso -----------------------------------
+     Numerada porque el contenido SÍ es una secuencia: primero escribe,
+     luego agenda, luego envía documentos, luego recibe la hoja de ruta.
+     El orden es información que el lector necesita. Va con cero a la
+     izquierda y filete superior, como las casillas de un formulario. */
+  .casilla-num {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--color-ambar);
+  }
+}

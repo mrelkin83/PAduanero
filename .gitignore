@@ -14,8 +14,11 @@
 !/storage/logs/.gitkeep
 !/storage/cache/.gitkeep
 /storage/config.sentinel
+/storage/landing.sentinel
+/storage/capturas/
 
-/public/css/app.css
+# app.css SÍ se versiona: va incrustado en el HTML y el despliegue no corre
+# npm. Ver docs/RUNBOOK.md §5.
 /public/build/
 
 # PHPUnit 11 usa un directorio, no el .phpunit.result.cache de la 10.

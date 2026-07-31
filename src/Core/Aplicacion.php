@@ -9,6 +9,9 @@ use App\Servicios\Config;
 use App\Servicios\ConfigMysql;
 use App\Servicios\Credenciales;
 use App\Servicios\CredencialesAes;
+use App\Servicios\Landing;
+use App\Servicios\MetricasLanding;
+use App\Servicios\Seo;
 use App\Soporte\Cifrado;
 use App\Soporte\Entorno;
 use App\Soporte\Fechas;
@@ -91,18 +94,69 @@ final class Aplicacion
                 $c->obtener(Logger::class),
             ),
         );
+
+        $urlBase = rtrim(Entorno::obtener('APP_URL', '') ?? '', '/');
+
+        $this->contenedor->registrar(
+            Seo::class,
+            static fn (Contenedor $c): Seo => new Seo(
+                $c->obtener(BD::class),
+                $c->obtener(Config::class),
+                $urlBase,
+            ),
+        );
+
+        $this->contenedor->registrar(
+            Landing::class,
+            static fn (Contenedor $c): Landing => new Landing(
+                $c->obtener(BD::class),
+                $c->obtener(Config::class),
+                $c->obtener(Seo::class),
+                $urlBase,
+                $raiz . '/storage/cache/landing.html',
+                $raiz . '/storage/landing.sentinel',
+                $raiz . '/public/css/app.css',
+            ),
+        );
+
+        $this->contenedor->registrar(
+            MetricasLanding::class,
+            static fn (Contenedor $c): MetricasLanding => new MetricasLanding(
+                $c->obtener(BD::class),
+                $c->obtener(Config::class),
+            ),
+        );
     }
 
-    /**
-     * Etapa 0: solo lo que hace falta para verificar que el andamio está en
-     * pie. La landing llega en la Etapa 1 y el panel en la 3.
-     */
+    /** El panel llega en la Etapa 3; hasta entonces solo landing y salud. */
     private function registrarRutas(): void
     {
         $this->router->get('/', function (): Respuesta {
-            return Respuesta::vista('bienvenida', [
-                'entorno' => Entorno::obtener('APP_ENV', 'produccion'),
-            ]);
+            return $this->contenedor->obtener(Landing::class)->responder();
+        });
+
+        $this->router->get('/robots.txt', function (): Respuesta {
+            return $this->contenedor->obtener(Seo::class)->robots();
+        });
+
+        $this->router->get('/sitemap.xml', function (): Respuesta {
+            return $this->contenedor->obtener(Seo::class)->sitemap();
+        });
+
+        $this->router->post('/api/evento', function (Peticion $peticion): Respuesta {
+            // Endpoint público y de escritura. Se responde 204 pase lo que
+            // pase: decirle a un cliente que su evento se descartó no le
+            // sirve de nada, y decírselo a quien sondea el endpoint le
+            // regala información sobre los filtros.
+            try {
+                $this->contenedor->obtener(MetricasLanding::class)->registrar($peticion->json());
+            } catch (\Throwable $e) {
+                $this->contenedor->obtener(Logger::class)->warn('landing.evento_fallido', [
+                    'excepcion' => $e::class,
+                ]);
+            }
+
+            return new Respuesta('', 204);
         });
 
         $this->router->get('/salud', function (): Respuesta {

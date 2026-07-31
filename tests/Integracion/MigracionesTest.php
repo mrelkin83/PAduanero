@@ -152,8 +152,4 @@ final class MigracionesTest extends CasoBaseBd
         return (int) $stmt->fetchColumn() > 0;
     }
 
-    protected function limpiar(): void
-    {
-        // Esta clase comprueba las semillas: vaciar las tablas las borraría.
-    }
 }

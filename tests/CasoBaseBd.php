@@ -46,10 +46,58 @@ abstract class CasoBaseBd extends TestCase
 
         if (!self::$migrada) {
             $this->recrear();
+            $this->capturarSemillas();
             self::$migrada = true;
         }
 
         $this->limpiar();
+        $this->restaurarSemillas();
+    }
+
+    /**
+     * Tablas de semillas que las pruebas modifican y hay que devolver a su
+     * sitio.
+     *
+     * No se vacían en `limpiar()` porque son la configuración del negocio, no
+     * datos de prueba — pero eso significa que un `set()` o un `DELETE` de
+     * una prueba sobrevive a la siguiente, y el fallo aparece en otra clase.
+     * Se guarda una copia justo después de migrar y se restaura entre casos.
+     */
+    private const TABLAS_SEMILLA = ['configuraciones', 'landing_bloques'];
+
+    /** @var array<string,list<array<string,mixed>>> */
+    private static array $semillas = [];
+
+    private function capturarSemillas(): void
+    {
+        foreach (self::TABLAS_SEMILLA as $tabla) {
+            self::$semillas[$tabla] = $this->bd->pdo()
+                ->query("SELECT * FROM `{$tabla}`")
+                ->fetchAll();
+        }
+    }
+
+    private function restaurarSemillas(): void
+    {
+        $pdo = $this->bd->pdo();
+
+        foreach (self::$semillas as $tabla => $filas) {
+            $pdo->exec("DELETE FROM `{$tabla}`");
+
+            if ($filas === []) {
+                continue;
+            }
+
+            $columnas = array_keys($filas[0]);
+            $lista = implode(', ', array_map(static fn (string $c): string => "`{$c}`", $columnas));
+            $huecos = implode(', ', array_fill(0, count($columnas), '?'));
+
+            $stmt = $pdo->prepare("INSERT INTO `{$tabla}` ({$lista}) VALUES ({$huecos})");
+
+            foreach ($filas as $fila) {
+                $stmt->execute(array_values($fila));
+            }
+        }
     }
 
     /** Deja la base vacía y vuelve a aplicar las migraciones desde cero. */
@@ -82,7 +130,7 @@ abstract class CasoBaseBd extends TestCase
             'pagos', 'consultas', 'caso_partes', 'casos', 'consentimientos',
             'conversacion_estado', 'contactos', 'eventos_outbox', 'auditoria',
             'credenciales', 'sesiones', 'usuarios', 'intentos_acceso',
-            'configuraciones_historial', 'secuencias',
+            'configuraciones_historial', 'secuencias', 'eventos_landing',
             'kb_chunks', 'kb_documentos', 'consumo_ia',
         ] as $tabla) {
             $pdo->exec('TRUNCATE TABLE `' . $tabla . '`');

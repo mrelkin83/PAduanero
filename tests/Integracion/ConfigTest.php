@@ -16,31 +16,11 @@ final class ConfigTest extends CasoBaseBd
     private string $sentinela;
     private string $cache;
 
-    /**
-     * Valores sembrados que estas pruebas modifican.
-     *
-     * `configuraciones` es tabla de semillas: `limpiar()` no la vacía, porque
-     * es la configuración del negocio y no datos de prueba. Eso significa que
-     * un `set()` de una prueba sobrevive a la siguiente, así que hay que
-     * devolverlos a su sitio a mano.
-     *
-     * @var array<string,string>
-     */
-    private const SEMBRADOS = [
-        'motor_ia_pausado' => 'false',
-        'minutos_reserva_pago' => '45',
-        'pasarela_activa' => '"wompi"',
-        'max_turnos_ia' => '40',
-    ];
-
     protected function setUp(): void
     {
+        // `CasoBaseBd` restaura las semillas de `configuraciones` entre
+        // casos, así que cada prueba arranca con los valores sembrados.
         parent::setUp();
-
-        $stmt = $this->bd->pdo()->prepare('UPDATE configuraciones SET valor = ? WHERE clave = ?');
-        foreach (self::SEMBRADOS as $clave => $valor) {
-            $stmt->execute([$valor, $clave]);
-        }
 
         $sufijo = bin2hex(random_bytes(4));
         $this->sentinela = sys_get_temp_dir() . "/pedro-sentinela-{$sufijo}";
