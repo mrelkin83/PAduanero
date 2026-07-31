@@ -5,6 +5,10 @@
 !.env.example
 !.env.pruebas.example
 
+# Los .env de Chatwoot y Evolution llevan SECRET_KEY_BASE, la llave de la API
+# de WhatsApp y las contraseñas de SMTP. Solo se versionan las plantillas.
+/infra/*/.env
+
 /vendor/
 /node_modules/
 

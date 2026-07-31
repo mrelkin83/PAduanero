@@ -40,6 +40,9 @@ hay que construir el puente.
 
 - Licencia: MIT para el núcleo. El directorio `enterprise/` va bajo licencia
   comercial separada y requiere suscripción en producción — **no usarlo**.
+  En la práctica esto se traduce en una sola cosa: la imagen de Docker debe ser
+  la **community edition**, con etiqueta terminada en `-ce`. La etiqueta por
+  defecto (`chatwoot/chatwoot:latest`) incluye el código `enterprise/`.
 - Requisitos: Linux, PostgreSQL, Redis, ≥2 vCPU y ≥4 GB RAM. Presupuestar 4 GB solo
   para Chatwoot; el motor y Evolution van aparte.
 - Captain AI (la capa de IA propia de Chatwoot) se mide en créditos de pago:
@@ -75,23 +78,73 @@ sin acceso a la base de clientes y con `allowFrom` limitado a su número**.
 
 ### 1.3 Evolution API — ADOPTAR
 
-Evolution API es la pasarela de WhatsApp. Código bajo Apache 2.0. Desde las
-versiones recientes (API 2.4.0+, y Go) exige una **activación de licencia
-gratuita** en el primer arranque: no hay cobro, ni límite de instancias, ni de
-mensajes, ni feature flags. Lo que sí hay es fricción operativa que conviene
-prever:
+Evolution API es la pasarela de WhatsApp. Código bajo Apache 2.0.
 
-- Los endpoints devuelven 503 hasta activar, y el servicio envía heartbeats
-  periódicos al servidor de licenciamiento. Eso significa una dependencia de red
-  externa en el arranque.
-- La activación manual por el Manager rompe despliegues automatizados. Usar
-  `EVOLUTION_OPERATOR_EMAIL` para la autoactivación headless y documentarlo en el
-  runbook, o el primer reinicio no supervisado deja el WhatsApp caído.
+**Decisión (2026-07-31, cierre de la acción previa a la Etapa 2): se adopta,
+pineada en `evoapicloud/evolution-api:v2.3.7`.**
 
-**Acción antes de Fase 2:** leer el LICENSE de la versión exacta a
-instalar y decidir. Alternativas 100 % libres si la licencia no convence:
-`evolution-api-lite` (solo conectividad, sin integración nativa con Chatwoot — habría
-que escribir el puente), o construir directo sobre `whatsmeow` (Go) o Baileys (Node).
+Al ir a fijar la versión apareció el dato que reordena todo el análisis: **la
+2.4.0 todavía no existe como estable.** Solo hay `2.4.0-rc1` y `2.4.0-rc2`,
+marcadas por el propio proyecto como «validation only; do not deploy to
+production». La última estable es **v2.3.7** (diciembre de 2025), que es
+**anterior a la 2.4.0 y por tanto no pide activación de licencia en absoluto**.
+
+Consecuencia práctica: en la Etapa 2 el problema de la activación **no
+existe**. La maquinaria para tratarlo se deja montada igualmente —el
+`EVOLUTION_OPERATOR_EMAIL` en la plantilla, la distinción del 503 en
+`bin/salud.sh` y en `bin/verificar-canales.php`, el procedimiento en
+`docs/DESPLIEGUE_CANALES.md` §2.1— porque el día que la 2.4.0 salga estable y
+haya que subir, todo eso hace falta y nadie se acordará de escribirlo.
+
+**Lo que sí hay que vigilar es lo contrario: la antigüedad.** Baileys sigue el
+protocolo de WhatsApp, que cambia sin avisar, y una versión que envejece
+termina perdiendo la conexión sin arreglo posible salvo actualizar. v2.3.7
+lleva ya unos meses. **Revisar cada mes si la 2.4.0 salió estable** y planear
+la subida en ventana acordada — momento en el que la activación pasa a ser
+relevante y la mitigación de abajo, obligatoria.
+
+Se descartó `evolution-go`: exige activación **y no tiene integración nativa
+con Chatwoot**, que es justamente la razón por la que se eligió Evolution
+(§1.1). Sin ese puente habría que escribirlo, y eso es meses de trabajo para
+volver al punto de partida.
+
+Sobre la licencia en sí, verificado contra la documentación de Evolution
+Foundation por si se llega a la 2.4.0:
+
+| Punto | Estado |
+|---|---|
+| Coste | Gratis. Sin límite de instancias, mensajes ni funciones |
+| Licencia del código | Apache 2.0, y lo ya publicado bajo ella lo sigue estando |
+| Kill switch remoto | **No existe** |
+| Servidor de licencias caído | La instancia **sigue operando**; el cliente reintenta con backoff |
+| Operación sin red | Tras la activación inicial, los heartbeats fallan en silencio |
+| Datos enviados | Correo, teléfono, UUID de instancia, versión, conteos agregados, IP. **Nunca** mensajes, contactos ni credenciales |
+
+Eso corrige una suposición de la v1.0 de este documento: los heartbeats **no**
+son una dependencia de red en cada arranque, y una caída del servidor de
+licenciamiento no tumba el WhatsApp.
+
+**El riesgo real, cuando se llegue a la 2.4.0:** la activación se pide una sola
+vez por instancia, pero al **recrear el contenedor** (actualización de imagen,
+reinicio del orquestador, volumen perdido) la API queda devolviendo 503 hasta
+que alguien entre al Manager a activarla a mano. Mitigación obligatoria a
+partir de esa versión, en este orden:
+
+1. Volumen persistente para el estado de la instancia. Si sobrevive, no se
+   vuelve a pedir activación.
+2. Etiqueta de imagen **fija**, nunca `latest`: una actualización desatendida
+   es la forma más probable de recrear el contenedor sin supervisión.
+3. `EVOLUTION_OPERATOR_EMAIL` para la autoactivación headless. Requiere que
+   ese correo se haya registrado **una vez** manualmente; si falla, cae de
+   vuelta al flujo manual sin abortar.
+4. `bin/salud.sh` distingue el estado «pendiente de activación» del resto de
+   fallos, porque el remedio es distinto.
+
+Alternativas 100 % libres si algún día la licencia deja de convencer:
+`evolution-api-lite` (solo conectividad, sin integración nativa con Chatwoot —
+habría que escribir el puente), o construir directo sobre `whatsmeow` (Go) o
+Baileys (Node). No se toman hoy: todas cuestan el puente con Chatwoot, y en
+v2.3.7 ni siquiera hay licencia que esquivar.
 
 **Riesgo transversal de WhatsApp Web:** Baileys/whatsmeow no son API oficiales de
 Meta. Un número puede ser bloqueado. Para un negocio cuyo centro es WhatsApp, esto

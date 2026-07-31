@@ -243,7 +243,20 @@ respaldo de anoche exista y pese lo razonable.
 **Mensual (1 h).** **Restauración de prueba** en entorno aparte (ver `RESPALDOS.md`
 §5) — un respaldo no probado no es un respaldo. Revisión de logs de acceso al
 panel. Rotación de credenciales que estén por vencer. Actualización de Chatwoot y
-Evolution en ventana acordada con Pedro, nunca en día hábil por la mañana.
+Evolution en ventana acordada con Pedro, nunca en día hábil por la mañana y
+**siempre subiendo la etiqueta a mano en el compose**, nunca con `latest`.
+
+Y tres comprobaciones de los canales, todas de fallo silencioso:
+
+- `php bin/verificar-canales.php`: las cuatro bandejas siguen ahí.
+- **Instagram y Messenger**: los tokens de Meta caducan y la bandeja deja de
+  recibir sin avisar. Se reconecta desde Chatwoot.
+- **¿Salió ya la 2.4.0 estable de Evolution?**
+  `https://github.com/evolution-foundation/evolution-api/releases`.
+  Estamos en v2.3.7, que es la última estable pero envejece: Baileys sigue el
+  protocolo de WhatsApp y quedarse atrás acaba en conexión caída. Al subir,
+  esa versión **sí** pide activación de licencia: leer `CLAUDE.md` §1.3 y
+  poner `EVOLUTION_OPERATOR_EMAIL` **después** de registrar el correo a mano.
 
 ---
 
@@ -275,8 +288,9 @@ server {
         try_files $uri /index.php$is_args$args;
     }
 
-    # El .env lleva MASTER_KEY y PEPPER_TELEFONO.
-    location ~ ^/(src|db|docs|bin|tests|storage|motor|vendor|\.git|\.env) {
+    # El .env lleva MASTER_KEY y PEPPER_TELEFONO; infra/ lleva las plantillas
+    # de Chatwoot y Evolution.
+    location ~ ^/(src|db|docs|bin|tests|storage|motor|infra|resources|vendor|node_modules|\.git|\.env) {
         deny all;
         return 404;
     }

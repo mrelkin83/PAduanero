@@ -55,15 +55,31 @@ else mal "Chatwoot no responde"; fi
 # --- WhatsApp --------------------------------------------------------
 echo
 echo "WhatsApp (Evolution)"
-ESTADO=$(curl -sf -m 10 -H "apikey: ${EVOLUTION_API_KEY}" \
-  "${EVOLUTION_URL}/instance/connectionState/${EVOLUTION_INSTANCE}" 2>/dev/null \
-  | jq -r '.instance.state // .state // "desconocido"' 2>/dev/null || echo "sin_respuesta")
 
-case "$ESTADO" in
-  open)  ok "instancia conectada" ;;
-  close|connecting) mal "WhatsApp DESCONECTADO (estado: ${ESTADO}) — ver RUNBOOK §3.1" ;;
-  *)     mal "Evolution no responde o requiere activación de licencia (${ESTADO})" ;;
-esac
+# El código HTTP se mira aparte del cuerpo: un 503 no es «desconectado», es
+# «licencia sin activar», y el remedio es otro (CLAUDE.md §1.3). Confundirlos
+# manda a alguien a buscar un QR cuando lo que hay que hacer es entrar al
+# Manager.
+HTTP=$(curl -s -o /tmp/pedro-evolution.json -w '%{http_code}' -m 10 \
+  -H "apikey: ${EVOLUTION_API_KEY}" \
+  "${EVOLUTION_URL}/instance/connectionState/${EVOLUTION_INSTANCE}" 2>/dev/null || echo "000")
+
+if [[ "$HTTP" == "503" ]]; then
+  mal "LICENCIA SIN ACTIVAR (503): el contenedor se recreó. Activar en /manager y revisar EVOLUTION_OPERATOR_EMAIL — CLAUDE.md §1.3"
+elif [[ "$HTTP" == "000" ]]; then
+  mal "Evolution no responde en ${EVOLUTION_URL}"
+elif [[ "$HTTP" != "200" ]]; then
+  mal "Evolution devolvió HTTP ${HTTP}"
+else
+  ESTADO=$(jq -r '.instance.state // .state // "desconocido"' /tmp/pedro-evolution.json 2>/dev/null || echo "desconocido")
+  case "$ESTADO" in
+    open)       ok "instancia conectada" ;;
+    connecting) mal "WhatsApp CONECTANDO: falta escanear el QR — ver RUNBOOK §3.1" ;;
+    close)      mal "WhatsApp DESCONECTADO — ver RUNBOOK §3.1" ;;
+    *)          mal "WhatsApp en estado «${ESTADO}» — ver RUNBOOK §3.1" ;;
+  esac
+fi
+rm -f /tmp/pedro-evolution.json
 
 # --- Outbox ----------------------------------------------------------
 echo

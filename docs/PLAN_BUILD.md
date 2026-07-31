@@ -60,8 +60,15 @@ Evolution API desplegado con número dedicado, integración nativa con Chatwoot,
 Instagram y Messenger conectados, widget web enlazado a la misma cuenta, alertas
 por correo.
 
+**Procedimiento completo: `docs/DESPLIEGUE_CANALES.md`.** Los compose están en
+`infra/`, listos para copiar a `/opt/chatwoot` y `/opt/evolution`.
+
 **Cierre:** un mensaje enviado por cada uno de los cuatro canales aparece en la
 bandeja de Chatwoot y Pedro puede responder desde un solo lugar. Sin IA todavía.
+
+La parte automatizable la comprueba `php bin/verificar-canales.php`. La otra
+—enviar un mensaje real por cada canal— necesita un teléfono y las cuentas de
+Meta, así que la hace una persona: lista en `DESPLIEGUE_CANALES.md` §7.
 
 ---
 

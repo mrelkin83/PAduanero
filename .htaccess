@@ -27,7 +27,7 @@
     Require all denied
 </FilesMatch>
 
-RedirectMatch 404 ^/(src|db|docs|bin|tests|storage|motor|vendor|\.git)(/|$)
+RedirectMatch 404 ^/(src|db|docs|bin|tests|storage|motor|infra|resources|vendor|node_modules|\.git)(/|$)
 
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options "nosniff"
