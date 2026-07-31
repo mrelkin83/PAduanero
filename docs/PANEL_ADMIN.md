@@ -22,11 +22,17 @@ Punto de contacto: el panel muestra, en la ficha de cada caso, un enlace directo
 al hilo de Chatwoot (`https://chat.pedroabogadoaduanero.com/app/accounts/1/conversations/{id}`).
 No se embebe ni se replica. Un clic y estás en la bandeja.
 
-**ADR-005 — Runtime del panel.** El panel corre en el mismo proceso Node que el
-motor, sobre el mismo Postgres. Razón: comparten `configuraciones`, `credenciales`
-y la capa `db/queries`. Montarlo en PHP obligaría a duplicar el cifrado de
-credenciales, la invalidación de caché y toda la capa de datos, con dos fuentes de
-verdad sobre los mismos secretos. *Decisión pendiente de confirmación del PO.*
+**ADR-009 — Runtime del panel.** El panel corre en el **mismo proceso PHP** que el
+motor y la landing, sobre la **misma base MySQL**. Razón: comparten
+`configuraciones`, `credenciales` y la capa `src/Repositorios/`. Separarlos
+obligaría a duplicar el cifrado de credenciales, la invalidación de caché y toda
+la capa de datos, con dos fuentes de verdad sobre los mismos secretos.
+
+> Este ADR decía "mismo proceso Node, mismo Postgres" y estaba marcado como
+> pendiente de confirmación. Lo resolvió el **ADR-005** de `CLAUDE.md`
+> (PHP 8.2+ / MySQL 8) el 2026-07-31; el argumento de no duplicar la capa de datos
+> sobrevive intacto, solo cambia el runtime. Se renumeró de ADR-005 a ADR-009
+> porque ese número ya estaba tomado por la decisión de stack.
 
 ---
 
@@ -74,6 +80,8 @@ Listado de transacciones con estado y conciliación.
 
 ### 2.6 Base de conocimiento
 Alta de documentos (tipo de fuente, referencia normativa, URL oficial, vigencia).
+La búsqueda es MySQL: prefiltro FULLTEXT y coseno en PHP sobre `kb_chunks`
+(ADR-005). No hay `pgvector`.
 Cola de verificación: ningún chunk entra al RAG sin `verificado_por` del abogado.
 Buscador de prueba: escribir una consulta y ver qué fragmentos recuperaría el
 motor, con su puntaje de similitud. Sirve para depurar respuestas raras.
@@ -91,7 +99,9 @@ filas. Añadir un parámetro nuevo es un `INSERT`, no un cambio de código.
 Historial de cambios visible: quién cambió qué, cuándo y por qué.
 
 ### 2.9 Usuarios y auditoría
-Alta de usuarios con rol. Al crear un usuario con rol `abogado` o `asistente`, el
+El primer `super_admin` no se crea desde aquí — el panel todavía no es accesible
+cuando hace falta. Se crea por consola con `bin/crear-usuario.php`, una sola vez.
+De ahí en adelante, alta de usuarios con rol. Al crear un usuario con rol `abogado` o `asistente`, el
 panel aprovisiona el agente correspondiente en Chatwoot vía API — una sola alta,
 no dos. 2FA obligatorio para `super_admin` y `abogado`.
 Bitácora consultable de `auditoria` y `configuraciones_historial`.
@@ -134,7 +144,10 @@ Dos asimetrías deliberadas:
 2. Sesiones en base con hash del token; nunca el token en claro. Rotación al
    cambiar contraseña. Revocación remota desde el panel.
 3. Bloqueo tras 5 intentos fallidos, con espera creciente.
-4. Rate limit por IP en login y en el webhook de pagos.
+4. Rate limit por IP en login y en el webhook de pagos, contra la tabla
+   `intentos_acceso`. `usuarios.intentos_fallidos` cuenta por cuenta y no cubre
+   esto: quien prueba mil contraseñas contra mil usuarios distintos nunca dispara
+   el bloqueo de la regla 3.
 5. CSRF en todo formulario. CSP estricta. Cookies `HttpOnly`, `Secure`, `SameSite=Lax`.
 6. El panel se sirve en subdominio propio (`panel.pedroabogadoaduanero.com`) y,
    si es viable, restringido por IP o detrás de VPN. No comparte origen con la landing.
@@ -148,7 +161,7 @@ Dos asimetrías deliberadas:
 ## 5. Landing pública
 
 Estáticamente generada o renderizada en servidor desde `landing_bloques` y
-`articulos`, con caché agresiva. La landing **no** consulta Postgres en cada visita
+`articulos`, con caché agresiva. La landing **no** consulta MySQL en cada visita
 ni carga JavaScript del panel.
 
 Requisitos de rendimiento (son criterio de aceptación, no aspiración):

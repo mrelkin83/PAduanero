@@ -1,9 +1,19 @@
 -- =====================================================================
--- PEDRO ABOGADO — Esquema del Motor Conversacional
--- MySQL 8.0.13+ · InnoDB · utf8mb4_0900_ai_ci
+-- 0001 — Esquema del Motor Conversacional
+-- MySQL 8.0.16+ · InnoDB · utf8mb4_0900_ai_ci
+--
+-- Se aplica con `php bin/migrar.php`, que lleva el control en la tabla
+-- `migraciones` y aborta si el contenido de un archivo ya aplicado cambió
+-- (ADR-013). Editar este archivo después de aplicarlo NO lo reaplica: hay que
+-- crear una migración nueva.
+--
+-- La versión mínima es 8.0.16, no 8.0.13: `DEFAULT (UUID())` existe desde
+-- 8.0.13, pero MySQL ignoraba silenciosamente las restricciones CHECK hasta
+-- 8.0.16, y `ck_horarios_dia` es una de ellas. En 8.0.13 el esquema se crea
+-- sin error y la restricción sencillamente no protege nada.
 --
 -- NOTAS DE CONVERSIÓN DESDE POSTGRES (leer antes de tocar nada):
---  · UUID → CHAR(36) con DEFAULT (UUID()). Requiere MySQL 8.0.13+.
+--  · UUID → CHAR(36) con DEFAULT (UUID()).
 --  · JSONB → JSON. TIMESTAMPTZ → DATETIME en UTC (la app convierte a Bogotá).
 --  · MySQL NO tiene índices únicos parciales. Se emulan con columnas
 --    generadas STORED que valen NULL cuando la condición no aplica, ya que
@@ -21,7 +31,7 @@ SET time_zone = '+00:00';
 -- ---------------------------------------------------------------------
 -- 1. CONTACTOS
 -- ---------------------------------------------------------------------
-CREATE TABLE contactos (
+CREATE TABLE IF NOT EXISTS contactos (
   id                  CHAR(36)     NOT NULL DEFAULT (UUID()),
   chatwoot_contact_id BIGINT       NULL,
   telefono            VARCHAR(20)  NOT NULL,
@@ -46,7 +56,7 @@ CREATE TABLE contactos (
 -- ---------------------------------------------------------------------
 -- 2. CONSENTIMIENTOS (Ley 1581 de 2012)
 -- ---------------------------------------------------------------------
-CREATE TABLE consentimientos (
+CREATE TABLE IF NOT EXISTS consentimientos (
   id               CHAR(36)    NOT NULL DEFAULT (UUID()),
   contacto_id      CHAR(36)    NOT NULL,
   version_politica VARCHAR(20) NOT NULL,
@@ -64,7 +74,7 @@ CREATE TABLE consentimientos (
 -- ---------------------------------------------------------------------
 -- 3. CASOS
 -- ---------------------------------------------------------------------
-CREATE TABLE casos (
+CREATE TABLE IF NOT EXISTS casos (
   id                  CHAR(36)     NOT NULL DEFAULT (UUID()),
   contacto_id         CHAR(36)     NOT NULL,
   radicado_interno    VARCHAR(20)  NULL,
@@ -97,7 +107,7 @@ CREATE TABLE casos (
     REFERENCES contactos(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE caso_partes (
+CREATE TABLE IF NOT EXISTS caso_partes (
   id        CHAR(36)     NOT NULL DEFAULT (UUID()),
   caso_id   CHAR(36)     NOT NULL,
   rol       ENUM('cliente','contraparte','tercero') NOT NULL,
@@ -112,7 +122,7 @@ CREATE TABLE caso_partes (
 -- ---------------------------------------------------------------------
 -- 4. AGENDA
 -- ---------------------------------------------------------------------
-CREATE TABLE modalidades_asesoria (
+CREATE TABLE IF NOT EXISTS modalidades_asesoria (
   id            CHAR(36)    NOT NULL DEFAULT (UUID()),
   nombre        VARCHAR(80) NOT NULL,
   descripcion   TEXT        NULL,
@@ -125,7 +135,7 @@ CREATE TABLE modalidades_asesoria (
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE horarios (
+CREATE TABLE IF NOT EXISTS horarios (
   id          CHAR(36)   NOT NULL DEFAULT (UUID()),
   dia_semana  TINYINT    NOT NULL,      -- 0=domingo … 6=sábado
   hora_inicio TIME       NOT NULL,
@@ -136,7 +146,7 @@ CREATE TABLE horarios (
   CONSTRAINT ck_horarios_dia CHECK (dia_semana BETWEEN 0 AND 6)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE bloqueos (
+CREATE TABLE IF NOT EXISTS bloqueos (
   id          CHAR(36)     NOT NULL DEFAULT (UUID()),
   fecha       DATE         NOT NULL,
   hora_inicio TIME         NOT NULL,
@@ -147,7 +157,7 @@ CREATE TABLE bloqueos (
   KEY ix_bloqueos_fecha (fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE consultas (
+CREATE TABLE IF NOT EXISTS consultas (
   id             CHAR(36) NOT NULL DEFAULT (UUID()),
   caso_id        CHAR(36) NOT NULL,
   contacto_id    CHAR(36) NOT NULL,
@@ -157,8 +167,9 @@ CREATE TABLE consultas (
   hora_fin       TIME     NOT NULL,
   estado         ENUM('reservada','pagada','realizada','cancelada','no_asistio','expirada')
                  NOT NULL DEFAULT 'reservada',
-  precio_cop     BIGINT   NOT NULL,   -- congelado al reservar: si sube la tarifa,
-                                      -- las reservas vivas conservan su precio
+  precio_cop     BIGINT   NOT NULL,   -- PESOS (ADR-010), congelado al reservar:
+                                      -- si sube la tarifa, las reservas vivas
+                                      -- conservan su precio
   reserva_expira DATETIME NULL,
   enlace_reunion TEXT     NULL,
   notas_internas TEXT     NULL,
@@ -167,7 +178,12 @@ CREATE TABLE consultas (
 
   -- Emulación del índice único parcial de Postgres.
   -- Vale NULL salvo cuando la consulta está viva; MySQL admite NULLs repetidos
-  -- en UNIQUE, así que solo bloquea el solapamiento real.
+  -- en UNIQUE.
+  --
+  -- SEGUNDA línea de defensa, no la única (ADR-015). Solo bloquea horas de
+  -- inicio idénticas: 14:00-15:00 y 14:30-15:30 no lo violan. La primera línea
+  -- es la validación de solapamiento con FOR UPDATE en ConsultaRepo::reservar().
+  -- No se elimina.
   slot_unico CHAR(20) GENERATED ALWAYS AS (
     IF(estado IN ('reservada','pagada','realizada'),
        CONCAT(fecha, 'T', hora_inicio), NULL)
@@ -186,7 +202,7 @@ CREATE TABLE consultas (
 -- ---------------------------------------------------------------------
 -- 5. PAGOS
 -- ---------------------------------------------------------------------
-CREATE TABLE pagos (
+CREATE TABLE IF NOT EXISTS pagos (
   id               CHAR(36)    NOT NULL DEFAULT (UUID()),
   consulta_id      CHAR(36)    NOT NULL,
   pasarela         VARCHAR(20) NOT NULL,
@@ -209,7 +225,7 @@ CREATE TABLE pagos (
 -- ---------------------------------------------------------------------
 -- 6. ESTADO CONVERSACIONAL
 -- ---------------------------------------------------------------------
-CREATE TABLE conversacion_estado (
+CREATE TABLE IF NOT EXISTS conversacion_estado (
   id                CHAR(36)    NOT NULL DEFAULT (UUID()),
   chatwoot_conv_id  BIGINT      NOT NULL,
   contacto_id       CHAR(36)    NULL,
@@ -244,7 +260,7 @@ CREATE TABLE conversacion_estado (
 --    Si esto creciera a decenas de miles de chunks, la salida es Qdrant en
 --    Docker, no reescribir el motor.
 -- ---------------------------------------------------------------------
-CREATE TABLE kb_documentos (
+CREATE TABLE IF NOT EXISTS kb_documentos (
   id             CHAR(36)     NOT NULL DEFAULT (UUID()),
   titulo         VARCHAR(250) NOT NULL,
   area           ENUM('aduanero','tributario','ambos') NOT NULL DEFAULT 'aduanero',
@@ -259,7 +275,7 @@ CREATE TABLE kb_documentos (
   KEY ix_kb_doc_vigente (vigente, area)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE kb_chunks (
+CREATE TABLE IF NOT EXISTS kb_chunks (
   id              CHAR(36)    NOT NULL DEFAULT (UUID()),
   documento_id    CHAR(36)    NOT NULL,
   orden           INT         NOT NULL,
@@ -278,7 +294,7 @@ CREATE TABLE kb_chunks (
 -- ---------------------------------------------------------------------
 -- 8. OUTBOX
 -- ---------------------------------------------------------------------
-CREATE TABLE eventos_outbox (
+CREATE TABLE IF NOT EXISTS eventos_outbox (
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   tipo          VARCHAR(50) NOT NULL,
   payload       JSON        NOT NULL,
@@ -293,9 +309,23 @@ CREATE TABLE eventos_outbox (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ---------------------------------------------------------------------
--- 9. AUDITORÍA
+-- 9. SECUENCIAS  (radicado interno, ADR-014)
+--    Formato PA-YYYY-NNNNNN, consecutivo por año reiniciando cada enero.
+--    Se toma con SELECT ... FOR UPDATE dentro de la misma transacción que
+--    inserta el caso. Nunca MAX(id)+1: con dos mensajes concurrentes entrega
+--    el mismo radicado dos veces y el UNIQUE de casos.radicado_interno hace
+--    fallar la creación del caso en plena conversación.
 -- ---------------------------------------------------------------------
-CREATE TABLE auditoria (
+CREATE TABLE IF NOT EXISTS secuencias (
+  anio   SMALLINT UNSIGNED NOT NULL,
+  ultimo INT UNSIGNED      NOT NULL DEFAULT 0,
+  PRIMARY KEY (anio)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- ---------------------------------------------------------------------
+-- 10. AUDITORÍA
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS auditoria (
   id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   entidad    VARCHAR(40) NOT NULL,
   entidad_id CHAR(36)    NULL,

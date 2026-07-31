@@ -1,6 +1,6 @@
 -- =====================================================================
--- PANEL ADMINISTRATIVO — MySQL 8.0.13+
--- Ejecutar DESPUÉS de db/schema.sql (misma base).
+-- 0002 — PANEL ADMINISTRATIVO — MySQL 8.0.16+
+-- Se aplica después de 0001_motor.sql, sobre la misma base.
 --
 -- El panel NO reimplementa la bandeja de conversaciones: eso es Chatwoot.
 -- Aquí vive lo que Chatwoot no sabe.
@@ -11,7 +11,7 @@ SET NAMES utf8mb4;
 -- ---------------------------------------------------------------------
 -- 1. USUARIOS Y ROLES
 -- ---------------------------------------------------------------------
-CREATE TABLE roles (
+CREATE TABLE IF NOT EXISTS roles (
   id          SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
   clave       VARCHAR(30) NOT NULL,
   nombre      VARCHAR(60) NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE roles (
   UNIQUE KEY ux_roles_clave (clave)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE permisos (
+CREATE TABLE IF NOT EXISTS permisos (
   id     SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
   clave  VARCHAR(60) NOT NULL,     -- 'config.credenciales.escribir'
   modulo VARCHAR(30) NOT NULL,
@@ -28,7 +28,7 @@ CREATE TABLE permisos (
   UNIQUE KEY ux_permisos_clave (clave)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE roles_permisos (
+CREATE TABLE IF NOT EXISTS roles_permisos (
   rol_id     SMALLINT UNSIGNED NOT NULL,
   permiso_id SMALLINT UNSIGNED NOT NULL,
   PRIMARY KEY (rol_id, permiso_id),
@@ -36,7 +36,7 @@ CREATE TABLE roles_permisos (
   CONSTRAINT fk_rp_permiso FOREIGN KEY (permiso_id) REFERENCES permisos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE usuarios (
+CREATE TABLE IF NOT EXISTS usuarios (
   id                  CHAR(36)     NOT NULL DEFAULT (UUID()),
   email               VARCHAR(180) NOT NULL,
   nombre              VARCHAR(150) NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE usuarios (
   CONSTRAINT fk_usuarios_rol FOREIGN KEY (rol_id) REFERENCES roles(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE sesiones (
+CREATE TABLE IF NOT EXISTS sesiones (
   id          CHAR(36)   NOT NULL DEFAULT (UUID()),
   usuario_id  CHAR(36)   NOT NULL,
   token_hash  CHAR(64)   NOT NULL,      -- SHA-256 del token; nunca el token
@@ -74,7 +74,7 @@ CREATE TABLE sesiones (
 -- ---------------------------------------------------------------------
 -- 2. CONFIGURACIÓN TIPADA
 -- ---------------------------------------------------------------------
-CREATE TABLE configuraciones (
+CREATE TABLE IF NOT EXISTS configuraciones (
   clave             VARCHAR(80)  NOT NULL,
   valor             JSON         NOT NULL,
   tipo              ENUM('texto','entero','decimal','booleano','json','fecha','lista') NOT NULL,
@@ -93,7 +93,7 @@ CREATE TABLE configuraciones (
   KEY ix_config_grupo (grupo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE configuraciones_historial (
+CREATE TABLE IF NOT EXISTS configuraciones_historial (
   id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   clave          VARCHAR(80) NOT NULL,
   valor_anterior JSON        NULL,
@@ -109,15 +109,24 @@ CREATE TABLE configuraciones_historial (
 -- 3. CREDENCIALES
 --    AES-256-GCM con clave maestra en variable de entorno. NUNCA en base.
 --    La UI es de solo escritura: al leer devuelve mascara, jamás el valor.
+--
+--    `valor_cifrado` lleva el blob completo (ADR-011):
+--        v1 ‖ nonce(12) ‖ tag(16) ‖ ciphertext
+--    Por eso no hay columnas `nonce` ni `tag`: eran un segundo camino de código
+--    para lo mismo. El formato empaquetado es el que ya usaban por fuerza
+--    `contactos.nit_cifrado` y `usuarios.totp_secret_cifrado`, que nunca
+--    tuvieron columnas propias para el nonce.
+--
+--    `key_version` NO es el byte `v1`. key_version dice qué clave maestra
+--    cifró el dato y lo mueve rotarClaveMaestra(); el byte dice qué layout
+--    tiene el blob. Rotan por razones distintas y en momentos distintos.
 -- ---------------------------------------------------------------------
-CREATE TABLE credenciales (
+CREATE TABLE IF NOT EXISTS credenciales (
   id               CHAR(36)    NOT NULL DEFAULT (UUID()),
   servicio         VARCHAR(40) NOT NULL,
   entorno          ENUM('produccion','pruebas') NOT NULL DEFAULT 'produccion',
   clave            VARCHAR(60) NOT NULL,
   valor_cifrado    VARBINARY(2048) NOT NULL,
-  nonce            VARBINARY(16)   NOT NULL,
-  tag              VARBINARY(16)   NOT NULL,
   mascara          VARCHAR(40) NOT NULL,
   key_version      SMALLINT    NOT NULL DEFAULT 1,
   activo           TINYINT(1)  NOT NULL DEFAULT 1,
@@ -133,7 +142,7 @@ CREATE TABLE credenciales (
 -- ---------------------------------------------------------------------
 -- 4. PROVEEDORES Y MODELOS DE IA
 -- ---------------------------------------------------------------------
-CREATE TABLE proveedores_ia (
+CREATE TABLE IF NOT EXISTS proveedores_ia (
   id            CHAR(36)    NOT NULL DEFAULT (UUID()),
   clave         VARCHAR(30) NOT NULL,
   nombre        VARCHAR(80) NOT NULL,
@@ -146,7 +155,7 @@ CREATE TABLE proveedores_ia (
   UNIQUE KEY ux_prov_clave (clave)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE modelos_ia (
+CREATE TABLE IF NOT EXISTS modelos_ia (
   id                   CHAR(36)     NOT NULL DEFAULT (UUID()),
   proveedor_id         CHAR(36)     NOT NULL,
   identificador        VARCHAR(120) NOT NULL,
@@ -172,7 +181,7 @@ CREATE TABLE modelos_ia (
   CONSTRAINT fk_modelo_prov FOREIGN KEY (proveedor_id) REFERENCES proveedores_ia(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE consumo_ia (
+CREATE TABLE IF NOT EXISTS consumo_ia (
   id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   modelo_id      CHAR(36)     NULL,
   caso_id        CHAR(36)     NULL,
@@ -191,7 +200,7 @@ CREATE TABLE consumo_ia (
 -- ---------------------------------------------------------------------
 -- 5. PROMPTS VERSIONADOS
 -- ---------------------------------------------------------------------
-CREATE TABLE prompts (
+CREATE TABLE IF NOT EXISTS prompts (
   id           CHAR(36)    NOT NULL DEFAULT (UUID()),
   clave        VARCHAR(50) NOT NULL,
   version      INT         NOT NULL,
@@ -213,7 +222,7 @@ CREATE TABLE prompts (
 -- ---------------------------------------------------------------------
 -- 6. CONTENIDO DE LA LANDING
 -- ---------------------------------------------------------------------
-CREATE TABLE landing_bloques (
+CREATE TABLE IF NOT EXISTS landing_bloques (
   id              CHAR(36)     NOT NULL DEFAULT (UUID()),
   clave           VARCHAR(50)  NOT NULL,
   titulo          VARCHAR(250) NULL,
@@ -227,7 +236,7 @@ CREATE TABLE landing_bloques (
   UNIQUE KEY ux_bloques_clave (clave)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE articulos (
+CREATE TABLE IF NOT EXISTS articulos (
   id                   CHAR(36)     NOT NULL DEFAULT (UUID()),
   slug                 VARCHAR(180) NOT NULL,
   titulo               VARCHAR(250) NOT NULL,
@@ -252,7 +261,7 @@ CREATE TABLE articulos (
 -- ---------------------------------------------------------------------
 -- 7. MÉTRICAS DE ADQUISICIÓN
 -- ---------------------------------------------------------------------
-CREATE TABLE eventos_landing (
+CREATE TABLE IF NOT EXISTS eventos_landing (
   id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   sesion_hash  CHAR(64)     NOT NULL,   -- sin cookies identificables
   tipo         VARCHAR(30)  NOT NULL,   -- vista|scroll_50|click_whatsapp|envio_form
@@ -265,4 +274,26 @@ CREATE TABLE eventos_landing (
   creado_en    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY ix_eventos_landing (creado_en, tipo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- ---------------------------------------------------------------------
+-- 8. RATE LIMIT POR IP  (docs/PANEL_ADMIN.md §4.4)
+--    `usuarios.intentos_fallidos` cuenta por cuenta y no cubre esto: quien
+--    prueba mil contraseñas contra mil usuarios distintos nunca dispara el
+--    bloqueo por usuario. Aquí se cuenta por IP y por acción.
+--
+--    Se registran intentos, no sesiones. La IP es dato personal en la Ley
+--    1581 de 2012: la purga la hace bin/cron-expirar-reservas.php junto con
+--    lo demás, no se guarda indefinidamente.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS intentos_acceso (
+  id        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  ip        VARBINARY(16) NOT NULL,   -- INET6_ATON: sirve para IPv4 e IPv6
+  accion    ENUM('login','webhook_pago','recuperacion') NOT NULL,
+  exito     TINYINT(1)  NOT NULL DEFAULT 0,
+  usuario   VARCHAR(180) NULL,        -- email tanteado, para detectar barridos
+  creado_en DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY ix_intentos_ventana (ip, accion, creado_en),
+  KEY ix_intentos_purga (creado_en)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

@@ -13,7 +13,24 @@
  *      Evolution solo se usa para notificaciones internas al abogado.
  *   6. Prohibiciones jurídicas duras: nada de términos, plazos ni estrategia.
  *
- * Ver CLAUDE.md §7 (reglas inviolables) antes de tocar este archivo.
+ * Ver CLAUDE.md §4 (reglas inviolables) antes de tocar este archivo.
+ *
+ * ----------------------------------------------------------------------------
+ * ESTADO: referencia conceptual de la Etapa 4. Este archivo NO se ejecuta y NO
+ * se traduce literalmente — se reescribe idiomático como
+ * App\Motor\MotorConversacional (docs/PLAN_BUILD.md).
+ *
+ * Sabido desactualizado frente a la especificación vigente:
+ *   · TIPOS_CASO tiene 21 valores y ninguno tributario. El catálogo normativo
+ *     es CLAUDE.md §5, con las dos ramas.
+ *   · procesarFueraDeAlcance dice "exclusivamente a derecho aduanero", lo que
+ *     rechazaría clientes tributarios, que son negocio.
+ *   · El aviso de habeas data está incrustado en el código; debe leerse de
+ *     `texto_aviso_habeas_data` y la versión de `version_politica_datos`.
+ *   · Captura el código '23505' de Postgres; en MySQL es 1062 (ADR-005), y la
+ *     primera defensa es la validación de solapamiento (ADR-015).
+ *   · precio_cop * 100 asume pesos en la tabla: correcto (ADR-010), pero la
+ *     conversión debe vivir solo en Pagos::crearLink().
  * ============================================================================
  */
 
@@ -378,8 +395,11 @@ async function process({ chatwootConvId, chatwootContactId, telefono, mensaje, c
     const mensajeCompleto = buffered.textoConsolidado;
 
     // ── 4. Señal crítica: se escala sin pasar por el LLM ─────────────────
+    // Ojo al orden: esto corre ANTES del gate de consentimiento, a propósito
+    // (regla 5). Por eso escalarHumano() no puede persistir contenido: ver
+    // regla 14.
     if (detectarSenalCritica(mensajeCompleto)) {
-      await escalarHumano({ ctx, motivo: 'urgencia', textoOrigen: mensajeCompleto });
+      await escalarHumano({ ctx, motivo: 'urgencia' });
       return;
     }
 
@@ -721,7 +741,7 @@ async function procesarReagendarConsulta({ ctx, accion }) {
   await outbox.encolar('notificar_abogado', { tipo: 'reagendamiento', consultaId: consulta.id });
 }
 
-async function escalarHumano({ ctx, motivo, textoOrigen }) {
+async function escalarHumano({ ctx, motivo }) {
   const convId = ctx.estado.chatwoot_conv_id;
 
   await estadoQ.actualizar(ctx.estado.id, { estado: E.HUMANO, ia_activa: false, pausada_hasta: null });
@@ -729,13 +749,21 @@ async function escalarHumano({ ctx, motivo, textoOrigen }) {
   await chatwoot.cambiarPrioridad(convId, motivo === 'urgencia' ? 'urgent' : 'high');
   await chatwoot.asignarAlAbogado(convId);
 
+  // REGLA 14 (CLAUDE.md §4): sin consentimiento vigente, la notificación no
+  // lleva contenido del caso. Ni extracto, ni descripción, ni resumen.
+  // El texto que el contacto escribió ya está en Chatwoot, que es donde Pedro
+  // debe leerlo: copiarlo aquí lo replicaría en el outbox, en los logs de
+  // correo y en el WhatsApp personal de Pedro, sin autorización de nadie.
+  const hayConsentimiento = Boolean(ctx.consentimiento);
+
   await outbox.encolar('notificar_abogado', {
     tipo: 'escalamiento',
     motivo,
-    casoId: ctx.caso?.id || null,
-    contacto: ctx.contacto?.nombre || ctx.estado.contacto_id,
-    extracto: (textoOrigen || '').slice(0, 200),
+    casoId: hayConsentimiento ? (ctx.caso?.id || null) : null,
+    contactoId: ctx.contacto?.id || ctx.estado.contacto_id || null,
+    chatwootConvId: convId,
     urgente: motivo === 'urgencia'
+    // Sin `extracto` a propósito. El enlace al hilo lo arma el worker.
   });
 
   const mensaje = motivo === 'urgencia'

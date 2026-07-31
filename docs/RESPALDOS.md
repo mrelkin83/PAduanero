@@ -16,7 +16,7 @@ de forma diferente.
 | 2 | Postgres de Chatwoot | Docker `/opt/chatwoot` | Todo el historial de conversaciones con clientes. |
 | 3 | Sesión de Evolution | Volumen `/opt/evolution/instances` | Hay que reescanear el QR. Recuperable, pero deja WhatsApp caído mientras tanto. |
 | 4 | `/public/img` y adjuntos | Sistema de archivos | Fotos de Pedro y documentos subidos. |
-| 5 | **`MASTER_KEY` y `.env`** | Variable de entorno | **Irrecuperable.** Todas las credenciales cifradas se pierden. |
+| 5 | **`MASTER_KEY`, `PEPPER_TELEFONO` y `.env`** | Variable de entorno | **Irrecuperable.** Se pierden todas las credenciales cifradas y la búsqueda de contactos por hash de teléfono. |
 
 El punto 5 es el único que no se arregla con un restore, y por eso viaja por un
 camino separado (§4).
@@ -76,17 +76,26 @@ age -r "$AGE_CLAVE_PUBLICA" -o respaldo.tar.age respaldo.tar
 La clave **privada** de `age` no vive en el servidor. Vive donde tú puedas
 alcanzarla y el atacante no.
 
-### La MASTER_KEY
+### La MASTER_KEY y el PEPPER_TELEFONO
 
-No va en el respaldo automático. Nunca. Va por su propio camino:
+Ninguna de las dos va en el respaldo automático. Nunca. Van por su propio camino,
+y son las mismas tres copias para ambas:
 
 1. Copia en un gestor de contraseñas (1Password, Bitwarden, KeePass).
 2. Copia impresa en papel, en sobre cerrado, fuera de la oficina.
 3. Copia en poder de Pedro, no solo tuya. Si te pasa algo, el negocio no puede
    quedar sin acceso a sus propias credenciales.
 
-Se rota cada 12 meses con `Credenciales::rotarClaveMaestra()`, que re-cifra todo e
-incrementa `key_version`. Después de rotar, actualizar las tres copias.
+**Rotan distinto, y la diferencia importa:**
+
+| | `MASTER_KEY` | `PEPPER_TELEFONO` |
+|---|---|---|
+| Rotación | Cada 12 meses | **Nunca** |
+| Cómo | `Credenciales::rotarClaveMaestra()` re-cifra todo y sube `key_version` | No aplica |
+| Por qué | El cifrado es reversible: se puede descifrar con la vieja y re-cifrar con la nueva | Un hash no es reversible. Cambiarlo dejaría todos los `telefono_hash` huérfanos y la búsqueda por teléfono fallaría **en silencio** |
+
+Después de rotar la `MASTER_KEY`, actualizar las tres copias. El
+`PEPPER_TELEFONO` se guarda una vez y no se toca más.
 
 ---
 

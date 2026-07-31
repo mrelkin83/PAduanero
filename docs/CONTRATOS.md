@@ -17,8 +17,13 @@
 ├── index.php                 ← único punto de entrada (front controller)
 ├── .env                      ← fuera del control de versiones
 ├── composer.json
+├── CLAUDE.md  README.md
+├── docs/                     CONTRATOS, PANEL_ADMIN, PLAN_BUILD, PRUEBAS,
+│                             RUNBOOK, RESPALDOS
+├── motor/index.js            ← referencia conceptual de la Etapa 4, no se ejecuta
+├── storage/                  logs/  cache/  config.sentinel   (no versionado)
 ├── public/
-│   ├── img/                  ← fotos de Pedro (definido por el PO)
+│   ├── img/                  ← fotos de Pedro; se sirve como URL /img
 │   ├── css/  js/
 ├── src/
 │   ├── Core/                 Router, Request, Response, Container, Csrf
@@ -133,9 +138,19 @@ interface Pagos
 
     /**
      * Valida la firma contra el CUERPO CRUDO, no contra el JSON parseado.
+     * NO toca la base de datos: solo dice si la firma cuadra.
      * @return array{valido:bool,referencia:string,estado:string}
      */
     public function verificarWebhook(string $cuerpoCrudo, array $cabeceras): array;
+
+    /**
+     * Orquesta el webhook completo: llama a verificarWebhook() y, SOLO si la
+     * firma valida, registra el pago y confirma la consulta. Si no valida,
+     * no escribe nada en ninguna tabla.
+     * Idempotente por `pagos.referencia`: el mismo evento dos veces confirma una.
+     * @return array{valido:bool,procesado:bool,referencia:string,estado:string}
+     */
+    public function procesarWebhook(string $cuerpoCrudo, array $cabeceras): array;
 
     public function consultarEstado(string $referencia): array;
 }
@@ -143,6 +158,11 @@ interface Pagos
 
 Innegociable: el webhook es idempotente — recibir dos veces el mismo evento no
 confirma dos veces. Nunca se marca `pagada` sin `firma_verificada = 1`.
+
+**Unidades (ADR-010).** `crearLink()` es el único punto del sistema donde los pesos
+se convierten a centavos, y `pagos.monto_centavos` la única columna en centavos.
+`modalidades_asesoria.precio_cop` y `consultas.precio_cop` están en pesos enteros.
+Hay una prueba de nivel 1 que exige `40000000` para la modalidad sembrada.
 
 ---
 
@@ -214,6 +234,20 @@ $nonce, $tag)`. Nada casero. La clave maestra se lee de `MASTER_KEY` en el entor
 persiste en base de datos. `obtener()` nunca se expone por HTTP: la API del panel
 devuelve solo `mascara`.
 
+**Formato del blob (ADR-011).** Un solo layout para todo campo cifrado del sistema:
+
+```
+v1 ‖ nonce(12) ‖ tag(16) ‖ ciphertext
+```
+
+Lo produce y lo consume `App\Soporte\Cifrado`. Aplica a `credenciales.valor_cifrado`,
+`contactos.nit_cifrado` y `usuarios.totp_secret_cifrado`. Por eso `credenciales` ya
+no tiene columnas `nonce` ni `tag`: eran un segundo camino para lo mismo.
+
+`key_version` sobrevive y es otra cosa: dice **qué clave maestra** cifró el dato y lo
+mueve `rotarClaveMaestra()`. El byte `v1` dice **qué layout** tiene el blob. Rotan
+por razones distintas.
+
 ---
 
 ## `App\Servicios\Config`
@@ -229,10 +263,12 @@ interface Config
 }
 ```
 
-Caché en APCu con TTL de 60 s. `set()` valida tipo, rango y opciones contra la
-propia fila, escribe en `configuraciones_historial` e invalida la caché en todos
-los procesos (incluido el worker) tocando un archivo centinela cuyo `mtime` se
-compara al leer.
+Caché de dos niveles con TTL de 60 s: **APCu** si la extensión está disponible
+(obligatoria en el VPS: `pecl install apcu`), archivo en `storage/cache/` si no —
+ese fallback existe para el entorno de desarrollo en Windows, no para producción.
+`set()` valida tipo, rango y opciones contra la propia fila, escribe en
+`configuraciones_historial` e invalida la caché en todos los procesos (incluido el
+worker) tocando `storage/config.sentinel`, cuyo `mtime` se compara al leer.
 
 ---
 
@@ -250,23 +286,82 @@ Todo el SQL vive aquí y solo aquí, siempre con sentencias preparadas.
 | `ConsentimientoRepo` | `registrar` · `vigentePorContacto` · `revocar` |
 | `UsuarioRepo` | `crear` · `autenticar` · `porEmail` · `registrarAcceso` |
 
-**`reservar()` — punto crítico.** MySQL lanza el error **1062** (SQLSTATE 23000)
-cuando el índice único sobre la columna generada `slot_unico` bloquea una doble
-reserva. Hay que capturarlo así:
+**`reservar()` — punto crítico.** Dos defensas, en este orden (ADR-015):
 
 ```php
+$pdo->beginTransaction();
+
+// 1ª línea: solapamiento REAL, no solo coincidencia de hora de inicio.
+$vivas = $pdo->prepare(
+    'SELECT hora_inicio, hora_fin FROM consultas
+      WHERE fecha = ? AND estado IN (\'reservada\',\'pagada\',\'realizada\')
+      FOR UPDATE'
+);
+$vivas->execute([$fecha]);
+foreach ($vivas->fetchAll() as $v) {
+    if ($horaInicio < $v['hora_fin'] && $v['hora_inicio'] < $horaFin) {
+        $pdo->rollBack();
+        throw new SlotOcupadoException();
+    }
+}
+
+// 2ª línea: el índice único sobre `slot_unico`, por si algo se saltó la primera.
 try {
     $stmt->execute($params);
 } catch (\PDOException $e) {
+    $pdo->rollBack();
     if ($e->errorInfo[1] === 1062) {
         throw new SlotOcupadoException();
     }
     throw $e;
 }
+$pdo->commit();
 ```
 
 Ese `1062` es el equivalente MySQL del `23505` de Postgres. El motor traduce
 `SlotOcupadoException` a "ese horario se acaba de tomar".
+
+Por qué no basta el índice: `slot_unico` es `CONCAT(fecha,'T',hora_inicio)`, así que
+solo bloquea horas de inicio idénticas. Con una modalidad de 30 minutos creada
+desde el panel, 14:00–15:00 y 14:30–15:30 conviven sin violarlo. La comparación
+`(inicio_a < fin_b) AND (inicio_b < fin_a)` bajo `FOR UPDATE` es la que realmente
+protege; el índice es la red debajo.
+
+**`crear()` de `CasoRepo` — radicado (ADR-014).** Asigna `PA-YYYY-NNNNNN` dentro de
+la misma transacción que inserta el caso, tomando el consecutivo de
+`secuencias (anio, ultimo)` con `SELECT … FOR UPDATE`. Nunca `MAX(id)+1`: con dos
+mensajes concurrentes entrega el mismo radicado dos veces y el `UNIQUE` de
+`casos.radicado_interno` revienta la creación en plena conversación.
+
+**`crear()` de `ContactoRepo` — hash (ADR-012).** `telefono_hash` se calcula con
+`Cifrado::hashTelefono()`, que es `HMAC-SHA256` con `PEPPER_TELEFONO`. Nunca con
+`sha256()` a secas.
+
+---
+
+## `App\Soporte\Cifrado`
+
+```php
+final class Cifrado
+{
+    /** Devuelve el blob v1 ‖ nonce(12) ‖ tag(16) ‖ ciphertext */
+    public function cifrar(string $claro): string;
+
+    /** @throws CifradoException si el tag no valida (dato alterado o clave errónea) */
+    public function descifrar(string $blob): string;
+
+    /** HMAC-SHA256 con PEPPER_TELEFONO. Determinista: sirve para buscar. */
+    public function hashTelefono(string $telefonoE164): string;
+
+    /** '…123' — los últimos 3 caracteres. Lo único que puede salir por HTTP. */
+    public static function mascara(string $valor): string;
+}
+```
+
+Se construye con `MASTER_KEY` y `PEPPER_TELEFONO` ya decodificadas. Si cualquiera
+de las dos falta o no mide 32 bytes, el constructor lanza
+`ConfiguracionFatalException` y la aplicación no arranca. Es deliberado: arrancar
+sin ellas significaría escribir datos que nadie podrá volver a leer.
 
 ---
 
@@ -303,3 +398,10 @@ compilada en el servidor.
 8. Capturar `23505` en vez de `1062`: esto es MySQL, no Postgres.
 9. Usar un ORM o un framework completo. PDO y clases propias.
 10. Concatenar variables en SQL. Sentencias preparadas, siempre.
+11. Multiplicar o dividir por 100 fuera de `Pagos::crearLink()`. Los pesos son
+    pesos en todo el sistema menos en `pagos.monto_centavos` (ADR-010).
+12. Hashear el teléfono con `sha256()` a secas, o derivar `PEPPER_TELEFONO` de
+    `MASTER_KEY`. Rotar la clave maestra dejaría todos los hashes huérfanos y la
+    búsqueda por hash fallaría en silencio (ADR-012).
+13. Confiar solo en el índice `slot_unico` para evitar la doble reserva. Es la
+    segunda línea; la primera es la validación de solapamiento (ADR-015).

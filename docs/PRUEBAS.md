@@ -24,6 +24,7 @@ Fallo aquí = no se despliega, aunque el cliente esté esperando.
 | Verificación de firma del webhook | Sin esto, cualquiera confirma pagos gratis |
 | Cifrado y descifrado de credenciales | Si falla, se pierden todas las llaves |
 | Que la API nunca devuelva una credencial en claro | Fuga directa |
+| Conversión pesos → centavos en `crearLink()` | Un factor 100 cobra $40 M o $4.000 |
 | Gate de consentimiento antes de persistir | Ley 1581 de 2012 |
 | Filtro de la base de conocimiento (solo verificados) | El bot citaría material sin revisar |
 
@@ -109,7 +110,7 @@ public function testDosReservasSimultaneasSoloUnaSobrevive(): void
         $pid = pcntl_fork();
         if ($pid === 0) {
             try { $this->consultaRepo->reservar($mismosDatos); exit(0); }
-            catch (SlotOcupadaException) { exit(1); }
+            catch (SlotOcupadoException) { exit(1); }
         }
         $pids[] = $pid;
     }
@@ -123,6 +124,27 @@ public function testDosReservasSimultaneasSoloUnaSobrevive(): void
 Lo que se está verificando de fondo es que la columna generada `slot_unico` y su
 índice único siguen ahí. Si alguien los elimina "porque MySQL se quejó", esta
 prueba lo detecta.
+
+### Solapamiento parcial
+
+El caso anterior solo cubre horas de inicio idénticas, que es lo único que el
+índice sabe frenar. Este cubre lo que el índice **no** ve y que solo detiene la
+validación de rango de `reservar()` (ADR-015):
+
+```php
+public function testSolapamientoParcialSeRechaza(): void
+{
+    $this->consultaRepo->reservar([... 'horaInicio' => '14:00:00', 'horaFin' => '15:00:00']);
+
+    $this->expectException(SlotOcupadoException::class);
+    $this->consultaRepo->reservar([... 'horaInicio' => '14:30:00', 'horaFin' => '15:30:00']);
+}
+```
+
+Hoy, con una sola modalidad de 60 minutos alineada en punto, este escenario no se
+da. Aparece en cuanto alguien cree desde el panel una modalidad de otra duración,
+que es exactamente cuando nadie se acordará de esta prueba. Por eso está escrita
+antes de que haga falta.
 
 ---
 
@@ -155,6 +177,28 @@ public function testFirmaSeValidaSobreElCuerpoCrudo(): void
     $this->assertFalse($r['valido']);
 }
 ```
+
+---
+
+## 4 bis. Unidades de dinero
+
+Una sola prueba, y es de nivel 1. La modalidad sembrada vale $400.000 en pesos;
+la pasarela cobra en centavos (ADR-010):
+
+```php
+public function testElLinkDePagoCobraCuarentaMillonesDeCentavos(): void
+{
+    $modalidad = $this->agenda->getModalidad($this->modalidadSembradaId);
+    $this->assertSame(400000, $modalidad->precioCop, 'la tabla va en PESOS');
+
+    $link = $this->pagos->crearLink($consultaId, $modalidad->precioCop * 100, '…', $contacto);
+
+    $this->assertSame(40000000, $this->pagoRepo->porReferencia($link['referencia'])->montoCentavos);
+}
+```
+
+Parece trivial. Es la única prueba que separa cobrarle $400.000 a un cliente de
+cobrarle $40.000.000 o $4.000.
 
 ---
 

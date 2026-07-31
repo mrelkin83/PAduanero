@@ -191,17 +191,31 @@ SELECT DATE(creado_en) d, SUM(costo_usd), COUNT(*)
 FROM consumo_ia WHERE creado_en > NOW() - INTERVAL 30 DAY GROUP BY d ORDER BY d DESC;
 ```
 
-### 3.7 Se perdió la MASTER_KEY
+### 3.7 Se perdió la MASTER_KEY o el PEPPER_TELEFONO
 
-No hay recuperación. Las credenciales cifradas son irrecuperables.
+No hay recuperación para ninguna de las dos. Son los únicos datos del sistema cuya
+pérdida no se arregla con un restore, y por eso se respaldan por separado y fuera
+del servidor (`RESPALDOS.md` §4).
 
-1. Restaurar la clave desde el respaldo fuera del servidor (ver `RESPALDOS.md` §4).
+**MASTER_KEY.** Las credenciales cifradas son irrecuperables.
+
+1. Restaurar la clave desde el respaldo fuera del servidor.
 2. Si no existe ese respaldo: rotar **todas** las credenciales en cada proveedor
    (Wompi, LLM, Chatwoot, Evolution, SMTP), generar `MASTER_KEY` nueva, vaciar la
    tabla `credenciales` y volver a cargarlas desde el panel.
 
-Por eso esa clave se respalda por separado y fuera del servidor. Es el único dato
-del sistema cuya pérdida no se arregla con un restore.
+**PEPPER_TELEFONO.** Es peor, porque falla en silencio: la aplicación arranca, pero
+`ContactoRepo::porTelefono()` deja de encontrar a los contactos existentes y el
+motor empieza a crear duplicados de gente que ya estaba en la base.
+
+1. Restaurar el pepper desde el respaldo. Es la única salida limpia.
+2. Si no existe: los `telefono_hash` viejos son basura permanente. Hay que generar
+   un pepper nuevo y **recalcular la columna entera** desde `contactos.telefono`,
+   que sí está en claro. Es un script de una pasada, pero mientras no se corra el
+   sistema duplica contactos.
+
+Por eso el pepper no rota nunca y por eso no se deriva de la `MASTER_KEY`: rotar la
+maestra habría provocado este mismo incidente en cada rotación programada.
 
 ### 3.8 Chatwoot caído
 

@@ -7,9 +7,9 @@
 ## Regla de supervisión
 
 Requieren aprobación explícita del PO antes de ejecutarse:
-cambios de esquema, nuevas dependencias npm, cambios en contratos de servicios,
-cualquier cosa que toque `services/credenciales.js`, y el paso de modo sombra a
-envío automático.
+cambios de esquema, nuevas dependencias de Composer, cambios en contratos de
+servicios, cualquier cosa que toque `src/Servicios/Credenciales`, y el paso de
+modo sombra a envío automático.
 
 ---
 
@@ -33,6 +33,10 @@ sobre el VPS con PHP-FPM + Nginx.
 y existe una prueba que guarda una credencial, la recupera descifrada y verifica
 que la respuesta HTTP solo devuelve la máscara. Sin `MASTER_KEY`, la app no
 arranca — eso también se prueba.
+
+Decisiones cerradas al arrancar esta etapa (unidades de dinero, formato del blob
+cifrado, pepper del teléfono, migraciones, radicado, concurrencia de la reserva):
+`CLAUDE.md` §12, ADR-010 a ADR-015.
 
 ---
 
@@ -117,8 +121,9 @@ seis motivos. Horario del bot activo.
 
 ## Etapa 7 — Conocimiento jurídico
 
-`pgvector` operativo, carga de los 130+ escenarios, cola de verificación, buscador
-de prueba en el panel.
+`App\Servicios\BaseConocimiento` operativo (embeddings en `JSON`, prefiltro
+FULLTEXT y coseno en PHP — **no `pgvector`**, ver ADR-005), carga de los 130+
+escenarios, cola de verificación, buscador de prueba en el panel.
 
 **Cierre:** los 130 escenarios verificados por Pedro. Muestreo de 50 respuestas del
 bot con cero violaciones de §4.
@@ -146,7 +151,7 @@ Sin frameworks, sin ORM. index.php en la raíz.
 
 Vamos por la Etapa 0. Antes de generar código, dame:
   1. El árbol de archivos que vas a crear.
-  2. La lista de dependencias npm, con justificación de una línea cada una.
+  2. La lista de dependencias de Composer, con justificación de una línea cada una.
   3. Cualquier ambigüedad que encuentres en los contratos.
 
 No escribas código hasta que yo apruebe esos tres puntos.

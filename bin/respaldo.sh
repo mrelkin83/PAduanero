@@ -92,9 +92,16 @@ tar cf "${TRABAJO}/archivos/publicos.tar" \
 [[ -d "${RAIZ}/storage/adjuntos" ]] && \
   tar cf "${TRABAJO}/archivos/adjuntos.tar" -C "${RAIZ}/storage" adjuntos
 
-# .env SIN la MASTER_KEY: se respalda la configuración de conexión,
-# no la llave que descifra todo. Esa va por otro canal.
-grep -v '^MASTER_KEY=' "${RAIZ}/.env" > "${TRABAJO}/archivos/env.sinclave" || true
+# .env SIN las claves de cifrado: se respalda la configuración de conexión,
+# no las llaves. Esas van por otro canal (docs/RESPALDOS.md §4).
+grep -vE '^(MASTER_KEY|PEPPER_TELEFONO)=' "${RAIZ}/.env" \
+  > "${TRABAJO}/archivos/env.sinclave" || true
+
+# Verificación: si el filtro se rompe, el respaldo cifrado contendría las
+# llaves que lo protegen. Preferimos fallar el respaldo a filtrarlas.
+if grep -qE '^(MASTER_KEY|PEPPER_TELEFONO)=.' "${TRABAJO}/archivos/env.sinclave"; then
+  fallo "el .env filtrado todavía contiene claves de cifrado"
+fi
 
 # --- 5. Empaquetar y cifrar ------------------------------------------
 log "Empaquetando"

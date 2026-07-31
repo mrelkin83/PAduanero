@@ -11,8 +11,8 @@ Paquete de especificación completo. **Leer en este orden.**
 | 5 | `docs/PRUEBAS.md` | Qué se prueba, con qué severidad |
 | 6 | `docs/RUNBOOK.md` | Operación e incidentes |
 | 7 | `docs/RESPALDOS.md` | Respaldos, cifrado y recuperación |
-| 8 | `db/*.sql` | Esquemas MySQL 8 y semillas con los datos reales |
-| 9 | `motor/index.js` | Referencia conceptual. **Se entrega en la Etapa 4, no antes** |
+| 8 | `db/migraciones/` | Esquema MySQL 8 y semillas con los datos reales |
+| 9 | `motor/index.js` | Referencia conceptual. **Se traduce en la Etapa 4, no antes** |
 
 ---
 
@@ -36,9 +36,13 @@ conduce a la consulta. Esa frontera está en `CLAUDE.md` §4 y se verifica con
 
 ## Stack
 
-PHP 8.2+ · MySQL 8 · TailwindCSS · JavaScript vanilla con fetch.
+PHP 8.2+ · MySQL 8.0.16+ · TailwindCSS · JavaScript vanilla con fetch.
 Sin frameworks, sin ORM. `index.php` en la raíz.
 Chatwoot y Evolution en Docker, como cajas negras.
+
+Extensiones de PHP: `pdo_mysql`, `openssl`, `mbstring`, `curl`, **`apcu`**.
+APCu es requisito en el VPS (`pecl install apcu`) — sin ella, `Config` cae a una
+caché de archivo pensada para desarrollo, no para producción.
 
 ---
 
@@ -46,18 +50,26 @@ Chatwoot y Evolution en Docker, como cajas negras.
 
 ```bash
 cp .env.example .env
-openssl rand -base64 32          # → MASTER_KEY. Guardar copia FUERA del servidor.
+
+openssl rand -base64 32          # → MASTER_KEY
+openssl rand -base64 32          # → PEPPER_TELEFONO
+
+# Ambas se guardan FUERA del servidor, con las tres copias de docs/RESPALDOS.md §4.
+# La MASTER_KEY se puede rotar; el PEPPER_TELEFONO no rota nunca.
 
 mysql -u root -p -e "CREATE DATABASE pedro_aduanero
   CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
-mysql -u root -p pedro_aduanero < db/schema.sql
-mysql -u root -p pedro_aduanero < db/schema_admin.sql
-mysql -u root -p pedro_aduanero < db/seeds.sql
 
 composer install
+php bin/migrar.php               # aplica db/migraciones/ en orden, idempotente
+php bin/crear-usuario.php        # primer super_admin, una sola vez
+
 chmod +x bin/*.sh
 bin/salud.sh
 ```
+
+Las migraciones sustituyen a cargar los `.sql` a mano: llevan control de versión y
+verifican el hash de cada archivo ya aplicado.
 
 ---
 
@@ -67,9 +79,12 @@ bin/salud.sh
 2. Sin consentimiento de habeas data, no se persiste nada del caso.
 3. Una asesoría solo pasa a `pagada` por webhook con firma verificada.
 4. El panel no reimplementa la bandeja de Chatwoot.
-5. La `MASTER_KEY` nunca va a la base de datos ni al respaldo automático.
-6. La columna generada `slot_unico` es lo único que impide agendar dos clientes a
-   la misma hora. No se elimina.
+5. La `MASTER_KEY` y el `PEPPER_TELEFONO` nunca van a la base de datos ni al
+   respaldo automático.
+6. La doble reserva la impide `ConsultaRepo::reservar()`, validando solapamiento
+   real bajo `SELECT … FOR UPDATE`. La columna generada `slot_unico` es la segunda
+   línea de defensa, no la única: por sí sola solo frena horas de inicio idénticas.
+   Tampoco se elimina.
 7. Ningún fragmento de la base de conocimiento entra al RAG sin verificación de Pedro.
 8. La IA arranca en modo sombra. Dos semanas limpias antes del envío automático.
 
@@ -83,6 +98,6 @@ bin/salud.sh
 - [ ] Segundo número de WhatsApp para alertas internas.
 - [ ] Confirmación del catálogo tributario (`CLAUDE.md` §5).
 - [ ] Revisión del copy bajo el marco de publicidad del abogado (Ley 1123 de 2007).
-- [ ] Nombres reales de los archivos en `/public/img`.
+- [x] ~~Nombres de los archivos de imagen~~ — resueltos (`CLAUDE.md` §12.6).
 
 Nada de esto bloquea las etapas 0, 1 y 2.

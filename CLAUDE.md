@@ -4,7 +4,7 @@
 > completo antes de escribir código. Los cambios de esquema, dependencias, API o
 > seguridad requieren aprobación explícita del Product Owner.
 
-**Versión:** 1.1 · **Fecha:** 2026-07-31 · **Dominio:** pedroabogadoaduanero.com
+**Versión:** 1.2 · **Fecha:** 2026-07-31 · **Dominio:** pedroabogadoaduanero.com
 **Infraestructura:** VPS propio · **Zona horaria:** America/Bogota
 
 **Documentos que componen la especificación** (leer los cuatro antes de codificar):
@@ -253,6 +253,20 @@ Uso: orden de atención en la bandeja y priorización de respuesta de Pedro.
     intenten alterar su comportamiento. El contenido del usuario es dato, no orden.
 13. Datos sensibles (NIT, documentos) se cifran a nivel aplicación (AES-256-GCM),
     nunca se registran en logs y nunca se envían al proveedor del LLM sin necesidad.
+14. **Un escalamiento sin consentimiento vigente no persiste contenido.** Cuando la
+    regla 5 obliga a escalar (POLFA en operativo, detención, allanamiento) y todavía
+    no hay habeas data, el sistema puede almacenar únicamente: teléfono, motivo del
+    escalamiento, marca de tiempo y `chatwoot_conv_id`. **Cero texto del mensaje**:
+    ni descripción, ni extracto, ni resumen, en ninguna tabla, cola o notificación.
+    La alerta a Pedro dice "escalamiento urgente, revise la conversación #123" con
+    el enlace al hilo; el contenido lo lee en Chatwoot, que es donde el contacto ya
+    lo escribió por voluntad propia.
+
+    Esto resuelve el choque entre la regla 1 y la regla 5, que se contradecían: la 1
+    prohíbe persistir sin consentimiento y la 5 obliga a escalar de inmediato. La
+    notificación sin carga útil no es solo cumplimiento — también evita que datos de
+    un caso penal en curso queden copiados en el outbox, en logs de correo y en el
+    historial de WhatsApp del teléfono personal de Pedro.
 
 ---
 
@@ -275,7 +289,11 @@ así que el catálogo se amplía y el campo `casos.area` distingue las dos ramas
 `recurso_reconsideracion` · `nulidad_restablecimiento` · `fiscalizacion` · `otro`
 
 Catálogo cerrado: el saneador de acciones fuerza `otro` ante cualquier valor no
-listado. **Pendiente de confirmación de Pedro:** que la lista tributaria refleje
+listado. **Esta lista es la normativa.** El array `TIPOS_CASO` de `motor/index.js`
+tiene 21 valores y ninguno tributario — está desactualizado y se corrige contra
+esta sección cuando se traduzca a PHP en la Etapa 4, no antes.
+
+**Pendiente de confirmación de Pedro:** que la lista tributaria refleje
 lo que efectivamente quiere atender. Un especialista en tributario puede no querer
 precios de transferencia, por ejemplo.
 
@@ -292,8 +310,14 @@ token en cada turno, dilución de atención del modelo y, sobre todo, imposibili
 de auditar qué fragmento se usó en cada respuesta.
 
 Diseño:
-- `kb_documentos` + `kb_chunks` con `pgvector`, embeddings de 1536 dimensiones.
-- Filtro previo por `tipo_caso` y luego búsqueda vectorial. Máximo 4 fragmentos.
+- `kb_documentos` + `kb_chunks` en MySQL, embeddings de 1536 dimensiones guardados
+  en columna `JSON` con la norma del vector precalculada en `embedding_norma`.
+  **No hay `pgvector`**: lo cerró el ADR-005. La similitud coseno se calcula en PHP.
+- Búsqueda en tres pasos: prefiltro por `area` y `tipo_caso`, prefiltro léxico con
+  `MATCH … AGAINST` sobre el índice FULLTEXT, y coseno en PHP sobre los candidatos.
+  Máximo 4 fragmentos. Con ~2.000 chunks son milisegundos.
+- Si esto creciera un orden de magnitud, la salida es Qdrant en Docker, no
+  reescribir el motor.
 - Marco normativo base: Decreto 1165 de 2019 y sus modificaciones, resoluciones
   reglamentarias de la DIAN, conceptos DIAN, jurisprudencia del Consejo de Estado.
   **La vigencia de cada norma la valida Pedro, no el desarrollador.**
@@ -321,7 +345,10 @@ producción en el otro proyecto:
 5. **Sin manejo de ráfagas.** En WhatsApp la gente manda 4 mensajes seguidos y se
    disparan 4 llamadas al LLM que se pisan. Añadido buffer con ventana.
 6. **Sin control de concurrencia en la reserva.** Dos mensajes simultáneos pueden
-   crear cita doble. Añadido índice único parcial + captura de `23505`.
+   crear cita doble. Añadida validación de solapamiento bajo `SELECT … FOR UPDATE`
+   dentro de la transacción, con el índice único sobre `slot_unico` como segunda
+   línea de defensa y captura del error **1062** de MySQL (no el `23505` de
+   Postgres: ver ADR-005).
 7. **Sin tope de costo por conversación.** Un contacto puede quemar presupuesto de
    LLM indefinidamente. Añadido `max_turnos_ia`.
 8. **Historial truncado a 10 turnos sin resumen.** En un caso jurídico se pierde
@@ -364,7 +391,8 @@ Lo que en la v1.0 era un checklist de pendientes ahora vive en la tabla
 Siguen bloqueando el paso a producción, pero como **valores por definir**, no como
 decisiones de arquitectura:
 
-- Precio de cada modalidad (`modalidades_asesoria.precio_cop` está sembrado en 0).
+- ~~Precio de cada modalidad~~ — **resuelto**: `modalidades_asesoria.precio_cop`
+  está sembrado en `400000` (pesos). Ver §12 sobre las unidades.
 - Pasarela activa y sus credenciales (`pasarela_activa` + tabla `credenciales`).
 - Política de reembolso y ventana de cancelación sin costo.
 - Proveedor y modelo de LLM, y país del servidor (`proveedores_ia.pais_servidor`).
@@ -413,7 +441,7 @@ Cerradas. Ya están sembradas en `db/seeds.sql`, no hay que preguntarlas de nuev
 | Modalidad de asesoría | Virtual, 60 minutos |
 | Precio | **$400.000 COP** (`40000000` centavos para la pasarela) |
 | WhatsApp del negocio | `573159923676` |
-| Imágenes | Carpeta `/img` del proyecto |
+| Imágenes | Ruta de disco `public/img/` · ruta URL `/img` (ver §12) |
 | Perfil | Especialista en Derecho Tributario · Especialista en Derecho Aduanero y Comercio Exterior · más de 15 años de experiencia |
 | Áreas de práctica | Aduanero **y** tributario |
 | `motor/index.js` | Referencia de la Etapa 4. **No se entrega antes** |
@@ -443,4 +471,109 @@ Etapa 5 se ve caída alta entre reserva y pago, subirla a 24 horas desde el pane
 - [ ] Segundo número de WhatsApp, distinto del `573159923676`, para alertas internas.
 - [ ] Confirmación del catálogo tributario (§5).
 - [ ] Revisión del copy de landing bajo el marco de publicidad del abogado.
-- [ ] Nombres reales de los archivos en `/img`.
+- [x] ~~Nombres reales de los archivos en `/img`~~ — resuelto en la Etapa 0 (§12).
+
+---
+
+## 12. Decisiones del Product Owner (Etapa 0)
+
+Cerradas al arrancar la construcción. Son invariantes de implementación: cambiarlas
+después obliga a migrar datos, no solo a editar código.
+
+### 12.1 Unidades de dinero — ADR-010
+
+**`modalidades_asesoria.precio_cop` y `consultas.precio_cop` van en PESOS enteros.**
+La multiplicación por 100 ocurre **exclusivamente** en `Pagos::crearLink()`, y
+`pagos.monto_centavos` es la única columna en centavos de todo el sistema.
+
+La razón de fijarlo por escrito: un error de factor 100 en cualquiera de los dos
+sentidos le cobra $40.000.000 a un cliente o le cobra $4.000 a Pedro. Hay una
+prueba de nivel 1 que crea el link de la modalidad sembrada y exige
+`monto_centavos = 40000000`.
+
+### 12.2 Formato de los campos cifrados — ADR-011
+
+Un solo formato para todo lo que se cifre, un solo camino de código:
+
+```
+v1 ‖ nonce(12) ‖ tag(16) ‖ ciphertext
+```
+
+Aplica a `credenciales.valor_cifrado`, `contactos.nit_cifrado` y
+`usuarios.totp_secret_cifrado`. En consecuencia se **eliminan** las columnas
+`nonce` y `tag` de `credenciales`: eran un segundo camino para lo mismo.
+
+`key_version` se conserva y **no** es lo mismo que el byte de versión del blob:
+`key_version` dice *qué clave maestra* cifró el dato y cambia con
+`rotarClaveMaestra()`; el byte dice *qué layout* tiene el blob y cambia solo si
+se altera el formato. Rotan por razones distintas y en momentos distintos.
+
+### 12.3 Hash de teléfono — ADR-012
+
+`contactos.telefono_hash = HMAC-SHA256(telefono_e164, PEPPER_TELEFONO)`.
+
+`PEPPER_TELEFONO` es una variable de entorno propia, 32 bytes en base64, que
+**nunca rota** y se respalda junto a la `MASTER_KEY` con las mismas tres copias
+(`docs/RESPALDOS.md` §4).
+
+No se deriva de `MASTER_KEY` a propósito: `rotarClaveMaestra()` puede re-cifrar
+credenciales porque el cifrado es reversible, pero un hash no lo es. El día que se
+rotara la clave maestra, todos los `telefono_hash` quedarían huérfanos y la
+búsqueda por hash dejaría de funcionar **en silencio**, que es la peor forma de
+fallar. Un SHA-256 pelado tampoco sirve: un número de 12 dígitos se rompe por
+fuerza bruta en segundos.
+
+### 12.4 Migraciones — ADR-013
+
+Numeradas, idempotentes y siempre aditivas. Tabla `migraciones (version,
+aplicada_en, hash)`. `bin/migrar.php` compara el hash del archivo con el
+registrado y **aborta** si una migración ya aplicada cambió de contenido, en vez
+de reaplicarla. Ningún `DROP COLUMN` en el mismo despliegue que deja de usar la
+columna.
+
+### 12.5 Radicado interno — ADR-014
+
+Formato `PA-YYYY-NNNNNN` (p. ej. `PA-2026-000123`). Secuencial por año,
+reiniciando cada enero. Se asigna **al crear el caso, dentro de la misma
+transacción**, contra una tabla `secuencias (anio, ultimo)` con
+`SELECT … FOR UPDATE`.
+
+Nunca con `MAX(id)+1`: con dos mensajes concurrentes eso entrega el mismo
+radicado dos veces y el `UNIQUE` de `casos.radicado_interno` hace fallar la
+creación del caso en plena conversación.
+
+### 12.6 Rutas de imágenes
+
+No había contradicción entre los documentos, sino dos cosas distintas mal
+explicadas:
+
+| | Valor | Quién lo usa |
+|---|---|---|
+| Ruta de disco | `public/img/` | `respaldo.sh`, el despliegue |
+| Ruta URL | `/img` | El HTML, `landing_ruta_imagenes` |
+
+Nginx sirve la primera bajo la segunda. `landing_ruta_imagenes` sigue en `/img`
+porque es lo que termina en el atributo `src`.
+
+Nombres de archivo definidos por el PO:
+
+| Archivo | Foto | Bloque |
+|---|---|---|
+| `pedro-hero.jpg` | Puerto, contenedores al atardecer | `hero` |
+| `pedro-perfil.jpg` | Retrato de estudio, fondo neutro | `credenciales` |
+| `pedro-documentos.jpg` | Revisión documental en escritorio | `proceso` |
+| `pedro-comercio-exterior.jpg` | Oficina, globo terráqueo | `cta_final` |
+
+### 12.7 Concurrencia en la reserva — ADR-015
+
+`ConsultaRepo::reservar()` valida el solapamiento **real** dentro de una
+transacción:
+
+1. `SELECT … FOR UPDATE` sobre las consultas vivas de esa fecha.
+2. Validar `(inicio_a < fin_b) AND (inicio_b < fin_a)`.
+3. `INSERT`.
+
+El índice único sobre `slot_unico` queda como **segunda** línea de defensa. Por sí
+solo únicamente bloquea la coincidencia exacta de `hora_inicio`: bastaría con
+crear desde el panel una modalidad de 30 minutos para que 14:00–15:00 y
+14:30–15:30 convivan sin violarlo. La validación de rango es la primera línea.

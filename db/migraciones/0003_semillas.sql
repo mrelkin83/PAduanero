@@ -1,9 +1,14 @@
 -- =====================================================================
--- SEMILLAS — Datos reales definidos por el Product Owner (2026-07-31)
--- Ejecutar después de schema.sql y schema_admin.sql
+-- 0003 — SEMILLAS — Datos reales definidos por el Product Owner (2026-07-31)
+-- Se aplica después de 0001_motor.sql y 0002_panel.sql.
 --
 -- Lo que está aquí ES la configuración de arranque del negocio.
 -- Todo lo editable después vive en el panel, no en este archivo.
+--
+-- Todos los INSERT son repetibles: `INSERT IGNORE` donde hay clave única, y
+-- guarda `WHERE NOT EXISTS` donde no la hay (modalidades y horarios). El
+-- runner ya evita reaplicar la migración; esto es la segunda red, para el día
+-- que alguien cargue el archivo a mano.
 -- =====================================================================
 
 SET NAMES utf8mb4;
@@ -11,39 +16,107 @@ SET NAMES utf8mb4;
 -- ---------------------------------------------------------------------
 -- ROLES
 -- ---------------------------------------------------------------------
-INSERT INTO roles (clave, nombre, descripcion) VALUES
+INSERT IGNORE INTO roles (clave, nombre, descripcion) VALUES
  ('super_admin','Super administrador','Acceso técnico total. Único que ve y edita credenciales y proveedores de IA. NO aprueba prompts ni publica contenido.'),
  ('abogado','Abogado titular','Dueño del negocio. Tarifas, agenda, casos, contenido, métricas. Aprueba prompts y verifica normas. NO ve credenciales.'),
  ('asistente','Asistente jurídico','Casos, agenda, conversaciones. Sin configuración ni finanzas.'),
  ('contador','Contador','Solo lectura de pagos y reportes financieros.');
 
 -- ---------------------------------------------------------------------
+-- PERMISOS  (matriz de docs/PANEL_ADMIN.md §3)
+-- ---------------------------------------------------------------------
+INSERT IGNORE INTO permisos (clave, modulo) VALUES
+ ('tablero.ver','tablero'),
+ ('casos.ver','casos'),
+ ('casos.editar','casos'),
+ ('agenda.ver','agenda'),
+ ('agenda.editar','agenda'),
+ ('pagos.transacciones.ver','pagos'),
+ ('pagos.credenciales.ver','pagos'),
+ ('pagos.credenciales.escribir','pagos'),
+ ('ia.proveedores.ver','ia'),
+ ('ia.proveedores.escribir','ia'),
+ ('ia.prompts.editar','ia'),
+ ('ia.prompts.aprobar','ia'),
+ ('ia.consumo.ver','ia'),
+ ('kb.cargar','conocimiento'),
+ ('kb.verificar','conocimiento'),
+ ('contenido.editar','contenido'),
+ ('contenido.publicar','contenido'),
+ ('config.ver','config'),
+ ('config.editar','config'),
+ ('usuarios.ver','usuarios'),
+ ('usuarios.editar','usuarios'),
+ ('auditoria.ver','usuarios'),
+ ('motor.killswitch','motor');
+
+-- ---------------------------------------------------------------------
+-- MATRIZ ROLES × PERMISOS
+--
+-- Las dos asimetrías del ADR-007 están aquí, y son deliberadas:
+--   · super_admin NO tiene ia.prompts.aprobar, kb.verificar ni
+--     contenido.publicar. Tiene las llaves técnicas; la responsabilidad
+--     profesional es del abogado. Si el bot dice una barbaridad jurídica, la
+--     firma que la autorizó debe ser la suya.
+--   · abogado NO tiene pagos.credenciales.*. No las necesita y no debería
+--     poder filtrarlas. Ve máscaras y el botón de probar conexión.
+--
+-- El "✔ (parcial)" del abogado en Configuración general no se modela aquí:
+-- lo resuelve `configuraciones.rol_minimo` fila por fila.
+-- ---------------------------------------------------------------------
+INSERT IGNORE INTO roles_permisos (rol_id, permiso_id)
+SELECT r.id, p.id FROM roles r JOIN permisos p
+WHERE (r.clave = 'super_admin' AND p.clave IN (
+        'tablero.ver','casos.ver','casos.editar','agenda.ver','agenda.editar',
+        'pagos.transacciones.ver','pagos.credenciales.ver','pagos.credenciales.escribir',
+        'ia.proveedores.ver','ia.proveedores.escribir','ia.prompts.editar','ia.consumo.ver',
+        'kb.cargar','contenido.editar','config.ver','config.editar',
+        'usuarios.ver','usuarios.editar','auditoria.ver','motor.killswitch'))
+   OR (r.clave = 'abogado' AND p.clave IN (
+        'tablero.ver','casos.ver','casos.editar','agenda.ver','agenda.editar',
+        'pagos.transacciones.ver',
+        'ia.proveedores.ver','ia.prompts.editar','ia.prompts.aprobar','ia.consumo.ver',
+        'kb.cargar','kb.verificar','contenido.editar','contenido.publicar',
+        'config.ver','config.editar','usuarios.ver','auditoria.ver','motor.killswitch'))
+   OR (r.clave = 'asistente' AND p.clave IN (
+        'tablero.ver','casos.ver','casos.editar','agenda.ver','kb.cargar','contenido.editar'))
+   OR (r.clave = 'contador' AND p.clave IN (
+        'tablero.ver','pagos.transacciones.ver'));
+
+-- ---------------------------------------------------------------------
 -- MODALIDAD DE ASESORÍA — definida por el PO
 --   Asesoría virtual · 60 minutos · $400.000 COP
+--
+--   precio_cop va en PESOS (ADR-010). La conversión a centavos ocurre solo
+--   en Pagos::crearLink(); aquí un 40000000 le cobraría $40 millones al
+--   cliente. Hay una prueba de nivel 1 que vigila exactamente esto.
 -- ---------------------------------------------------------------------
 INSERT INTO modalidades_asesoria
   (nombre, descripcion, duracion_min, precio_cop, modalidad, requiere_pago, activo, orden)
-VALUES
- ('Asesoría jurídica virtual (1 hora)',
-  'Revisión del caso con el abogado por videollamada. Incluye análisis de los documentos enviados con antelación y hoja de ruta de la actuación.',
-  60, 400000, 'virtual', 1, 1, 1);
+SELECT 'Asesoría jurídica virtual (1 hora)',
+       'Revisión del caso con el abogado por videollamada. Incluye análisis de los documentos enviados con antelación y hoja de ruta de la actuación.',
+       60, 400000, 'virtual', 1, 1, 1
+WHERE NOT EXISTS (SELECT 1 FROM modalidades_asesoria);
 
 -- ---------------------------------------------------------------------
 -- HORARIOS BASE  (lunes a viernes 8–12 y 14–18; sábado 9–12)
 -- Ajustables desde el panel. Pedro debe confirmarlos.
 -- ---------------------------------------------------------------------
-INSERT INTO horarios (dia_semana, hora_inicio, hora_fin) VALUES
- (1,'08:00:00','12:00:00'), (1,'14:00:00','18:00:00'),
- (2,'08:00:00','12:00:00'), (2,'14:00:00','18:00:00'),
- (3,'08:00:00','12:00:00'), (3,'14:00:00','18:00:00'),
- (4,'08:00:00','12:00:00'), (4,'14:00:00','18:00:00'),
- (5,'08:00:00','12:00:00'), (5,'14:00:00','18:00:00'),
- (6,'09:00:00','12:00:00');
+INSERT INTO horarios (dia_semana, hora_inicio, hora_fin)
+SELECT * FROM (
+  SELECT 1 d,'08:00:00' i,'12:00:00' f UNION ALL SELECT 1,'14:00:00','18:00:00'
+  UNION ALL SELECT 2,'08:00:00','12:00:00' UNION ALL SELECT 2,'14:00:00','18:00:00'
+  UNION ALL SELECT 3,'08:00:00','12:00:00' UNION ALL SELECT 3,'14:00:00','18:00:00'
+  UNION ALL SELECT 4,'08:00:00','12:00:00' UNION ALL SELECT 4,'14:00:00','18:00:00'
+  UNION ALL SELECT 5,'08:00:00','12:00:00' UNION ALL SELECT 5,'14:00:00','18:00:00'
+  UNION ALL SELECT 6,'09:00:00','12:00:00'
+) base
+WHERE NOT EXISTS (SELECT 1 FROM horarios);
 
 -- ---------------------------------------------------------------------
 -- CONFIGURACIÓN
 -- ---------------------------------------------------------------------
-INSERT INTO configuraciones (clave, valor, tipo, grupo, etiqueta, ayuda, rol_minimo, minimo, maximo, opciones) VALUES
+INSERT IGNORE INTO configuraciones (clave, valor, tipo, grupo, etiqueta, ayuda, rol_minimo, minimo, maximo, opciones) VALUES
 -- Motor
 ('motor_ia_pausado','false','booleano','motor','Pausar toda la IA','Kill switch. Chatwoot y WhatsApp siguen funcionando; solo calla el bot.','abogado',NULL,NULL,NULL),
 ('motor_modo_sombra','true','booleano','motor','Modo sombra','La IA redacta como nota privada en Chatwoot en vez de enviar. Arranca encendido.','abogado',NULL,NULL,NULL),
@@ -89,7 +162,7 @@ INSERT INTO configuraciones (clave, valor, tipo, grupo, etiqueta, ayuda, rol_min
 -- marco de publicidad del abogado (Ley 1123 de 2007) antes de publicar:
 -- ninguno promete resultados, y así debe permanecer.
 -- ---------------------------------------------------------------------
-INSERT INTO landing_bloques (clave, titulo, subtitulo, contenido, orden) VALUES
+INSERT IGNORE INTO landing_bloques (clave, titulo, subtitulo, contenido, orden) VALUES
 
 ('hero',
  '¿La DIAN le aprehendió la mercancía o le llegó un requerimiento?',
@@ -133,17 +206,25 @@ INSERT INTO landing_bloques (clave, titulo, subtitulo, contenido, orden) VALUES
 ('proceso',
  'Cómo funciona',
  NULL,
- JSON_OBJECT('pasos', JSON_ARRAY(
-   JSON_OBJECT('n',1,'titulo','Escriba por WhatsApp','detalle','Cuente qué pasó. Le responden el mismo día.'),
-   JSON_OBJECT('n',2,'titulo','Agende la asesoría','detalle','Una hora por videollamada. $400.000.'),
-   JSON_OBJECT('n',3,'titulo','Envíe los documentos','detalle','El acta, la declaración y las facturas. El abogado llega con el caso leído.'),
-   JSON_OBJECT('n',4,'titulo','Reciba la hoja de ruta','detalle','Qué se puede hacer, en qué orden y con qué plazos reales.')
- )), 4),
+ JSON_OBJECT(
+   'imagen','/img/pedro-documentos.jpg',
+   'alt','El abogado revisando una declaración de importación',
+   'pasos', JSON_ARRAY(
+     JSON_OBJECT('n',1,'titulo','Escriba por WhatsApp','detalle','Cuente qué pasó. Le responden el mismo día.'),
+     JSON_OBJECT('n',2,'titulo','Agende la asesoría','detalle','Una hora por videollamada. $400.000.'),
+     JSON_OBJECT('n',3,'titulo','Envíe los documentos','detalle','El acta, la declaración y las facturas. El abogado llega con el caso leído.'),
+     JSON_OBJECT('n',4,'titulo','Reciba la hoja de ruta','detalle','Qué se puede hacer, en qué orden y con qué plazos reales.')
+   )
+ ), 4),
 
 ('cta_final',
  'Entre más temprano, más opciones',
  'La mayoría de los casos que se pierden se pierden por tiempo, no por argumentos.',
- JSON_OBJECT('cta_texto','Escribir ahora por WhatsApp'), 5);
+ JSON_OBJECT(
+   'imagen','/img/pedro-comercio-exterior.jpg',
+   'alt','Pedro, especialista en derecho aduanero y comercio exterior',
+   'cta_texto','Escribir ahora por WhatsApp'
+ ), 5);
 
 -- ---------------------------------------------------------------------
 -- PROVEEDOR DE IA — placeholder. Completar desde el panel.
