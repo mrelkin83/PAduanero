@@ -1,0 +1,15 @@
+# Normalización de fin de línea.
+# Los .sh se despliegan en el VPS: con CRLF fallan con "bad interpreter".
+# Es la razón por la que este archivo existe.
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.php  text eol=lf
+*.sql  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+
+*.jpg binary
+*.png binary
+*.webp binary
+*.ico binary

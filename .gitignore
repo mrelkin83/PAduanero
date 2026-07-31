@@ -1,0 +1,26 @@
+# Secretos. El .env contiene MASTER_KEY y PEPPER_TELEFONO: si esto falla,
+# se filtran todas las credenciales del sistema.
+.env
+.env.*
+!.env.example
+
+/vendor/
+/node_modules/
+
+# storage/ se reconstruye; solo se versionan los directorios vacíos.
+/storage/logs/*
+/storage/cache/*
+!/storage/logs/.gitkeep
+!/storage/cache/.gitkeep
+/storage/config.sentinel
+
+/public/css/app.css
+/public/build/
+
+.phpunit.result.cache
+/tests/cobertura/
+
+.idea/
+.vscode/
+Thumbs.db
+desktop.ini
