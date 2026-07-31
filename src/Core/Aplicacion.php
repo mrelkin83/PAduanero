@@ -152,6 +152,9 @@ final class Aplicacion
                 $c->obtener(\App\Repositorios\IntentoAccesoRepo::class),
                 $c->obtener(\App\Repositorios\AuditoriaRepo::class),
                 (int) (Entorno::obtener('SESSION_DURACION_MIN', '120') ?? '120'),
+                // El tope del segundo factor es parámetro operativo, no
+                // constante: se ajusta desde el panel sin desplegar.
+                (int) $c->obtener(Config::class)->get('totp_max_intentos', 5),
             ),
         );
 

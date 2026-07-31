@@ -216,6 +216,141 @@ final class AutenticacionTest extends CasoBaseBd
         self::assertTrue($this->usuarios->porEmail($this->email)->totpActivo);
     }
 
+    // ── Antirreplay y tope del segundo factor ────────────────────────────
+
+    /** Deja al usuario con TOTP activo y devuelve el secreto. */
+    private function conTotpActivo(): string
+    {
+        $usuario = $this->usuarios->porEmail($this->email);
+        $datos = $this->auth->prepararTotp($usuario);
+
+        self::assertTrue($this->auth->confirmarTotp($usuario, Totp::codigo($datos['secreto']), self::IP));
+
+        return $datos['secreto'];
+    }
+
+    #[Test]
+    public function elMismoCodigoNoEntraDosVeces(): void
+    {
+        $secreto = $this->conTotpActivo();
+        $usuario = $this->usuarios->porEmail($this->email);
+
+        // El código de activación ya quedó consumido: si no, ese mismo
+        // código serviría acto seguido para iniciar sesión.
+        $codigo = Totp::codigo($secreto);
+
+        self::assertFalse(
+            $this->auth->verificarTotp($usuario, $codigo, self::IP)['ok'],
+            'el código usado para activar no puede servir además para entrar',
+        );
+    }
+
+    #[Test]
+    public function unCodigoValidoEntraUnaVezYSoloUna(): void
+    {
+        $usuario = $this->usuarios->porEmail($this->email);
+        $datos = $this->auth->prepararTotp($usuario);
+        $this->usuarios->activarTotp($usuario->id, 0);
+
+        $usuario = $this->usuarios->porEmail($this->email);
+        $codigo = Totp::codigo($datos['secreto']);
+
+        self::assertTrue($this->auth->verificarTotp($usuario, $codigo, self::IP)['ok']);
+
+        // Segunda vez con el mismo código: rechazado (RFC 6238 §5.2).
+        self::assertFalse($this->auth->verificarTotp($usuario, $codigo, self::IP)['ok']);
+    }
+
+    #[Test]
+    public function elContadorAceptadoQuedaGuardado(): void
+    {
+        $usuario = $this->usuarios->porEmail($this->email);
+        $datos = $this->auth->prepararTotp($usuario);
+        $this->auth->confirmarTotp($usuario, Totp::codigo($datos['secreto']), self::IP);
+
+        self::assertSame(
+            intdiv(time(), 30),
+            $this->usuarios->ultimoContadorTotp($usuario->id),
+        );
+    }
+
+    #[Test]
+    public function elContadorNuncaRetrocede(): void
+    {
+        $usuario = $this->usuarios->porEmail($this->email);
+
+        $this->usuarios->guardarContadorTotp($usuario->id, 1000);
+        $this->usuarios->guardarContadorTotp($usuario->id, 500);
+
+        // Cierra la carrera entre dos peticiones simultáneas con el mismo
+        // código: la segunda no puede rebajar el contador.
+        self::assertSame(1000, $this->usuarios->ultimoContadorTotp($usuario->id));
+    }
+
+    #[Test]
+    public function elSegundoFactorTieneTopePropio(): void
+    {
+        $this->conTotpActivo();
+        $usuario = $this->usuarios->porEmail($this->email);
+
+        // Son seis dígitos y quien llega aquí ya pasó la contraseña: sin
+        // tope propio queda un millón de combinaciones abierto.
+        for ($i = 0; $i < 5; $i++) {
+            $this->auth->verificarTotp($usuario, '000000', self::IP);
+        }
+
+        $r = $this->auth->verificarTotp($usuario, '000000', self::IP);
+
+        self::assertFalse($r['ok']);
+        self::assertStringContainsString('Demasiados códigos', $r['motivo']);
+    }
+
+    #[Test]
+    public function elTopeDelSegundoFactorEsPorCuentaYNoPorIp(): void
+    {
+        $this->conTotpActivo();
+        $usuario = $this->usuarios->porEmail($this->email);
+
+        // Rotar de IP no debe servir para esquivarlo: quien ya tiene la
+        // contraseña puede cambiar de salida cuantas veces quiera.
+        for ($i = 0; $i < 5; $i++) {
+            $this->auth->verificarTotp($usuario, '000000', "190.85.1.{$i}");
+        }
+
+        $r = $this->auth->verificarTotp($usuario, '000000', '181.50.9.9');
+
+        self::assertFalse($r['ok']);
+        self::assertStringContainsString('Demasiados códigos', $r['motivo']);
+    }
+
+    #[Test]
+    public function restablecerElSegundoFactorLoDejaSinTotpYSinSesiones(): void
+    {
+        $this->conTotpActivo();
+        $usuario = $this->usuarios->porEmail($this->email);
+        $token = $this->auth->abrirSesion($usuario, self::IP, null);
+
+        $this->auth->restablecerTotp($usuario, 'consola:elkin', 'perdió el teléfono');
+
+        $despues = $this->usuarios->porEmail($this->email);
+
+        self::assertFalse($despues->totpActivo);
+        self::assertNull($this->usuarios->secretoTotp($usuario->id));
+        self::assertNull($this->usuarios->ultimoContadorTotp($usuario->id));
+
+        // Si el teléfono se perdió, una sesión abierta en ese teléfono sigue
+        // siendo una sesión abierta.
+        self::assertNull($this->auth->usuarioDeSesion($token));
+
+        $fila = $this->bd->pdo()->query(
+            "SELECT actor, detalle FROM auditoria WHERE accion='totp_restablecido'"
+        )->fetch();
+
+        self::assertIsArray($fila, 'debe quedar en la bitácora');
+        self::assertSame('consola:elkin', $fila['actor']);
+        self::assertStringContainsString('perdió el teléfono', (string) $fila['detalle']);
+    }
+
     #[Test]
     public function elRolDeAbogadoExigeSegundoPaso(): void
     {

@@ -49,8 +49,28 @@ final class IntentoAccesoRepo
     }
 
     /**
+     * Fallos de un usuario concreto en la ventana, independientemente de la
+     * IP.
+     *
+     * El tope del segundo factor tiene que ser por CUENTA y no por IP: son
+     * seis dígitos, y quien ya pasó la contraseña puede rotar de IP mientras
+     * prueba el millón de combinaciones.
+     */
+    public function fallosDeUsuario(string $accion, string $usuario, int $minutos = 15): int
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT COUNT(*) FROM intentos_acceso
+              WHERE usuario = ? AND accion = ? AND exito = 0
+                AND creado_en > DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? MINUTE)'
+        );
+        $stmt->execute([$usuario, $accion, $minutos]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
      * La IP es dato personal bajo la Ley 1581 de 2012: no se guarda
-     * indefinidamente. Lo llama el cron.
+     * indefinidamente. Lo llama el cron, con los días de `configuraciones`.
      */
     public function purgar(int $dias = 30): int
     {

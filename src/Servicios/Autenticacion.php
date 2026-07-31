@@ -35,6 +35,7 @@ final class Autenticacion
         private readonly IntentoAccesoRepo $intentos,
         private readonly AuditoriaRepo $auditoria,
         private readonly int $duracionMinutos = 120,
+        private readonly int $maxIntentosTotp = 5,
     ) {
     }
 
@@ -95,13 +96,36 @@ final class Autenticacion
             return ['ok' => false, 'motivo' => 'Este usuario todavía no tiene la verificación en dos pasos activa.'];
         }
 
-        if (!Totp::verificar($secreto, $codigo)) {
+        // Tope PROPIO del segundo factor, y por cuenta, no por IP: son seis
+        // dígitos y quien ya pasó la contraseña puede rotar de IP mientras
+        // prueba. El contador de la contraseña mide otra cosa y no sirve.
+        if ($this->intentos->fallosDeUsuario('totp', $usuario->email) >= $this->maxIntentosTotp) {
+            $this->auditoria->registrar('sesion', $usuario->id, 'totp_bloqueado', $usuario->email, [], $ip);
+
+            return [
+                'ok' => false,
+                'motivo' => 'Demasiados códigos incorrectos. Espere unos minutos antes de volver a intentar.',
+            ];
+        }
+
+        $contador = Totp::verificarConContador(
+            $secreto,
+            $codigo,
+            // Antirreplay: un código ya usado no vuelve a valer aunque siga
+            // dentro de su ventana de 30 segundos (RFC 6238 §5.2).
+            $this->usuarios->ultimoContadorTotp($usuario->id),
+        );
+
+        if ($contador === null) {
             $this->usuarios->registrarFallo($usuario->email);
-            $this->intentos->registrar('login', $ip, false, $usuario->email);
+            $this->intentos->registrar('totp', $ip, false, $usuario->email);
             $this->auditoria->registrar('sesion', $usuario->id, 'totp_fallido', $usuario->email, [], $ip);
 
             return ['ok' => false, 'motivo' => 'Código incorrecto.'];
         }
+
+        $this->usuarios->guardarContadorTotp($usuario->id, $contador);
+        $this->intentos->registrar('totp', $ip, true, $usuario->email);
 
         return ['ok' => true];
     }
@@ -166,14 +190,54 @@ final class Autenticacion
     {
         $secreto = $this->usuarios->secretoTotp($usuario->id);
 
-        if ($secreto === null || !Totp::verificar($secreto, $codigo)) {
+        if ($secreto === null) {
             return false;
         }
 
-        $this->usuarios->activarTotp($usuario->id);
+        // El alta también tiene tope: si no, el formulario de activación
+        // sería una vía de fuerza bruta sin vigilancia.
+        if ($this->intentos->fallosDeUsuario('totp', $usuario->email) >= $this->maxIntentosTotp) {
+            return false;
+        }
+
+        // Sin `ultimoAceptado`: es el primer código de este secreto y no hay
+        // contador previo con el que comparar.
+        $contador = Totp::verificarConContador($secreto, $codigo);
+
+        if ($contador === null) {
+            $this->intentos->registrar('totp', $ip, false, $usuario->email);
+
+            return false;
+        }
+
+        // Se guarda el contador del propio código de activación: si no, ese
+        // mismo código serviría acto seguido para iniciar sesión.
+        $this->usuarios->activarTotp($usuario->id, $contador);
         $this->auditoria->registrar('usuario', $usuario->id, 'totp_activado', $usuario->email, [], $ip);
 
         return true;
+    }
+
+    /**
+     * Restablece el segundo factor de un usuario.
+     *
+     * Solo desde consola (`bin/restablecer-2fa.php`). Deja la cuenta sin
+     * TOTP y con todas sus sesiones revocadas: el siguiente ingreso obliga a
+     * configurarlo de nuevo.
+     */
+    public function restablecerTotp(Usuario $usuario, string $actor, ?string $motivo = null): void
+    {
+        $this->usuarios->desactivarTotp($usuario->id);
+
+        // Revocar es imprescindible: si el teléfono se perdió, una sesión
+        // abierta en ese teléfono sigue siendo una sesión abierta.
+        $revocadas = $this->sesiones->revocarTodas($usuario->id);
+
+        $this->auditoria->registrar('usuario', $usuario->id, 'totp_restablecido', $actor, [
+            'usuario_afectado' => $usuario->email,
+            'motivo' => $motivo,
+            'sesiones_revocadas' => $revocadas,
+        ]);
     }
 
     public function cambiarPassword(Usuario $usuario, string $nueva, ?string $ip): void

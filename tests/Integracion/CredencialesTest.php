@@ -177,6 +177,177 @@ final class CredencialesTest extends CasoBaseBd
         $this->credenciales->guardar('wompi', 'private_key', '   ', 'produccion', self::USUARIO);
     }
 
+    // ── Probar conexión ──────────────────────────────────────────────────
+    //
+    // `docs/PRUEBAS.md` §7 fija 100 % para este servicio: es el que custodia
+    // las llaves de la pasarela de pagos.
+
+    /** @param array{ok:bool,mensaje:string} $resultado */
+    private function conProbador(array $resultado, ?\Throwable $revienta = null): CredencialesAes
+    {
+        $probador = new class ($resultado, $revienta) implements \App\Servicios\Probadores\Probador {
+            public function __construct(private array $resultado, private ?\Throwable $revienta)
+            {
+            }
+
+            public function servicio(): string
+            {
+                return 'wompi';
+            }
+
+            public function clavesRequeridas(): array
+            {
+                return ['llave_publica', 'llave_privada'];
+            }
+
+            public function probar(array $credenciales, string $entorno): array
+            {
+                if ($this->revienta !== null) {
+                    throw $this->revienta;
+                }
+
+                return $this->resultado;
+            }
+        };
+
+        return new CredencialesAes(
+            $this->bd,
+            Cifrado::desdeEntorno(),
+            new Logger(sys_get_temp_dir() . '/pedro-pruebas.log', 'error'),
+            [$probador],
+        );
+    }
+
+    private function guardarPar(): void
+    {
+        $this->credenciales->guardar('wompi', 'llave_publica', 'pub_test_AAA', 'pruebas', self::USUARIO);
+        $this->credenciales->guardar('wompi', 'llave_privada', 'prv_test_BBB', 'pruebas', self::USUARIO);
+    }
+
+    #[Test]
+    public function sinProbadorRegistradoLoDiceYNoMarcaNada(): void
+    {
+        $r = $this->credenciales->probar('paypal', 'produccion');
+
+        self::assertFalse($r['ok']);
+        self::assertStringContainsString('no hay probador', $r['mensaje']);
+
+        // No se escribe un rojo por una integración que todavía no llega:
+        // confundiría más de lo que ayuda.
+        self::assertNull(
+            $this->bd->pdo()->query('SELECT ultima_prueba_ok FROM credenciales')->fetchColumn() ?: null,
+        );
+    }
+
+    #[Test]
+    public function sinCredencialesGuardadasDiceCualFalta(): void
+    {
+        $r = $this->conProbador(['ok' => true, 'mensaje' => 'no debería llegar'])->probar('wompi', 'pruebas');
+
+        self::assertFalse($r['ok']);
+        self::assertStringContainsString('Faltan credenciales', $r['mensaje']);
+        self::assertStringContainsString('llave_publica', $r['mensaje']);
+    }
+
+    #[Test]
+    public function unaPruebaCorrectaSeRegistra(): void
+    {
+        $this->guardarPar();
+
+        $r = $this->conProbador(['ok' => true, 'mensaje' => 'Conexión correcta.'])->probar('wompi', 'pruebas');
+
+        self::assertTrue($r['ok']);
+
+        $fila = $this->bd->pdo()->query(
+            "SELECT ultima_prueba_ok, ultima_prueba_en FROM credenciales WHERE clave='llave_publica'"
+        )->fetch();
+
+        self::assertSame(1, (int) $fila['ultima_prueba_ok']);
+        self::assertNotNull($fila['ultima_prueba_en']);
+    }
+
+    #[Test]
+    public function unaPruebaFallidaTambienSeRegistra(): void
+    {
+        $this->guardarPar();
+
+        $r = $this->conProbador(['ok' => false, 'mensaje' => 'La privada no vale.'])->probar('wompi', 'pruebas');
+
+        self::assertFalse($r['ok']);
+        self::assertSame(
+            0,
+            (int) $this->bd->pdo()->query("SELECT ultima_prueba_ok FROM credenciales WHERE clave='llave_publica'")->fetchColumn(),
+        );
+    }
+
+    #[Test]
+    public function unProbadorQueRevientaNoTumbaElPanel(): void
+    {
+        $this->guardarPar();
+
+        // Y su mensaje podría llevar la credencial dentro, así que no se
+        // propaga al usuario.
+        $r = $this->conProbador([], new \RuntimeException('boom con prv_test_BBB dentro'))
+            ->probar('wompi', 'pruebas');
+
+        self::assertFalse($r['ok']);
+        self::assertStringNotContainsString('prv_test_BBB', $r['mensaje']);
+        self::assertStringContainsString('inesperada', $r['mensaje']);
+    }
+
+    #[Test]
+    public function probarQuedaEnLaAuditoriaSinElValor(): void
+    {
+        $this->guardarPar();
+        $this->conProbador(['ok' => true, 'mensaje' => 'ok'])->probar('wompi', 'pruebas');
+
+        $fila = $this->bd->pdo()->query(
+            "SELECT detalle FROM auditoria WHERE entidad='credencial' AND accion='probar'"
+        )->fetch();
+
+        self::assertIsArray($fila);
+        self::assertStringNotContainsString('prv_test_BBB', (string) $fila['detalle']);
+    }
+
+    #[Test]
+    public function elBlobSeLeeTantoComoCadenaComoComoFlujo(): void
+    {
+        // PDO devuelve los VARBINARY como cadena con el driver de MySQL, pero
+        // como recurso con otras configuraciones. La rama del flujo no la
+        // ejercita ninguna prueba de extremo a extremo por eso, y `docs/
+        // PRUEBAS.md` §7 exige 100 % en este servicio: se llama directa.
+        $metodo = new \ReflectionMethod($this->credenciales, 'comoBinario');
+        $metodo->setAccessible(true);
+
+        self::assertSame('abc', $metodo->invoke($this->credenciales, 'abc'));
+
+        $flujo = fopen('php://memory', 'r+');
+        fwrite($flujo, 'abc');
+        rewind($flujo);
+
+        self::assertSame('abc', $metodo->invoke($this->credenciales, $flujo));
+
+        fclose($flujo);
+    }
+
+    #[Test]
+    public function rotarConUnaClaveInvalidaNoDejaLaTablaAMedias(): void
+    {
+        $this->credenciales->guardar('wompi', 'a', 'valor-a', 'produccion', self::USUARIO);
+        $this->credenciales->guardar('wompi', 'b', 'valor-b', 'produccion', self::USUARIO);
+
+        try {
+            $this->credenciales->rotarClaveMaestra(base64_encode('demasiado corta'));
+            self::fail('debió rechazar la clave');
+        } catch (\Throwable) {
+            // Quedarse a medias dejaría media tabla con una clave y media con
+            // otra, y ninguna podría leerla entera.
+        }
+
+        self::assertSame('valor-a', $this->credenciales->obtener('wompi', 'a', 'produccion'));
+        self::assertSame('valor-b', $this->credenciales->obtener('wompi', 'b', 'produccion'));
+    }
+
     private function blobActual(): string
     {
         $valor = $this->bd->pdo()->query('SELECT valor_cifrado FROM credenciales')->fetchColumn();

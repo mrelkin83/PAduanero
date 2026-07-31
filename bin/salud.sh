@@ -105,6 +105,22 @@ GASTO=$($MYSQL "SELECT COALESCE(ROUND(SUM(costo_usd),2),0) FROM consumo_ia
   WHERE creado_en >= DATE_FORMAT(NOW(),'%Y-%m-01')" 2>/dev/null || echo '?')
 echo "  · gasto de IA este mes: USD ${GASTO}"
 
+# --- Purga de datos personales ---------------------------------------
+# `intentos_acceso` guarda IP, que es dato personal bajo la Ley 1581 de 2012.
+# Si el cron deja de correr, la retención deja de cumplirse en silencio: nada
+# se rompe, solo se acumulan datos que no deberían estar ahí.
+echo
+echo "Retención de datos"
+PURGA=$($MYSQL "SELECT COUNT(*) FROM auditoria
+  WHERE entidad='sistema' AND accion='purga'
+    AND creado_en > NOW() - INTERVAL 24 HOUR" 2>/dev/null || echo "?")
+
+if [[ "$PURGA" -ge 1 ]] 2>/dev/null; then
+  ok "la purga corrió en las últimas 24 h"
+else
+  mal "cron-purgar.php NO ha corrido en 24 h: la retención de IP no se está cumpliendo"
+fi
+
 # --- Respaldo --------------------------------------------------------
 echo
 echo "Respaldos"

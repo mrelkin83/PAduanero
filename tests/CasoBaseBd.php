@@ -63,7 +63,16 @@ abstract class CasoBaseBd extends TestCase
      * una prueba sobrevive a la siguiente, y el fallo aparece en otra clase.
      * Se guarda una copia justo después de migrar y se restaura entre casos.
      */
-    private const TABLAS_SEMILLA = ['configuraciones', 'landing_bloques'];
+    private const TABLAS_SEMILLA = [
+        'configuraciones',
+        'landing_bloques',
+        // Las toca el módulo de tarifas: sin restaurarlas, una prueba que
+        // sube el precio deja a la siguiente comprobando contra $450.000.
+        // El orden importa — `consultas` tiene una clave foránea hacia
+        // `modalidades_asesoria`, y `limpiar()` la vacía justo antes.
+        'modalidades_asesoria',
+        'horarios',
+    ];
 
     /** @var array<string,list<array<string,mixed>>> */
     private static array $semillas = [];

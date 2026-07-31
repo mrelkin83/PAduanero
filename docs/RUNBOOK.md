@@ -222,7 +222,47 @@ motor empieza a crear duplicados de gente que ya estaba en la base.
 Por eso el pepper no rota nunca y por eso no se deriva de la `MASTER_KEY`: rotar la
 maestra habría provocado este mismo incidente en cada rotación programada.
 
-### 3.8 Chatwoot caído
+### 3.8 Nadie puede entrar al panel: teléfono perdido y 2FA
+
+**Es el incidente de domingo por excelencia.** El segundo factor es obligatorio
+para `super_admin` y `abogado`. Si Pedro cambia de teléfono sin migrar la
+aplicación de autenticación, o se le pierde, queda fuera del panel de su propio
+negocio. Y lo mismo aplica al perfil técnico.
+
+No hay que improvisar un `UPDATE` sobre producción. Hay un comando:
+
+```bash
+cd /var/www/pedro
+php bin/restablecer-2fa.php pedro@ejemplo.com
+```
+
+Pide confirmar escribiendo **el correo completo** —no un «s/n», porque
+equivocarse de usuario en un listado es fácil— y un motivo, que queda en la
+bitácora.
+
+Qué hace, y por qué cada parte:
+
+| Acción | Motivo |
+|---|---|
+| Borra el secreto TOTP y su contador | El siguiente secreto empieza limpio |
+| **Revoca todas las sesiones del usuario** | Si el teléfono se perdió, una sesión abierta en ese teléfono sigue abierta |
+| Registra en `auditoria` quién, cuándo y por qué | Es una operación privilegiada: tiene que dejar rastro |
+
+Qué **no** hace: no cambia la contraseña ni entra a ninguna cuenta. Después,
+el usuario entra con su contraseña de siempre y el panel le obliga a
+configurar el segundo factor otra vez.
+
+> **Por qué es defendible que este comando exista.** Quien puede ejecutarlo ya
+> tiene shell en el VPS, y con shell ya tiene la `MASTER_KEY`, la base y todo
+> lo demás: su privilegio es máximo con o sin él. No añade superficie de
+> ataque — hace usable una recuperación que, de otro modo, se haría con un
+> `UPDATE` improvisado a las tres de la mañana, sin registro y con el riesgo
+> de tocar la fila equivocada.
+
+Después del incidente, revisar en la bitácora que el restablecimiento fue el
+esperado: `Bitácora → acción = totp_restablecido`.
+
+### 3.9 Chatwoot caído
 
 El bot no puede responder. Los mensajes de WhatsApp siguen llegando a Evolution y
 se acumulan; Chatwoot los ingesta al volver.

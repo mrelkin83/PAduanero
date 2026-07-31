@@ -257,16 +257,36 @@ la producción.
 ## 7. Cobertura
 
 Sin objetivo global de porcentaje: invita a escribir pruebas triviales para subir
-el número. Objetivos por zona:
+el número. Objetivos por zona, y **medición real** al cierre de la Etapa 3:
 
-| Zona | Mínimo |
-|---|---|
-| `src/Motor/` | 90 % |
-| `src/Servicios/Pagos` | 90 % |
-| `src/Servicios/Credenciales` | 100 % |
-| `src/Repositorios/` | 70 % |
-| `src/Panel/` | 50 % |
-| Plantillas y vistas | sin objetivo |
+| Zona | Mínimo | Medido | |
+|---|---|---|---|
+| `src/Motor/` | 90 % | — | Llega en la Etapa 4 |
+| `src/Servicios/Pagos` | 90 % | 100 % | `ProbadorWompi`; el contrato `Pagos` llega en la Etapa 5 |
+| `src/Servicios/Credenciales` | 100 % | **100 %** | 99/99 líneas, 7/7 métodos |
+| `src/Repositorios/` | 70 % | 87 % | 171/196 líneas |
+| `src/Panel/` | 50 % | 82 % | 237/290 líneas |
+| Plantillas y vistas | sin objetivo | — | |
+
+### Cómo medirlo
+
+Contar pruebas no es medir cobertura. Hace falta un driver, que **no** es
+dependencia del proyecto — solo se necesita para medir, no para correr la
+suite:
+
+```bash
+# Linux / VPS
+pecl install pcov
+php -d extension=pcov.so -d pcov.enabled=1 -d pcov.directory=src \
+    vendor/bin/phpunit --coverage-text
+```
+
+En Windows, el DLL correspondiente a la versión y al *thread safety* del PHP
+instalado se descarga de `windows.php.net/downloads/pecl/releases/pcov/` y se
+carga con `-d extension=<ruta>`, sin tocar el `php.ini`.
+
+**phpdbg ya no sirve**: `php-code-coverage` 11, la de PHPUnit 11, retiró ese
+driver. Si aparece «No code coverage driver available», es eso.
 
 ---
 

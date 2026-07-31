@@ -161,6 +161,15 @@ final class AutenticacionControlador extends ControladorBase
     {
         $this->iniciarSesionPhp();
 
+        // Rotación del identificador ANTES de asociar nada al usuario.
+        // Sin esto hay fijación de sesión: un atacante fija el identificador
+        // de `pa_paso2` en el navegador de la víctima —por un enlace, por un
+        // subdominio— y, cuando esta supera la contraseña, ese identificador
+        // que él ya conoce queda asociado a la cuenta.
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
+
         $_SESSION['pendiente_totp'] = $usuarioId;
         $_SESSION['pendiente_hasta'] = time() + 300;
     }
@@ -183,9 +192,17 @@ final class AutenticacionControlador extends ControladorBase
 
     private function limpiarPendiente(): void
     {
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            unset($_SESSION['pendiente_totp'], $_SESSION['pendiente_hasta']);
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return;
         }
+
+        unset($_SESSION['pendiente_totp'], $_SESSION['pendiente_hasta']);
+
+        // Se destruye entera, no solo se vacía: el paso intermedio no tiene
+        // nada más que guardar, y dejar el identificador vivo es dejar algo
+        // que fijar.
+        $_SESSION = [];
+        @session_destroy();
     }
 
     private function iniciarSesionPhp(): void

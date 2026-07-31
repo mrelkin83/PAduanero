@@ -71,13 +71,24 @@ final class TarifasControlador extends ControladorBase
         $precio = (int) $precio;
         $duracion = (int) $duracion;
 
-        // Guarda contra el error de teclear centavos donde van pesos: a
-        // $400.000 la tarifa, un cero de más son cuatro millones.
-        if ($precio > 50_000_000) {
+        // Guarda contra teclear centavos donde van pesos.
+        //
+        // El umbral es 10 millones, no 50: el error que hay que atrapar es
+        // exactamente ×100 sobre la tarifa real, y $400.000 × 100 son
+        // $40.000.000 — que con un tope de 50 millones pasaba de largo. Una
+        // asesoría de una hora por encima de diez millones no existe, así que
+        // cualquier cosa así es un error de dedo o de unidades.
+        //
+        // El error es fácil justo porque la pasarela SÍ cobra en centavos
+        // (ADR-010): la conversión existe, solo que vive en Pagos::crearLink()
+        // y no aquí.
+        if ($precio >= 10_000_000) {
             return $this->redirigirCon(
                 '/panel/tarifas',
                 'error',
-                'El precio va en PESOS, no en centavos. ¿Seguro que son $' . number_format($precio, 0, ',', '.') . '?',
+                'El precio va en PESOS, no en centavos. ¿Seguro que son $'
+                    . number_format($precio, 0, ',', '.') . '? '
+                    . 'Para $400.000 se escribe 400000.',
             );
         }
 

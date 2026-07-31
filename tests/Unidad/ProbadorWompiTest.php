@@ -169,6 +169,89 @@ final class ProbadorWompiTest extends TestCase
     }
 
     #[Test]
+    public function unEntornoDesconocidoSeRechaza(): void
+    {
+        $r = (new ProbadorWompi($this->http([])))->probar(
+            ['llave_publica' => self::PUB_PROD, 'llave_privada' => self::PRV_PROD],
+            'certificacion',
+        );
+
+        self::assertFalse($r['ok']);
+        self::assertStringContainsString('Entorno desconocido', $r['mensaje']);
+    }
+
+    #[Test]
+    public function un500DeWompiSeDistingueDeUnaCredencialMala(): void
+    {
+        // Que la pasarela esté caída no es lo mismo que tener mal las llaves,
+        // y el mensaje no debe mandar a nadie a revisar credenciales que
+        // están bien.
+        $r = (new ProbadorWompi($this->http([$this->respuesta(500)])))->probar(
+            ['llave_publica' => self::PUB_PROD, 'llave_privada' => self::PRV_PROD],
+            'produccion',
+        );
+
+        self::assertFalse($r['ok']);
+        self::assertStringContainsString('HTTP 500', $r['mensaje']);
+        self::assertStringContainsString('pública', $r['mensaje']);
+    }
+
+    #[Test]
+    public function un500AlValidarLaPrivadaTambienSeDistingue(): void
+    {
+        $r = (new ProbadorWompi($this->http([
+            $this->respuesta(200, '{"data":{"name":"Despacho"}}'),
+            $this->respuesta(503),
+        ])))->probar(
+            ['llave_publica' => self::PUB_PROD, 'llave_privada' => self::PRV_PROD],
+            'produccion',
+        );
+
+        self::assertFalse($r['ok']);
+        self::assertStringContainsString('HTTP 503', $r['mensaje']);
+        self::assertStringContainsString('privada', $r['mensaje']);
+    }
+
+    #[Test]
+    public function laRedCaidaAlValidarLaPrivadaSeDistingue(): void
+    {
+        $r = (new ProbadorWompi($this->http([
+            $this->respuesta(200, '{"data":{"name":"Despacho"}}'),
+            new RespuestaHttp(0, '', 'Operation timed out', 0),
+        ])))->probar(
+            ['llave_publica' => self::PUB_PROD, 'llave_privada' => self::PRV_PROD],
+            'produccion',
+        );
+
+        self::assertFalse($r['ok']);
+        self::assertStringContainsString('se perdió la conexión', $r['mensaje']);
+    }
+
+    #[Test]
+    public function sinNombreDeComercioElMensajeSigueSiendoUtil(): void
+    {
+        $r = (new ProbadorWompi($this->http([
+            $this->respuesta(200, '{"data":{}}'),
+            $this->respuesta(200, '{"data":[]}'),
+        ])))->probar(
+            ['llave_publica' => self::PUB_PROD, 'llave_privada' => self::PRV_PROD],
+            'produccion',
+        );
+
+        self::assertTrue($r['ok']);
+        self::assertStringContainsString('ambas llaves validan', $r['mensaje']);
+    }
+
+    #[Test]
+    public function declaraQueServicioAtiendeYQueClavesNecesita(): void
+    {
+        $probador = new ProbadorWompi($this->http([]));
+
+        self::assertSame('wompi', $probador->servicio());
+        self::assertSame(['llave_publica', 'llave_privada'], $probador->clavesRequeridas());
+    }
+
+    #[Test]
     public function elResultadoNuncaLlevaLaCredencialDentro(): void
     {
         // Este resultado se serializa hacia el navegador.

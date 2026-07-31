@@ -17,11 +17,15 @@
 | Comprobación | Cómo |
 |---|---|
 | TOTP correcto | Los 6 vectores oficiales del RFC 6238 §B |
-| Probador de Wompi | 9 pruebas con las respuestas reales del sandbox |
+| Base32 | Los vectores del RFC 4648 §10, más minúsculas, espacios, guiones y relleno |
+| Antirreplay | Un código no entra dos veces (RFC 6238 §5.2) |
+| Tiempo constante | Guarda en el propio código fuente contra volver a `===` |
+| Tope del segundo factor | Por cuenta, no por IP: rotar de salida no lo esquiva |
+| Probador de Wompi | 15 pruebas con respuestas grabadas del sandbox |
 | Matriz de roles | Las dos asimetrías del ADR-007, contra la base |
 | Bloqueo y rate limit | Por cuenta y por IP, con espera creciente |
-| La credencial nunca sale en claro | Recorrido en navegador real |
-| Cookie de sesión HttpOnly + SameSite | Idem |
+| La credencial nunca sale en claro | Recorrido en navegador real y en pruebas |
+| Cookie de sesión HttpOnly + SameSite | Recorrido en navegador real |
 | CSRF | POST sin token → 419, idem |
 
 ```bash
@@ -29,10 +33,15 @@ composer test:criticas                 # nivel 1
 node bin/verificar-panel.mjs           # recorrido en navegador real
 ```
 
+**225 pruebas, 447 aserciones.** Cobertura medida contra los objetivos de
+`PRUEBAS.md` §7: Credenciales **100 %**, Pagos **100 %**, Repositorios
+**87 %**, Panel **82 %**. El Motor llega en la Etapa 4.
+
 Los códigos que distingue el probador de Wompi (`422` con llave desconocida en
 `/merchants`, `401` sin token y `422` con token inválido en `/transactions`)
-están verificados empíricamente contra el sandbox público, no deducidos de la
-documentación.
+se midieron contra el sandbox público **una vez**, y desde entonces viven como
+respuestas grabadas: **la suite no sale a la red**. Un mantenimiento de Wompi
+no puede poner las pruebas en rojo.
 
 ---
 
@@ -74,8 +83,23 @@ Y el cron de purga, que no es opcional:
 - [ ] Añadir la clave a la aplicación de autenticación **a mano** (no hay QR:
       generarlo exige una dependencia nueva, ver §4) y confirmar con el código.
 - [ ] Cerrar sesión, volver a entrar: ahora **pide el código** en un segundo paso.
+- [ ] **Reutilizar el código que acaba de usar** para entrar, dentro de sus 30
+      segundos de vida: debe **rechazarlo**. Es el antirreplay del RFC 6238
+      §5.2 — sin él, un código visto por encima del hombro sirve medio minuto.
 - [ ] Meter un código equivocado cinco veces y comprobar que **bloquea**, con
       la espera creciendo en cada intento.
+
+### Recuperación — probar ANTES de necesitarla
+
+- [ ] Desde el servidor: `php bin/restablecer-2fa.php <su-correo>`.
+- [ ] Confirmar escribiendo el correo completo y un motivo.
+- [ ] Entrar de nuevo con la contraseña de siempre: el panel **obliga a
+      reconfigurar** el segundo factor.
+- [ ] Bitácora: aparece `totp_restablecido` con el actor de consola y el motivo.
+
+> Probar esto un martes por la tarde cuesta cinco minutos. Descubrirlo un
+> domingo con Pedro fuera del panel cuesta mucho más. Procedimiento completo
+> en `RUNBOOK.md` §3.8.
 
 ### Tarifas — el corazón de la etapa
 

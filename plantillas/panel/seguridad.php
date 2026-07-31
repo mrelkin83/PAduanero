@@ -46,23 +46,42 @@ $contenido = static function () use ($e, $ctx, $secreto, $uri): void {
                 Aegis, 1Password…) y confirme con el código que muestre.
             </p>
 
-            <div class="mt-4">
-                <p class="rotulo">Clave de configuración</p>
-                <p class="mt-1 select-all break-all font-mono text-lg tracking-widest"><?= $e($secreto) ?></p>
-            </div>
+            <dl class="mt-4 space-y-3">
+                <div>
+                    <dt class="rotulo">Cuenta</dt>
+                    <dd class="mt-1 font-mono text-sm"><?= $e($usuario->email) ?></dd>
+                </div>
+                <div>
+                    <dt class="rotulo">Emisor</dt>
+                    <dd class="mt-1 font-mono text-sm">Pedro Abogado</dd>
+                </div>
+                <div>
+                    <dt class="rotulo">Clave de configuración</dt>
+                    <?php /* En bloques de cuatro: son 32 caracteres que hay que
+                             teclear a mano en un teléfono, y de corrido se
+                             pierde el sitio. Los espacios no molestan — el
+                             decodificador los ignora. */ ?>
+                    <dd class="mt-1 select-all font-mono text-lg leading-relaxed tracking-widest">
+                        <?= $e(trim(chunk_split($secreto, 4, ' '))) ?>
+                    </dd>
+                </div>
+                <div>
+                    <dt class="rotulo">Tipo</dt>
+                    <dd class="mt-1 text-sm">Basada en tiempo (TOTP), 6 dígitos, cada 30 segundos</dd>
+                </div>
+            </dl>
 
-            <details class="mt-3">
+            <details class="mt-4">
                 <summary class="cursor-pointer text-sm underline">Ver enlace completo</summary>
                 <p class="mt-2 select-all break-all font-mono text-xs text-acero"><?= $e((string) $uri) ?></p>
             </details>
 
-            <?php /* Sin código QR: generarlo exige una dependencia nueva
-                     (endroid/qr-code) y las dependencias necesitan aprobación
-                     del PO. Todas las apps de autenticación permiten meter la
-                     clave a mano. */ ?>
-            <p class="mt-2 text-xs text-acero">
-                Si su aplicación pide escanear un QR, use la opción de introducir la
-                clave manualmente.
+            <?php /* Sin código QR a propósito: generarlo exige una dependencia
+                     nueva y con cuatro usuarios en toda la vida del sistema no
+                     se paga. Se revisa si algún día hay diez. */ ?>
+            <p class="mt-3 text-xs text-acero">
+                Si su aplicación pide escanear un código QR, elija la opción de
+                introducir la clave manualmente. Los espacios se pueden omitir.
             </p>
 
             <form method="post" action="/panel/seguridad/totp/confirmar" class="mt-5 flex flex-wrap items-end gap-3">

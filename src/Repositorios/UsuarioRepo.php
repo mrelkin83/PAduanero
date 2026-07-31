@@ -204,16 +204,54 @@ final class UsuarioRepo
     }
 
     /** Solo tras verificar un código: activar antes dejaría fuera al usuario. */
-    public function activarTotp(string $usuarioId): void
+    public function activarTotp(string $usuarioId, int $contador): void
     {
-        $this->bd->pdo()->prepare('UPDATE usuarios SET totp_activo = 1 WHERE id = ?')
-            ->execute([$usuarioId]);
+        // El contador del código de activación se guarda ya: si no, ese
+        // mismo código serviría otra vez para entrar.
+        $this->bd->pdo()->prepare(
+            'UPDATE usuarios SET totp_activo = 1, totp_ultimo_contador = ? WHERE id = ?'
+        )->execute([$contador, $usuarioId]);
     }
 
+    /**
+     * Restablece el segundo factor.
+     *
+     * Lo usa `bin/restablecer-2fa.php` cuando alguien pierde el teléfono.
+     * También limpia el contador: el secreto siguiente empieza de cero.
+     */
     public function desactivarTotp(string $usuarioId): void
     {
         $this->bd->pdo()->prepare(
-            'UPDATE usuarios SET totp_activo = 0, totp_secret_cifrado = NULL WHERE id = ?'
+            'UPDATE usuarios
+                SET totp_activo = 0, totp_secret_cifrado = NULL, totp_ultimo_contador = NULL
+              WHERE id = ?'
         )->execute([$usuarioId]);
+    }
+
+    // ── Antirreplay (RFC 6238 §5.2) ──────────────────────────────────────
+
+    public function ultimoContadorTotp(string $usuarioId): ?int
+    {
+        $stmt = $this->bd->pdo()->prepare('SELECT totp_ultimo_contador FROM usuarios WHERE id = ?');
+        $stmt->execute([$usuarioId]);
+        $valor = $stmt->fetchColumn();
+
+        return ($valor === false || $valor === null) ? null : (int) $valor;
+    }
+
+    /**
+     * Guarda el contador aceptado.
+     *
+     * La condición `< ?` en el WHERE no es adorno: con dos peticiones
+     * simultáneas usando el mismo código, la segunda no debe poder retroceder
+     * el contador. La comprobación de aplicación evita el caso normal; esto
+     * cierra la carrera.
+     */
+    public function guardarContadorTotp(string $usuarioId, int $contador): void
+    {
+        $this->bd->pdo()->prepare(
+            'UPDATE usuarios SET totp_ultimo_contador = ?
+              WHERE id = ? AND (totp_ultimo_contador IS NULL OR totp_ultimo_contador < ?)'
+        )->execute([$contador, $usuarioId, $contador]);
     }
 }
