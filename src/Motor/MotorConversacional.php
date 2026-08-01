@@ -209,6 +209,29 @@ final class MotorConversacional
             return Decision::silencio('la conversación desapareció');
         }
 
+        // ── Horario del bot (Etapa 6) ────────────────────────────────────
+        //
+        // Fuera del horario configurado no se gasta un turno de modelo: se
+        // responde con la plantilla de espera y la conversación queda
+        // pausada hasta la apertura, para que una ráfaga nocturna no mande
+        // veinte veces el mismo aviso. Las señales críticas NO pasan por
+        // aquí: la regla 5 escala en `procesar()`, antes de este punto.
+        $minutosParaAbrir = $this->minutosParaAbrir();
+
+        if ($minutosParaAbrir > 0) {
+            $texto = 'Gracias por escribir. En este momento estamos fuera del horario de '
+                . 'atención, pero su mensaje quedó recibido: le respondemos a primera hora.';
+
+            $this->outbox->encolar('chatwoot.entregar', [
+                'chatwoot_conv_id' => $chatwootConvId,
+                'texto' => $texto,
+            ]);
+
+            $this->conversaciones->pausar($chatwootConvId, $minutosParaAbrir);
+
+            return Decision::respondio($texto, $estado->casoId, null);
+        }
+
         $historial = $this->prompt->historialConBuffer($estado);
 
         try {
@@ -537,5 +560,69 @@ final class MotorConversacional
         $valor = $this->config->get($clave, $porDefecto);
 
         return $valor === true || $valor === 'true' || $valor === 1 || $valor === '1';
+    }
+
+    /**
+     * Minutos que faltan para que abra el bot; 0 si está abierto.
+     *
+     * `horario_atencion_bot` = `{"inicio":"07:00","fin":"20:00","dias":[1..6]}`
+     * con los días en la convención de `Fechas::diaSemana()` (0 = domingo).
+     *
+     * Una config ausente o rota significa **bot abierto 24/7**, no bot mudo:
+     * el fallo seguro para un embudo de captación es responder, y el
+     * registro deja constancia de que el horario no se pudo leer.
+     */
+    private function minutosParaAbrir(): int
+    {
+        $crudo = $this->config->get('horario_atencion_bot');
+
+        $horario = is_string($crudo) ? json_decode($crudo, true) : $crudo;
+
+        if (!is_array($horario)
+            || !is_string($horario['inicio'] ?? null)
+            || !is_string($horario['fin'] ?? null)
+            || !is_array($horario['dias'] ?? null)
+            || $horario['dias'] === []) {
+            if ($crudo !== null) {
+                $this->log->warn('motor.horario_ilegible', []);
+            }
+
+            return 0;
+        }
+
+        $ahora = \App\Soporte\Fechas::ahora();
+        $dias = array_map(intval(...), $horario['dias']);
+
+        // Se busca la próxima apertura recorriendo hasta una semana. Si hoy
+        // es día hábil y estamos dentro de la franja, la respuesta es 0.
+        for ($salto = 0; $salto <= 7; $salto++) {
+            $dia = $ahora->modify("+{$salto} days");
+
+            if (!in_array((int) $dia->format('w'), $dias, true)) {
+                continue;
+            }
+
+            $abre = new \DateTimeImmutable(
+                $dia->format('Y-m-d') . ' ' . $horario['inicio'],
+                $ahora->getTimezone(),
+            );
+            $cierra = new \DateTimeImmutable(
+                $dia->format('Y-m-d') . ' ' . $horario['fin'],
+                $ahora->getTimezone(),
+            );
+
+            if ($salto === 0 && $ahora >= $abre && $ahora < $cierra) {
+                return 0;
+            }
+
+            if ($abre > $ahora) {
+                return (int) ceil(($abre->getTimestamp() - $ahora->getTimestamp()) / 60);
+            }
+        }
+
+        // Ningún día activo en la semana: horario mal configurado. Abierto.
+        $this->log->warn('motor.horario_sin_dias_validos', []);
+
+        return 0;
     }
 }

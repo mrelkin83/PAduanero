@@ -321,6 +321,110 @@ final class MotorTest extends CasoBaseBd
         self::assertSame('urgent', $escalar['prioridad']);
     }
 
+    // ── Horario del bot (Etapa 6) ────────────────────────────────────────
+
+    #[Test]
+    public function fueraDeHorarioNoSeGastaTurnoYLaConversacionQuedaPausada(): void
+    {
+        // Domingo, 3 de la mañana. El horario sembrado atiende lunes a
+        // sábado de 7 a 20.
+        \App\Soporte\Fechas::congelar(new \DateTimeImmutable('2026-08-02 03:00:00', new \DateTimeZone('America/Bogota')));
+
+        try {
+            $this->conConsentimiento();
+            $this->config['horario_atencion_bot'] = '{"inicio":"07:00","fin":"20:00","dias":[1,2,3,4,5,6]}';
+
+            $motor = $this->motor();
+            $motor->procesar(42, self::TELEFONO, 'buenas noches, me decomisaron mercancía');
+            $this->bd->pdo()->exec('UPDATE conversacion_estado SET buffer_hasta = DATE_SUB(NOW(), INTERVAL 1 SECOND)');
+            $decision = $motor->despacharRafaga(42);
+
+            self::assertSame(Decision::RESPONDIO, $decision->tipo);
+            self::assertSame([], $this->llamadasLlm, 'ni un token a las 3 a. m.');
+            self::assertStringContainsString('fuera del horario', (string) $decision->textoEntregado);
+
+            // Pausada hasta la apertura: una ráfaga nocturna no manda veinte
+            // veces el mismo aviso.
+            self::assertNotNull($this->conversaciones->porConversacion(42)?->pausadaHasta);
+        } finally {
+            \App\Soporte\Fechas::congelar(null);
+        }
+    }
+
+    #[Test]
+    public function laSenalCriticaEscalaAunFueraDeHorario(): void
+    {
+        // La regla 5 no tiene horario: una POLFA en la bodega a las 3 de la
+        // mañana escala igual, porque va por `procesar()` antes de la puerta
+        // del horario.
+        \App\Soporte\Fechas::congelar(new \DateTimeImmutable('2026-08-02 03:00:00', new \DateTimeZone('America/Bogota')));
+
+        try {
+            $this->conConsentimiento();
+            $this->config['horario_atencion_bot'] = '{"inicio":"07:00","fin":"20:00","dias":[1,2,3,4,5,6]}';
+
+            $decision = $this->motor()->procesar(42, self::TELEFONO, 'La POLFA está en mi bodega ahora');
+
+            self::assertSame(Decision::ESCALO, $decision->tipo);
+            self::assertNotEmpty($this->eventos('alerta.escalamiento'));
+        } finally {
+            \App\Soporte\Fechas::congelar(null);
+        }
+    }
+
+    #[Test]
+    public function unHorarioRotoDejaElBotAbiertoNoMudo(): void
+    {
+        // El fallo seguro de un embudo de captación es responder. Una config
+        // ilegible no puede silenciar el negocio.
+        $this->conConsentimiento();
+        $this->config['horario_atencion_bot'] = '{esto no es json}';
+
+        $motor = $this->motor();
+        $motor->procesar(42, self::TELEFONO, 'buenas');
+        $this->bd->pdo()->exec('UPDATE conversacion_estado SET buffer_hasta = DATE_SUB(NOW(), INTERVAL 1 SECOND)');
+        $decision = $motor->despacharRafaga(42);
+
+        self::assertSame(Decision::RESPONDIO, $decision->tipo);
+        self::assertNotEmpty($this->llamadasLlm, 'el modelo respondió normal');
+    }
+
+    // ── Los seis motivos de escalamiento (Etapa 6) ───────────────────────
+
+    #[Test]
+    public function losSeisMotivosDeEscalamientoFuncionan(): void
+    {
+        // Cierre de la Etapa 6: «escalamiento a humano probado en los seis
+        // motivos». urgencia, limite_turnos y error_tecnico tienen sus
+        // pruebas de puerta propias; aquí se recorren los seis por la vía
+        // del modelo, que es la única que los admite todos.
+        foreach ([
+            'urgencia',
+            'solicitud_expresa',
+            'caso_sensible',
+            'inconformidad',
+            'limite_turnos',
+            'error_tecnico',
+        ] as $i => $motivo) {
+            $conv = 100 + $i;
+            $this->limpiar();
+            $this->setUp();
+            $this->conConsentimiento();
+
+            $motor = $this->motor('Lo comunico. {"accion":"ESCALAR_HUMANO","motivo":"' . $motivo . '"}');
+            $motor->procesar($conv, self::TELEFONO, 'mensaje');
+            $this->bd->pdo()->exec('UPDATE conversacion_estado SET buffer_hasta = DATE_SUB(NOW(), INTERVAL 1 SECOND)');
+            $decision = $motor->despacharRafaga($conv);
+
+            self::assertSame(Decision::ESCALO, $decision->tipo, $motivo);
+            self::assertSame($motivo, $decision->motivo, $motivo);
+            self::assertFalse(
+                (bool) $this->conversaciones->porConversacion($conv)?->iaActiva,
+                "{$motivo}: la IA queda apagada",
+            );
+        }
+    }
+
     // ── Puerta 4: consentimiento antes que nada (regla 1) ────────────────
 
     #[Test]
