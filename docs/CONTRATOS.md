@@ -298,7 +298,7 @@ interface Pagos
     /** @return array{url:string,referencia:string,pagoId:string,expiraEn:DateTimeImmutable} */
     public function crearLink(
         string $consultaId,
-        int $montoCentavos,
+        int $montoPesos,
         string $descripcion,
         Contacto $contacto
     ): array;
@@ -368,8 +368,12 @@ interface Outbox
 }
 ```
 
-Tipos válidos: `notificar_abogado` · `enviar_mensaje` · `recordatorio_pago` ·
-`recordatorio_consulta` · `email` · `sincronizar_chatwoot`.
+Tipos válidos (los que los manejadores declaran en `tipos()`, que es la
+lista real — la de la v1 de este documento envejeció antes de implementarse):
+`chatwoot.entregar` · `chatwoot.etiquetar` · `chatwoot.escalar` ·
+`alerta.escalamiento` · `alerta.modelo_retirado` · `alerta.pago_confirmado` ·
+`alerta.pago_huerfano`. Los recordatorios son `chatwoot.entregar`
+programados con `retrasoSegundos`.
 Reintentos con backoff: 1 m, 5 m, 15 m, 1 h, 6 h. Al quinto fallo → `fallido` + alerta.
 
 El worker se lanza con systemd o supervisor, no con `cron` cada minuto: necesita

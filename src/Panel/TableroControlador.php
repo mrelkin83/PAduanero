@@ -11,22 +11,35 @@ use App\Servicios\Config;
 /**
  * Tablero.
  *
- * En la Etapa 3 todavía no hay casos ni conversaciones, así que las cifras de
- * embudo se quedan para la Etapa 8. Lo que sí muestra ya, y es lo importante,
- * son los dos interruptores del motor: «que nunca se olvide encendida o
- * apagada por descuido» (docs/PANEL_ADMIN.md §2.1).
+ * Los dos interruptores del motor arriba de todo —«que nunca se olvide
+ * encendida o apagada por descuido» (docs/PANEL_ADMIN.md §2.1)— y, desde la
+ * Etapa 8, el embudo por canal: costo por lead y conversión a asesoría
+ * pagada, que son los dos números que dicen si la pauta paga.
  */
 final class TableroControlador extends ControladorBase
 {
     public function __construct(
         private readonly BD $bd,
         private readonly Config $config,
+        private readonly \App\Servicios\Metricas $metricas,
     ) {
     }
 
     public function inicio(Contexto $ctx): Respuesta
     {
         $ctx->permisos->exigir($ctx->usuario, 'tablero.ver');
+
+        // Últimos 30 días por defecto; el rango se cambia por la URL.
+        $hasta = (string) ($ctx->peticion->consulta['hasta'] ?? \App\Soporte\Fechas::hoy());
+        $desde = (string) ($ctx->peticion->consulta['desde']
+            ?? \App\Soporte\Fechas::ahora()->modify('-30 days')->format('Y-m-d'));
+
+        $reFecha = '/^\d{4}-\d{2}-\d{2}$/';
+
+        if (preg_match($reFecha, $desde) !== 1 || preg_match($reFecha, $hasta) !== 1) {
+            $hasta = \App\Soporte\Fechas::hoy();
+            $desde = \App\Soporte\Fechas::ahora()->modify('-30 days')->format('Y-m-d');
+        }
 
         return $this->vista('panel/tablero', [
             'ctx' => $ctx,
@@ -37,8 +50,32 @@ final class TableroControlador extends ControladorBase
                 ->fetchColumn() ?: 0),
             'pasarela' => (string) $this->config->get('pasarela_activa', ''),
             'pendientes' => $this->pendientes(),
+            'desde' => $desde,
+            'hasta' => $hasta,
+            'embudo' => $this->metricas->porCanal($desde, $hasta),
+            'landing' => $this->metricas->eventosLanding($desde, $hasta),
+            'puedeAnotarInversion' => $ctx->puede('config.editar'),
             'avisos' => $this->avisos($ctx),
         ]);
+    }
+
+    /** Anota la inversión mensual de un canal, para el costo por lead. */
+    public function anotarInversion(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'config.editar');
+
+        try {
+            $this->metricas->anotarInversion(
+                $ctx->campo('mes'),
+                $ctx->campo('canal'),
+                (int) $ctx->campo('monto_cop', '0'),
+                $ctx->usuario?->id,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return $this->redirigirCon('/panel', 'error', $e->getMessage());
+        }
+
+        return $this->redirigirCon('/panel', 'ok', 'Inversión anotada.');
     }
 
     /**

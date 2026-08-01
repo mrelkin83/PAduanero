@@ -110,7 +110,7 @@ final class PanelTest extends CasoBaseBd
 
     private function tablero(): TableroControlador
     {
-        return new TableroControlador($this->bd, $this->config);
+        return new TableroControlador($this->bd, $this->config, new \App\Servicios\Metricas($this->bd));
     }
 
     private function configuracion(): ConfiguracionControlador

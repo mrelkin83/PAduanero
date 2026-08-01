@@ -130,6 +130,7 @@ final class Panel
 
         return match ($clave) {
             'GET /' => $modulos['tablero']->inicio($ctx),
+            'POST /inversion' => $modulos['tablero']->anotarInversion($ctx),
             'POST /salir' => $autenticacion->salir($ctx),
 
             'GET /configuracion' => $modulos['configuracion']->listar($ctx),
@@ -189,6 +190,7 @@ final class Panel
             'tablero' => new TableroControlador(
                 $this->c->obtener(BD::class),
                 $this->c->obtener(Config::class),
+                new \App\Servicios\Metricas($this->c->obtener(BD::class)),
             ),
             'configuracion' => new ConfiguracionControlador(
                 $this->c->obtener(Config::class),
