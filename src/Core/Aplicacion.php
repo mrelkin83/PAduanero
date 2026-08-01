@@ -144,6 +144,26 @@ final class Aplicacion
             ),
         );
 
+        // ── Conocimiento (Etapa 7) ───────────────────────────────────────
+        $this->contenedor->registrar(
+            \App\Servicios\Embeddings::class,
+            static fn (Contenedor $c): \App\Servicios\Embeddings => new \App\Servicios\EmbeddingsHttp(
+                $c->obtener(BD::class),
+                $c->obtener(Credenciales::class),
+                $c->obtener(\App\Soporte\Http::class),
+                $c->obtener(Logger::class),
+            ),
+        );
+
+        $this->contenedor->registrar(
+            \App\Servicios\BaseConocimiento::class,
+            static fn (Contenedor $c): \App\Servicios\BaseConocimiento => new \App\Servicios\BaseConocimientoMysql(
+                $c->obtener(BD::class),
+                $c->obtener(\App\Servicios\Embeddings::class),
+                $c->obtener(Logger::class),
+            ),
+        );
+
         // ── Motor (Etapa 4) ──────────────────────────────────────────────
         $this->contenedor->registrar(
             \App\Repositorios\ContactoRepo::class,
@@ -189,6 +209,9 @@ final class Aplicacion
             static fn (Contenedor $c): \App\Motor\ConstructorPrompt => new \App\Motor\ConstructorPrompt(
                 $c->obtener(\App\Repositorios\PromptRepo::class),
                 $c->obtener(\App\Servicios\GateDorado::class),
+                $c->obtener(\App\Servicios\BaseConocimiento::class),
+                $c->obtener(\App\Repositorios\CasoRepo::class),
+                max(1, (int) $c->obtener(Config::class)->get('rag_fragmentos_max', 4)),
             ),
         );
 

@@ -65,6 +65,11 @@ final class ConstructorPrompt
     public function __construct(
         private readonly PromptRepo $prompts,
         private readonly GateDorado $gate,
+        // Etapa 7. Opcionales para que las etapas anteriores sigan armándose
+        // sin el RAG; sin ellos el prompt va sin apoyo documental.
+        private readonly ?\App\Servicios\BaseConocimiento $conocimiento = null,
+        private readonly ?\App\Repositorios\CasoRepo $casos = null,
+        private readonly int $fragmentosMax = 4,
     ) {
     }
 
@@ -92,7 +97,82 @@ final class ConstructorPrompt
             $partes[] = "\nRESUMEN DE LO HABLADO HASTA AHORA:\n" . $estado->resumenLargo;
         }
 
+        $apoyo = $this->apoyoDocumental($estado);
+
+        if ($apoyo !== null) {
+            $partes[] = $apoyo;
+        }
+
         return implode("\n", $partes);
+    }
+
+    /**
+     * Fragmentos verificados de la base de conocimiento (Etapa 7).
+     *
+     * Los 130+ escenarios NO van en el prompt: van en `kb_chunks` y aquí se
+     * recuperan solo los pertinentes al caso y al último mensaje. Por diseño
+     * (regla 10) `buscar()` únicamente devuelve material que Pedro verificó,
+     * así que todo lo que entra por este camino tiene firma.
+     *
+     * El fragmento es apoyo para el CRITERIO del bot, no texto para citar:
+     * las prohibiciones duras siguen mandando, y se le recuerda en el mismo
+     * bloque para que la cercanía gane a la distancia.
+     */
+    private function apoyoDocumental(ConversacionEstado $estado): ?string
+    {
+        if ($this->conocimiento === null || $estado->casoId === null) {
+            return null;
+        }
+
+        $caso = $this->casos?->porId($estado->casoId);
+
+        if ($caso === null) {
+            return null;
+        }
+
+        // La consulta de búsqueda es el último mensaje del contacto: es lo
+        // que el bot está a punto de responder.
+        $ultimo = $estado->buffer !== []
+            ? implode(' ', $estado->buffer)
+            : $this->ultimoTurnoUsuario($estado);
+
+        if ($ultimo === null || trim($ultimo) === '') {
+            return null;
+        }
+
+        // El área «mixto» del caso no existe en los documentos, que declaran
+        // aduanero/tributario/ambos: un caso mixto busca en las dos ramas.
+        $fragmentos = $this->conocimiento->buscar(
+            $ultimo,
+            $caso->area === 'mixto' ? null : $caso->area,
+            $caso->tipoCaso,
+            max(1, $this->fragmentosMax),
+        );
+
+        if ($fragmentos === []) {
+            return null;
+        }
+
+        $bloques = array_map(
+            static fn (array $f): string => '· [' . ($f['referencia'] !== '' ? $f['referencia'] : 'KB')
+                . '] ' . $f['contenido'],
+            $fragmentos,
+        );
+
+        return "\nAPOYO DOCUMENTAL VERIFICADO POR EL DESPACHO (úsalo para orientar tu"
+            . " criterio; NO cites números de norma al contacto, las prohibiciones"
+            . " de arriba siguen valiendo):\n" . implode("\n", $bloques);
+    }
+
+    private function ultimoTurnoUsuario(ConversacionEstado $estado): ?string
+    {
+        foreach (array_reverse($estado->historial) as $turno) {
+            if (is_array($turno) && ($turno['role'] ?? '') === 'user' && is_string($turno['content'] ?? null)) {
+                return $turno['content'];
+            }
+        }
+
+        return null;
     }
 
     /**

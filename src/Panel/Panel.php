@@ -147,6 +147,11 @@ final class Panel
             'POST /prompts/activar' => $modulos['prompts']->activar($ctx),
             'GET /prompts/diff' => $modulos['prompts']->diferencias($ctx),
 
+            'GET /conocimiento' => $modulos['conocimiento']->inicio($ctx),
+            'POST /conocimiento' => $modulos['conocimiento']->crear($ctx),
+            'POST /conocimiento/verificar' => $modulos['conocimiento']->verificar($ctx),
+            'POST /conocimiento/vigencia' => $modulos['conocimiento']->alternarVigencia($ctx),
+
             'GET /ia' => $modulos['ia']->inicio($ctx),
             'POST /ia/proveedor' => $modulos['ia']->crearProveedor($ctx),
             'POST /ia/proveedor/activo' => $modulos['ia']->alternarProveedor($ctx),
@@ -201,6 +206,11 @@ final class Panel
             'prompts' => new PromptsControlador(
                 $this->c->obtener(\App\Repositorios\PromptRepo::class),
                 $this->c->obtener(\App\Servicios\GateDorado::class),
+                $this->c->obtener(AuditoriaRepo::class),
+            ),
+            'conocimiento' => new ConocimientoControlador(
+                $this->c->obtener(BD::class),
+                $this->c->obtener(\App\Servicios\BaseConocimiento::class),
                 $this->c->obtener(AuditoriaRepo::class),
             ),
             'ia' => new IaControlador(
