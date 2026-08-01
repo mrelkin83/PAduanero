@@ -157,6 +157,9 @@ corresponde: es una decisión de la persona, no un estado imposible de los datos
 ```php
 interface Chatwoot
 {
+    /** @return array{id:int,sombra:bool} — el ÚNICO método que el motor llama para hablar */
+    public function entregar(int $conversacionId, string $texto): array;
+
     public function responder(int $conversacionId, string $texto): int;    // → id del mensaje
     public function notaPrivada(int $conversacionId, string $texto): int;  // modo sombra
     public function etiquetar(int $conversacionId, array $etiquetas): void;
@@ -168,8 +171,37 @@ interface Chatwoot
 }
 ```
 
-Tres reintentos con backoff exponencial. Si Chatwoot no responde, el mensaje se
-encola en `eventos_outbox`: nunca se pierde ni se duplica.
+**`entregar()`, no `responder()`.** La decisión de modo sombra vive en un solo
+sitio. Si estuviera en cada punto que quiere hablar, bastaría un olvido para
+que un borrador sin revisar saliera hacia un cliente — y no habría ningún
+síntoma hasta que ese cliente contestara a algo que Pedro nunca aprobó. Lo
+comprueba `ArquitecturaTest`, que lee `src/Motor/` y falla si aparece una
+llamada directa a `responder()`.
+
+Ante la ausencia de la clave `motor_modo_sombra` —fila borrada, migración a
+medias, caché con basura— se asume **sombra**. El valor por defecto seguro es
+no enviarle nada a un cliente.
+
+El borrador va marcado (`ChatwootApi::MARCA_SOMBRA`). El día que se active el
+envío automático, una nota privada y un mensaje enviado se parecen demasiado en
+la bandeja como para distinguirlos de un vistazo.
+
+**Reintentos: tres, y solo ante lo que indica que la petición no llegó a
+procesarse** — error de red, 429, 502, 503, 504. Un **500 no se reintenta**:
+significa que Chatwoot corrió y pudo haber creado el mensaje antes de romperse,
+y repetir lo pondría dos veces en el hilo de un cliente. Tampoco se reintenta
+una respuesta 2xx sin `id`: Chatwoot aceptó, el mensaje está, y volver a
+enviarlo por no poder leer un número lo duplicaría.
+
+Riesgo residual asumido a conciencia: un 504 puede llegar *después* de que
+Chatwoot creara el mensaje. Entre perder un mensaje y repetirlo, se repite —
+el compromiso del ADR-004 es que nunca se pierde. En modo sombra el duplicado
+ni siquiera es visible para el cliente: son dos borradores para Pedro.
+
+Agotados los reintentos se lanza `ChatwootNoDisponible` y quien la captura lo
+encola en `eventos_outbox`. `agotoReintentos` distingue lo transitorio —a lo
+que el worker debe volver— del rechazo definitivo, que va a fallar igual dentro
+de una hora y solo llenaría la cola.
 
 ---
 

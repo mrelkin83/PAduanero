@@ -164,6 +164,24 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Servicios\Chatwoot::class,
+            static fn (Contenedor $c): \App\Servicios\Chatwoot => new \App\Servicios\ChatwootApi(
+                $c->obtener(\App\Soporte\Http::class),
+                $c->obtener(Config::class),
+                $c->obtener(Logger::class),
+                rtrim(Entorno::obtener('CHATWOOT_URL', '') ?? '', '/'),
+                Entorno::obtener('CHATWOOT_ACCOUNT_ID', '1') ?? '1',
+                Entorno::obtener('CHATWOOT_BOT_TOKEN', '') ?? '',
+                // Agente de Pedro, para asignarle los escalamientos. Si falta,
+                // el escalamiento sigue ocurriendo sin asignar: peor atendido,
+                // pero atendido.
+                ($id = Entorno::obtener('CHATWOOT_AGENTE_ABOGADO_ID', '')) !== null && $id !== ''
+                    ? (int) $id
+                    : null,
+            ),
+        );
+
+        $this->contenedor->registrar(
             \App\Servicios\Llm::class,
             static fn (Contenedor $c): \App\Servicios\Llm => new \App\Servicios\Llm(
                 $c->obtener(BD::class),
