@@ -142,6 +142,11 @@ final class Panel
             'POST /pagos/credenciales' => $modulos['pagos']->guardarCredencial($ctx),
             'POST /pagos/probar' => $modulos['pagos']->probar($ctx),
 
+            'GET /prompts' => $modulos['prompts']->listar($ctx),
+            'POST /prompts' => $modulos['prompts']->crear($ctx),
+            'POST /prompts/activar' => $modulos['prompts']->activar($ctx),
+            'GET /prompts/diff' => $modulos['prompts']->diferencias($ctx),
+
             'GET /ia' => $modulos['ia']->inicio($ctx),
             'POST /ia/sincronizar' => $modulos['ia']->sincronizar($ctx),
             'POST /ia/costo' => $modulos['ia']->guardarCosto($ctx),
@@ -185,6 +190,11 @@ final class Panel
                 $this->c->obtener(\App\Repositorios\CredencialRepo::class),
                 $this->c->obtener(Config::class),
                 rtrim(Entorno::obtener('APP_URL', '') ?? '', '/'),
+            ),
+            'prompts' => new PromptsControlador(
+                $this->c->obtener(\App\Repositorios\PromptRepo::class),
+                $this->c->obtener(\App\Servicios\GateDorado::class),
+                $this->c->obtener(AuditoriaRepo::class),
             ),
             'ia' => new IaControlador(
                 $this->c->obtener(BD::class),

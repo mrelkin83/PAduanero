@@ -116,6 +116,55 @@ final class GateDorado
     }
 
     /**
+     * ¿Se puede activar esta versión de prompt?
+     *
+     * Simétrico al de los modelos, y por la misma razón: la corrida dorada
+     * valida **la pareja prompt + modelo**, no cada uno por su lado. Activar
+     * un prompt que nunca se probó contra el modelo que está hablando deja al
+     * bot funcionando con una combinación que nadie verificó — y sin ningún
+     * síntoma, porque el bot sigue respondiendo.
+     *
+     * Es lo que cierra el hueco que quedaba: `puedePromover()` impide cambiar
+     * el modelo sin dorado, pero sin esto se podía conseguir lo mismo por el
+     * otro lado, cambiando el prompt.
+     *
+     * @return array{ok:bool,motivo:string}
+     */
+    public function puedeActivarPrompt(string $promptId): array
+    {
+        $primario = $this->bd->pdo()->query(
+            "SELECT id, identificador FROM modelos_ia
+              WHERE proposito = 'conversacion' AND es_primario = 1 LIMIT 1"
+        )->fetch();
+
+        if ($primario === false) {
+            // Todavía no hay primario: es el caso normal la primera vez, y
+            // entonces el orden correcto es activar el prompt y después
+            // correr el dorado para poder promover el modelo.
+            return ['ok' => true, 'motivo' => ''];
+        }
+
+        $stmt = $this->bd->pdo()->prepare(
+            "SELECT dorado_estado, dorado_prompt_id FROM modelos_ia WHERE id = ?"
+        );
+        $stmt->execute([$primario['id']]);
+        $modelo = $stmt->fetch();
+
+        if (($modelo['dorado_estado'] ?? '') === 'verde'
+            && (string) ($modelo['dorado_prompt_id'] ?? '') === $promptId) {
+            return ['ok' => true, 'motivo' => ''];
+        }
+
+        return [
+            'ok' => false,
+            'motivo' => 'Esta versión no se ha probado contra ' . $primario['identificador']
+                . ', que es el modelo que está hablando. Corra el conjunto dorado '
+                . '(`php bin/correr-dorado.php --prompt=' . $promptId . '`) y actívela '
+                . 'cuando salga en verde.',
+        ];
+    }
+
+    /**
      * Deja constancia de una corrida.
      *
      * La llama el corredor del conjunto dorado, no el panel: nadie marca un
@@ -123,11 +172,16 @@ final class GateDorado
      * parámetro, para que sea imposible registrar una corrida atribuyéndola a
      * un prompt que no era el activo.
      *
+     * @param array{id:string,contenido:string} $prompt la FILA del prompt con
+     *        el que se corrió, no su id suelto. Se recibe entera para que sea
+     *        imposible correr con un texto y registrar contra otro id: quien
+     *        llama solo puede pasar lo que leyó del repositorio.
      * @param array<string,mixed> $detalle recuento por categoría de regla,
      *                                     nunca el texto de las conversaciones
      */
     public function registrarCorrida(
         string $modeloId,
+        array $prompt,
         bool $verde,
         int $casos,
         int $fallos,
@@ -146,7 +200,7 @@ final class GateDorado
               WHERE id = ?'
         )->execute([
             $verde ? 'verde' : 'rojo',
-            $this->promptActivoId(),
+            $prompt['id'],
             $casos,
             $fallos,
             $detalle === []

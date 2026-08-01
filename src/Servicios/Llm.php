@@ -164,6 +164,74 @@ final class Llm
     }
 
     /**
+     * Una sola llamada a un modelo **concreto**, saltándose el `GateDorado`.
+     *
+     * Existe por una circularidad que el propio gate crea: un modelo no puede
+     * responder sin corrida dorada en verde, y la corrida dorada necesita que
+     * responda para existir. Sin esta puerta, la primera corrida sería
+     * imposible y el sistema no podría arrancar nunca.
+     *
+     * **Su único llamador legítimo es `bin/correr-dorado.php`.** Saltarse el
+     * gate es aceptable ahí y solo ahí, porque al otro lado de esa llamada no
+     * hay un cliente: hay un archivo de aserciones. El resto de garantías
+     * siguen en pie — el modelo tiene que estar activo, no retirado y con
+     * costo verificado, y el consumo se registra igual.
+     *
+     * La firma es deliberadamente incómoda: exige el **id** del modelo, que
+     * nadie tiene a mano por casualidad. No es una barrera criptográfica, es
+     * fricción suficiente para que no se use por descuido en lugar de
+     * `chat()`.
+     *
+     * @param array<int,array{role:string,content:string}> $mensajes
+     * @throws LlmException
+     */
+    public function chatParaConjuntoDorado(
+        string $systemPrompt,
+        array $mensajes,
+        string $modeloId,
+        ?int $maxTokens = null,
+    ): RespuestaLlm {
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT m.*, p.clave AS proveedor_clave, p.base_url, p.formato_api
+               FROM modelos_ia m
+               JOIN proveedores_ia p ON p.id = m.proveedor_id
+              WHERE m.id = ?
+                AND m.activo = 1
+                AND m.retirado_en IS NULL
+                AND m.costos_verificados = 1
+                AND m.costo_entrada_usd_1m IS NOT NULL
+                AND p.activo = 1'
+        );
+        $stmt->execute([$modeloId]);
+        $modelo = $stmt->fetch();
+
+        if ($modelo === false) {
+            throw LlmException::sinModeloAutorizado('conversacion');
+        }
+
+        $this->exigirPresupuesto();
+
+        try {
+            $respuesta = $this->intentar($modelo, $systemPrompt, $mensajes, $maxTokens);
+        } catch (FalloProveedor $e) {
+            $this->registrarConsumo($modelo, null, 0, 0, $e->latenciaMs, exito: false, error: $e->getMessage());
+
+            throw LlmException::proveedoresCaidos(1);
+        }
+
+        $this->registrarConsumo(
+            $modelo,
+            null,
+            $respuesta->tokensEntrada,
+            $respuesta->tokensSalida,
+            $respuesta->latenciaMs,
+            exito: true,
+        );
+
+        return $respuesta;
+    }
+
+    /**
      * Modelos que pueden responder, en orden.
      *
      * Cada condición del WHERE es una invariante y ninguna es redundante:

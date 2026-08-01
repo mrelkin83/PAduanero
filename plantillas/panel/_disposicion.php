@@ -22,6 +22,7 @@ $menu = [
     ['/panel/tarifas', 'Agenda y tarifas', 'agenda.ver'],
     ['/panel/pagos', 'Pagos', 'pagos.transacciones.ver'],
     ['/panel/ia', 'Modelos de IA', 'ia.proveedores.ver'],
+    ['/panel/prompts', 'Prompts del bot', 'ia.prompts.editar'],
     ['/panel/configuracion', 'Configuración', 'config.ver'],
     ['/panel/usuarios', 'Usuarios', 'usuarios.ver'],
     ['/panel/auditoria', 'Bitácora', 'auditoria.ver'],

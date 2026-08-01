@@ -44,6 +44,87 @@ final class PromptRepo
         ];
     }
 
+    /**
+     * Una versión concreta, activa o no.
+     *
+     * Es lo que permite correr el conjunto dorado contra una versión que
+     * todavía no está activa — y sin eso el ciclo no cierra: una versión no se
+     * puede activar hasta tener dorado verde, y no se podría probar si hubiera
+     * que activarla antes.
+     *
+     * @return array{id:string,version:int,contenido:string}|null
+     */
+    public function porVersion(string $clave, int $version): ?array
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT id, version, contenido FROM prompts WHERE clave = ? AND version = ? LIMIT 1'
+        );
+        $stmt->execute([$clave, $version]);
+        $fila = $stmt->fetch();
+
+        if ($fila === false) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $fila['id'],
+            'version' => (int) $fila['version'],
+            'contenido' => (string) $fila['contenido'],
+        ];
+    }
+
+    /** @return array{id:string,version:int,contenido:string}|null */
+    public function porId(string $id): ?array
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT id, version, contenido FROM prompts WHERE id = ? LIMIT 1'
+        );
+        $stmt->execute([$id]);
+        $fila = $stmt->fetch();
+
+        if ($fila === false) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $fila['id'],
+            'version' => (int) $fila['version'],
+            'contenido' => (string) $fila['contenido'],
+        ];
+    }
+
+    /**
+     * Activa una versión y desactiva la anterior, en una transacción.
+     *
+     * En este orden y atómico porque `ux_prompt_activo` solo admite una activa
+     * por clave: bajar la vieja y subir la nueva por separado deja, si algo
+     * falla en medio, al motor sin prompt — y sin prompt el motor no habla.
+     *
+     * **No comprueba permisos ni el gate dorado.** Eso lo hace el controlador,
+     * que es quien sabe quién está pulsando el botón.
+     */
+    public function activar(string $id, string $clave, string $aprobadoPor): void
+    {
+        $pdo = $this->bd->pdo();
+        $pdo->beginTransaction();
+
+        try {
+            $pdo->prepare('UPDATE prompts SET activo = 0 WHERE clave = ?')->execute([$clave]);
+
+            $pdo->prepare(
+                'UPDATE prompts SET activo = 1, aprobado_por = ?, aprobado_en = NOW() WHERE id = ?'
+            )->execute([$aprobadoPor, $id]);
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
+        }
+    }
+
     /** @return list<array<string,mixed>> */
     public function versiones(string $clave): array
     {

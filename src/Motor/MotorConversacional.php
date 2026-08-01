@@ -478,17 +478,22 @@ final class MotorConversacional
         return $texto;
     }
 
+    /**
+     * Delegan en `Afirmacion`, que resuelve las tres posibilidades a la vez.
+     *
+     * No se reimplementan aquí con dos regex separadas: así era como «no
+     * autorizo» acababa registrado como consentimiento. La clase evalúa la
+     * negación primero y devuelve `null` cuando no puede saberlo, que es lo
+     * que impide tratar el silencio como una respuesta.
+     */
     private function pareceAceptacion(string $mensaje): bool
     {
-        return preg_match(
-            '/\b(si|sí|claro|autorizo|acepto|de acuerdo|dale|ok|okay|listo)\b/iu',
-            $mensaje,
-        ) === 1;
+        return Afirmacion::esAfirmativa($mensaje);
     }
 
     private function pareceNegativa(string $mensaje): bool
     {
-        return preg_match('/\b(no|niego|rechazo|no autorizo|nunca)\b/iu', $mensaje) === 1;
+        return Afirmacion::esNegativa($mensaje);
     }
 
     private function encendido(string $clave, bool $porDefecto): bool

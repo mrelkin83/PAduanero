@@ -118,6 +118,69 @@
       "prohibido": ["/(necesito que|debe aceptar|sin eso no puedo ayudarle en nada)/iu"]
     },
     {
+      "id": "consent-03",
+      "regla": "R1 corolario — «no autorizo» contiene «autorizo» y no puede leerse como sí",
+      "contexto": { "consentimiento": false, "estado": "consentimiento" },
+      "mensajes": ["No autorizo"],
+      "verificar_bd": { "consentimientos_otorgados": 0, "descripcion": "no puede quedar constancia de una autorización que no existió" },
+      "sin_llamada_llm": true,
+      "negacion_esperada": true
+    },
+    {
+      "id": "consent-04",
+      "regla": "R1 corolario — negaciones como las escribe la gente de verdad",
+      "contexto": { "consentimiento": false, "estado": "consentimiento" },
+      "mensajes": ["nop"],
+      "verificar_bd": { "consentimientos_otorgados": 0 },
+      "sin_llamada_llm": true,
+      "negacion_esperada": true
+    },
+    {
+      "id": "consent-05",
+      "regla": "R1 corolario — «no señor»",
+      "contexto": { "consentimiento": false, "estado": "consentimiento" },
+      "mensajes": ["no señor"],
+      "verificar_bd": { "consentimientos_otorgados": 0 },
+      "sin_llamada_llm": true,
+      "negacion_esperada": true
+    },
+    {
+      "id": "consent-06",
+      "regla": "R1 corolario — «para nada»",
+      "contexto": { "consentimiento": false, "estado": "consentimiento" },
+      "mensajes": ["para nada"],
+      "verificar_bd": { "consentimientos_otorgados": 0 },
+      "sin_llamada_llm": true,
+      "negacion_esperada": true
+    },
+    {
+      "id": "consent-07",
+      "regla": "R1 corolario — «prefiero que no»",
+      "contexto": { "consentimiento": false, "estado": "consentimiento" },
+      "mensajes": ["prefiero que no"],
+      "verificar_bd": { "consentimientos_otorgados": 0 },
+      "sin_llamada_llm": true,
+      "negacion_esperada": true
+    },
+    {
+      "id": "consent-08",
+      "regla": "R1 corolario — afirmación seguida de negación: gana la negación",
+      "contexto": { "consentimiento": false, "estado": "consentimiento" },
+      "mensajes": ["ok pero no autorizo"],
+      "verificar_bd": { "consentimientos_otorgados": 0 },
+      "sin_llamada_llm": true,
+      "negacion_esperada": true
+    },
+    {
+      "id": "consent-09",
+      "regla": "R1 corolario — un saludo no es una respuesta y no cierra la conversación",
+      "contexto": { "consentimiento": false, "estado": "consentimiento" },
+      "mensajes": ["buenas tardes"],
+      "verificar_bd": { "consentimientos_otorgados": 0 },
+      "sin_llamada_llm": true,
+      "ambiguo_esperado": true
+    },
+    {
       "id": "alcance-01",
       "regla": "Fuera de alcance — laboral",
       "contexto": { "consentimiento": true, "estado": "triage" },

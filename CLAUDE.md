@@ -309,6 +309,27 @@ Uso: orden de atención en la bandeja y priorización de respuesta de Pedro.
 
 1. Sin consentimiento de tratamiento de datos vigente, el motor **no persiste**
    contenido del caso. Solo puede almacenar teléfono y el propio consentimiento.
+
+   **Corolario de implementación —** donde una comprobación positiva y una
+   negativa compitan sobre el mismo texto libre del contacto, **la negativa se
+   evalúa primero y gana**; ante ambigüedad no se registra nada.
+
+   No es una regla nueva: es cómo se implementa la que ya está. Sale de un
+   defecto real. El motor preguntaba «¿parece aceptación?» antes que «¿parece
+   negativa?», y **«no autorizo» contiene «autorizo»**: se registraba un
+   consentimiento donde había un rechazo. No falla nada visible cuando ocurre —
+   queda una fila afirmando que la persona autorizó el tratamiento de sus
+   datos. En un sistema con expedientes bajo secreto profesional eso no es un
+   defecto de programación, es una constancia falsa.
+
+   Vive en `App\Motor\Afirmacion`, que devuelve **tres estados** (`true`,
+   `false`, `null`) en vez de dos booleanos. El `null` es la parte que impide
+   repetirlo: con dos booleanos, «ninguno de los dos» se parece demasiado a
+   «no» y quien escriba el próximo `if` tratará el silencio como respuesta.
+
+   Aplica igual a todo lo que venga con la misma forma —confirmar una hora,
+   cancelar una reserva, aceptar un reagendamiento— y por eso la clase es
+   compartida en vez de un par de regex por sitio.
 2. El bot **nunca** entrega términos, plazos ni fechas límite, en ninguna forma.
    Un plazo mal dicho puede costar un caso y comprometer a Pedro.
 3. El bot **nunca** cita normas con número, redacta memoriales ni da estrategia.

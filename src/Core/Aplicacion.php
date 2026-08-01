@@ -199,6 +199,18 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Servicios\WebhookChatwoot::class,
+            static fn (Contenedor $c): \App\Servicios\WebhookChatwoot
+                => new \App\Servicios\WebhookChatwoot(
+                    $c->obtener(\App\Motor\MotorConversacional::class),
+                    $c->obtener(\App\Repositorios\ConversacionEstadoRepo::class),
+                    $c->obtener(\App\Servicios\Outbox::class),
+                    $c->obtener(Logger::class),
+                    Entorno::obtener('CHATWOOT_WEBHOOK_SECRET', '') ?? '',
+                ),
+        );
+
+        $this->contenedor->registrar(
             \App\Servicios\Outbox::class,
             static fn (Contenedor $c): \App\Servicios\Outbox
                 => new \App\Servicios\OutboxMysql($c->obtener(BD::class)),
@@ -429,6 +441,37 @@ final class Aplicacion
             }
 
             return new Respuesta('', 204);
+        });
+
+        // Webhook de Chatwoot. El secreto viaja en la ruta porque la interfaz
+        // de Chatwoot solo deja configurar una URL, sin cabeceras propias.
+        $this->router->post('/webhook/chatwoot/{secreto}', function (Peticion $p): Respuesta {
+            $webhook = $this->contenedor->obtener(\App\Servicios\WebhookChatwoot::class);
+
+            if (!$webhook->autenticado($p->parametros['secreto'] ?? null)) {
+                $this->contenedor->obtener(Logger::class)->warn('webhook.rechazado', [
+                    'ip' => $p->ip,
+                ]);
+
+                // 404 y no 401: a quien sondea el endpoint no se le confirma
+                // que existe.
+                return new Respuesta('', 404);
+            }
+
+            try {
+                $resultado = $webhook->manejar($p->json());
+            } catch (\Throwable $e) {
+                $this->contenedor->obtener(Logger::class)->error('webhook.excepcion', [
+                    'excepcion' => $e::class,
+                    'mensaje' => $e->getMessage(),
+                ]);
+
+                // 200 igualmente: un 500 hace que Chatwoot reintente el mismo
+                // evento roto para siempre, y el problema es nuestro.
+                return new Respuesta('', 200);
+            }
+
+            return Respuesta::json($resultado);
         });
 
         $this->router->get('/salud', function (): Respuesta {

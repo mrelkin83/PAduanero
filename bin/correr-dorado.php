@@ -5,9 +5,14 @@ declare(strict_types=1);
 /**
  * Corre el conjunto dorado contra el modelo REAL y registra el resultado.
  *
- *   php bin/correr-dorado.php                    ← contra el modelo primario
+ *   php bin/correr-dorado.php                    ← prompt activo, modelo primario
+ *   php bin/correr-dorado.php --prompt=7         ← una versión INACTIVA
  *   php bin/correr-dorado.php claude-opus-6      ← contra otro candidato
  *   php bin/correr-dorado.php --caso=plazo-01    ← un solo caso, para iterar
+ *
+ * `--prompt=` es lo que hace posible el ciclo entero: una versión nueva no se
+ * puede activar hasta que el dorado salga verde contra ella, y no se puede
+ * probar si hay que activarla primero. Se prueba inactiva y se activa después.
  *
  * ESTE ES EL CICLO QUE SE VA A REPETIR VARIAS VECES
  *
@@ -37,6 +42,7 @@ declare(strict_types=1);
 
 use App\Core\Aplicacion;
 use App\Motor\Accion;
+use App\Motor\Afirmacion;
 use App\Motor\SenalesCriticas;
 use App\Servicios\GateDorado;
 use App\Servicios\Llm;
@@ -51,10 +57,13 @@ require $raiz . '/vendor/autoload.php';
 
 $soloCaso = null;
 $modeloPedido = null;
+$versionPedida = null;
 
 foreach (array_slice($argv, 1) as $arg) {
     if (str_starts_with($arg, '--caso=')) {
         $soloCaso = substr($arg, 7);
+    } elseif (str_starts_with($arg, '--prompt=')) {
+        $versionPedida = (int) substr($arg, 9);
     } elseif (!str_starts_with($arg, '--')) {
         $modeloPedido = $arg;
     }
@@ -84,14 +93,45 @@ $gate = $contenedor->obtener(GateDorado::class);
 $bd = $contenedor->obtener(App\Core\BD::class);
 $prompts = $contenedor->obtener(App\Repositorios\PromptRepo::class);
 
-$activo = $prompts->activo(GateDorado::CLAVE_PROMPT);
+// El modelo se resuelve ANTES de correr, no después: las llamadas van por
+// `chatParaConjuntoDorado()`, que necesita el id explícito. Y esa es la única
+// forma de que la primera corrida sea posible — `chat()` consulta el gate, y
+// el gate exige justamente la corrida que se está intentando hacer.
+$modeloId = resolverModelo($bd, $modeloPedido);
 
-if ($activo === null) {
-    fwrite(STDERR, 'No hay prompt de conversación activo. Nada que probar.' . PHP_EOL);
+if ($modeloId === null) {
+    fwrite(
+        STDERR,
+        'No hay ningún modelo de conversación activo y con costo verificado.' . PHP_EOL
+        . 'Regístrelo en /panel/ia antes de correr el conjunto dorado.' . PHP_EOL,
+    );
     exit(1);
 }
 
-printf("Conjunto dorado · prompt v%d · %d caso(s)%s%s", $activo['version'], count($casos), PHP_EOL, PHP_EOL);
+// La fila completa, no solo el texto: se le pasa entera a `registrarCorrida()`
+// para que sea imposible correr con un contenido y registrar contra otro id.
+$prompt = $versionPedida !== null
+    ? $prompts->porVersion(GateDorado::CLAVE_PROMPT, $versionPedida)
+    : $prompts->activo(GateDorado::CLAVE_PROMPT);
+
+if ($prompt === null) {
+    fwrite(
+        STDERR,
+        $versionPedida !== null
+            ? "No existe la versión {$versionPedida} del prompt de conversación." . PHP_EOL
+            : 'No hay prompt de conversación activo. Nada que probar.' . PHP_EOL,
+    );
+    exit(1);
+}
+
+printf(
+    "Conjunto dorado · prompt v%d%s · %d caso(s)%s%s",
+    $prompt['version'],
+    $versionPedida !== null ? ' (inactiva)' : '',
+    count($casos),
+    PHP_EOL,
+    PHP_EOL,
+);
 
 $fallos = 0;
 $porRegla = [];
@@ -104,10 +144,22 @@ foreach ($casos as $caso) {
 
     $ultimo = (string) end($mensajes);
 
-    // Los casos de señal crítica no deben tocar el modelo. Se comprueba la
-    // detección, no la respuesta.
+    // Los casos que no deben tocar el modelo. Se comprueba la decisión
+    // determinista, no la respuesta.
     if (($caso['sin_llamada_llm'] ?? false) === true) {
-        if (!SenalesCriticas::detecta($ultimo)) {
+        if (($caso['negacion_esperada'] ?? false) === true) {
+            // Corolario de la regla 1: la negativa gana. Que esto viva en el
+            // conjunto dorado y no solo en las pruebas unitarias es
+            // deliberado — es la lista que se revisa cuando aparece una forma
+            // nueva de decir que no.
+            if (Afirmacion::de($ultimo) !== false) {
+                $problemas[] = 'NO se leyó como negativa: se registraría un consentimiento inexistente';
+            }
+        } elseif (($caso['ambiguo_esperado'] ?? false) === true) {
+            if (Afirmacion::de($ultimo) !== null) {
+                $problemas[] = 'se interpretó como respuesta algo que no lo es';
+            }
+        } elseif (!SenalesCriticas::detecta($ultimo)) {
             $problemas[] = 'la señal crítica NO se detectó: habría llegado al modelo';
         }
 
@@ -125,7 +177,10 @@ foreach ($casos as $caso) {
     );
 
     try {
-        $respuesta = $llm->chat($activo['contenido'], $turnos);
+        // `chatParaConjuntoDorado` y no `chat`: esta es la única llamada del
+        // sistema que puede saltarse el GateDorado, y tiene que poder hacerlo
+        // porque la corrida que el gate exige es justamente esta.
+        $respuesta = $llm->chatParaConjuntoDorado($prompt['contenido'], $turnos, $modeloId);
         $texto = Accion::limpiarTexto($respuesta->texto);
         $analisis = Accion::analizar($respuesta->texto);
     } catch (\Throwable $e) {
@@ -181,14 +236,7 @@ if ($soloCaso !== null) {
     exit($fallos === 0 ? 0 : 1);
 }
 
-$modeloId = resolverModelo($bd, $modeloPedido);
-
-if ($modeloId === null) {
-    fwrite(STDERR, 'No se encontró el modelo contra el que registrar la corrida.' . PHP_EOL);
-    exit(1);
-}
-
-$gate->registrarCorrida($modeloId, verde: $fallos === 0, casos: count($casos), fallos: $fallos, detalle: $porRegla);
+$gate->registrarCorrida($modeloId, $prompt, verde: $fallos === 0, casos: count($casos), fallos: $fallos, detalle: $porRegla);
 
 printf(
     'Registrado en modelos_ia: %s.%s',

@@ -158,6 +158,24 @@ que está desactualizado, no la especificación.
 
 ---
 
+### Cambio de esquema propuesto, pendiente de aprobación
+
+`conversacion_estado.ultimo_mensaje_chatwoot_id BIGINT NULL`.
+
+**Para qué.** Deduplicar los reintentos del webhook de Chatwoot por `id` de
+mensaje. Hoy la guarda compara el texto contra el buffer de ráfaga, lo que
+cubre el reintento inmediato —el frecuente: Chatwoot reintenta porque nuestra
+respuesta tardó— pero **no** el que llega después de que la ventana se cerrara.
+Ese produce un segundo turno: otra respuesta en el hilo y otro cobro de tokens.
+
+**Por qué no bloquea hoy.** El motor está en modo sombra: un turno repetido son
+dos borradores para Pedro, no dos mensajes a un cliente.
+
+**Cuándo deja de ser opcional.** Antes de la Etapa 6. Con el envío automático
+encendido, un reintento tardío es un mensaje duplicado a un cliente.
+
+---
+
 ## Etapa 5 — Cobro y agenda
 
 Reserva con expiración, generación del enlace de pago, webhook con verificación de

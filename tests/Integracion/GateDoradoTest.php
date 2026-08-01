@@ -62,6 +62,27 @@ final class GateDoradoTest extends CasoBaseBd
         return (string) $id;
     }
 
+    /**
+     * La fila del prompt activo, tal y como la lee el corredor del dorado.
+     *
+     * `registrarCorrida()` recibe la fila entera y no un id suelto: quien
+     * llama solo puede registrar lo que leyó, así que no puede correr con un
+     * texto y atribuir el resultado a otra versión.
+     *
+     * @return array{id:string,version:int,contenido:string}
+     */
+    private function promptRow(): array
+    {
+        $fila = $this->bd->pdo()->query(
+            "SELECT id, version, contenido FROM prompts
+              WHERE clave = 'conversacion' AND activo = 1 LIMIT 1"
+        )->fetch();
+
+        return $fila === false
+            ? ['id' => '00000000-0000-0000-0000-000000000000', 'version' => 0, 'contenido' => '']
+            : ['id' => (string) $fila['id'], 'version' => (int) $fila['version'], 'contenido' => (string) $fila['contenido']];
+    }
+
     // ── El nivel 1 ───────────────────────────────────────────────────────
 
     #[Test]
@@ -94,7 +115,7 @@ final class GateDoradoTest extends CasoBaseBd
         $this->activarPrompt();
         $modelo = $this->prepararModelo('claude-opus-5');
 
-        $this->gate->registrarCorrida($modelo['id'], verde: false, casos: 40, fallos: 3);
+        $this->gate->registrarCorrida($modelo["id"], $this->promptRow(), verde: false, casos: 40, fallos: 3);
 
         $veredicto = $this->gate->puedePromover($this->modelo('claude-opus-5'));
 
@@ -108,7 +129,7 @@ final class GateDoradoTest extends CasoBaseBd
         $this->activarPrompt();
         $modelo = $this->prepararModelo('claude-opus-5');
 
-        $this->gate->registrarCorrida($modelo['id'], verde: true, casos: 40, fallos: 0);
+        $this->gate->registrarCorrida($modelo["id"], $this->promptRow(), verde: true, casos: 40, fallos: 0);
 
         self::assertTrue($this->gate->puedePromover($this->modelo('claude-opus-5'))['ok']);
     }
@@ -123,7 +144,7 @@ final class GateDoradoTest extends CasoBaseBd
         // con un verde que ya no dice nada sobre lo que el bot diría.
         $this->activarPrompt('Prompt de ayer.');
         $modelo = $this->prepararModelo('claude-opus-5');
-        $this->gate->registrarCorrida($modelo['id'], verde: true, casos: 40, fallos: 0);
+        $this->gate->registrarCorrida($modelo["id"], $this->promptRow(), verde: true, casos: 40, fallos: 0);
 
         self::assertTrue($this->gate->puedePromover($this->modelo('claude-opus-5'))['ok']);
 
@@ -144,7 +165,7 @@ final class GateDoradoTest extends CasoBaseBd
         // conversación. Lo que caduca es el permiso para promover a OTRO.
         $this->activarPrompt('Prompt de ayer.');
         $modelo = $this->prepararModelo('claude-opus-5');
-        $this->gate->registrarCorrida($modelo['id'], verde: true, casos: 40, fallos: 0);
+        $this->gate->registrarCorrida($modelo["id"], $this->promptRow(), verde: true, casos: 40, fallos: 0);
 
         $this->bd->pdo()
             ->prepare('UPDATE modelos_ia SET es_primario = 1 WHERE id = ?')
@@ -160,7 +181,7 @@ final class GateDoradoTest extends CasoBaseBd
     public function sinPromptActivoNoHayNadaAQueAtarLaCorrida(): void
     {
         $modelo = $this->prepararModelo('claude-opus-5');
-        $this->gate->registrarCorrida($modelo['id'], verde: true, casos: 40, fallos: 0);
+        $this->gate->registrarCorrida($modelo["id"], $this->promptRow(), verde: true, casos: 40, fallos: 0);
 
         $veredicto = $this->gate->puedePromover($this->modelo('claude-opus-5'));
 
@@ -169,15 +190,15 @@ final class GateDoradoTest extends CasoBaseBd
     }
 
     #[Test]
-    public function laCorridaSeAtaAlPromptActivoDelMomentoNoAUnoQueSePase(): void
+    public function laCorridaSeAtaAlPromptConElQueSeCorrio(): void
     {
-        // `registrarCorrida()` no recibe el prompt como parámetro justamente
-        // para que sea imposible atribuir una corrida a un prompt que no era
-        // el activo.
+        // `registrarCorrida()` recibe la FILA del prompt, no su id suelto:
+        // quien llama solo puede registrar lo que leyó, así que no puede
+        // correr con un texto y atribuir el verde a otra versión.
         $activo = $this->activarPrompt('El bueno.');
         $modelo = $this->prepararModelo('claude-opus-5');
 
-        $this->gate->registrarCorrida($modelo['id'], verde: true, casos: 40, fallos: 0);
+        $this->gate->registrarCorrida($modelo["id"], $this->promptRow(), verde: true, casos: 40, fallos: 0);
 
         self::assertSame($activo, $this->modelo('claude-opus-5')['dorado_prompt_id']);
     }
