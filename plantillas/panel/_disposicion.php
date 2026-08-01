@@ -11,6 +11,7 @@ use App\Soporte\Vista;
  * @var string              $titulo
  * @var array{ok:string,error:string} $avisos
  * @var callable            $contenido
+ * @var callable|null       $scripts  opcional, se pinta antes de </body>
  */
 
 $e = Vista::e(...);
@@ -101,6 +102,15 @@ $menu = [
         </footer>
     </main>
 </div>
+
+<?php
+/* Script de la pantalla, si lo tiene. Va en línea y al final del cuerpo: el
+   panel no carga JS de terceros ni desde CDN, y así no hay una petición más
+   que bloquee el pintado. */
+?>
+<?php if (isset($scripts) && is_callable($scripts)): ?>
+<script><?php $scripts(); ?></script>
+<?php endif; ?>
 
 </body>
 </html>

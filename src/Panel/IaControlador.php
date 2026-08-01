@@ -12,6 +12,7 @@ use App\Servicios\CatalogoModelos;
 use App\Servicios\CatalogoProveedores;
 use App\Servicios\Credenciales;
 use App\Servicios\GateDorado;
+use App\Servicios\Llm;
 
 /**
  * Proveedores y modelos de IA (docs/PANEL_ADMIN.md §2.5).
@@ -60,6 +61,7 @@ final class IaControlador extends ControladorBase
         private readonly Credenciales $credenciales,
         private readonly CredencialRepo $credencialRepo,
         private readonly AuditoriaRepo $auditoria,
+        private readonly Llm $llm,
     ) {
     }
 
@@ -145,11 +147,59 @@ final class IaControlador extends ControladorBase
             $conteoModelos[$k] = ($conteoModelos[$k] ?? 0) + 1;
         }
 
+        // Lo que necesita la pantalla de «Proveedor de IA»: qué se puede
+        // elegir, qué está elegido hoy, y qué costo tiene ya registrado cada
+        // modelo para no volver a teclearlo.
+        $elegibles = [];
+
+        foreach (CatalogoProveedores::CONOCIDOS as $k => $d) {
+            $elegibles[$k] = [
+                'nombre' => $d['nombre'],
+                'formato_api' => $d['formato_api'],
+                'pais_servidor' => $d['pais_servidor'],
+                'dadoDeAlta' => false,
+                'clave_guardada' => '',
+            ];
+        }
+
+        foreach ($proveedores as $p) {
+            $k = (string) $p['clave'];
+            $mascaras = $credenciales[$k]['filas'] ?? [];
+
+            $elegibles[$k] = [
+                'nombre' => (string) $p['nombre'],
+                'formato_api' => (string) $p['formato_api'],
+                'pais_servidor' => (string) ($p['pais_servidor'] ?? ''),
+                'dadoDeAlta' => true,
+                'clave_guardada' => (string) ($mascaras[0]['mascara'] ?? ''),
+            ];
+        }
+
+        ksort($elegibles);
+
+        $costosConocidos = [];
+        $enUso = null;
+
+        foreach ($modelos as $m) {
+            $costosConocidos[$m['proveedor_clave'] . '|' . $m['identificador']] = [
+                'entrada' => $m['costo_entrada_usd_1m'],
+                'salida' => $m['costo_salida_usd_1m'],
+                'verificado' => (int) $m['costos_verificados'] === 1,
+            ];
+
+            if ((int) $m['es_primario'] === 1 && $m['proposito'] === 'conversacion') {
+                $enUso = $m;
+            }
+        }
+
         return $this->vista('panel/ia', [
             'ctx' => $ctx,
             'proveedores' => $proveedores,
             'modelos' => $modelos,
             'conteoModelos' => $conteoModelos,
+            'elegibles' => $elegibles,
+            'costosConocidos' => $costosConocidos,
+            'enUso' => $enUso,
             'credenciales' => $credenciales,
             'referencia' => $referencia,
             'disponibles' => CatalogoProveedores::disponibles(array_column($proveedores, 'clave')),
@@ -493,6 +543,288 @@ final class IaControlador extends ControladorBase
         return $this->redirigirCon('/panel/ia', 'ok', $texto);
     }
 
+    // ── La pantalla de «Proveedor de IA» ─────────────────────────────────
+    //
+    // Elegir proveedor, ver sus modelos en vivo, elegir uno, guardar la
+    // llave. Tres endpoints: uno lista, otro guarda, otro prueba.
+
+    /**
+     * Los modelos que el proveedor anuncia ahora mismo, para el desplegable.
+     *
+     * No escribe nada: abrir una lista no puede dar de alta filas. Si el
+     * proveedor no contesta cae a la lista de referencia y lo dice, porque
+     * una lista escrita a mano envejece y quien elige tiene derecho a saber
+     * cuál de las dos está mirando.
+     */
+    public function modelosDe(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+
+        $clave = (string) ($ctx->peticion->consulta['proveedor'] ?? '');
+        $proveedor = $this->proveedorPorClave($clave);
+
+        if ($proveedor === null) {
+            // Todavía no está dado de alta: se puede listar igual si es uno
+            // conocido, usando su URL del catálogo. Es lo que permite ver qué
+            // ofrece DeepSeek antes de decidir si se quiere DeepSeek.
+            $conocido = CatalogoProveedores::CONOCIDOS[$clave] ?? null;
+
+            if ($conocido === null) {
+                return Respuesta::json(['modelos' => [], 'origen' => 'ninguno', 'nota' =>
+                    'Proveedor desconocido.'], 404);
+            }
+
+            $proveedor = [
+                'id' => null,
+                'clave' => $clave,
+                'base_url' => $conocido['base_url'],
+                'formato_api' => $conocido['formato_api'],
+            ];
+        }
+
+        return Respuesta::json($this->catalogo->listarEnVivo($proveedor));
+    }
+
+    /**
+     * Guarda proveedor, modelo y llave de una sola vez.
+     *
+     * Es el «Guardar configuración» de la pantalla. Hace, en orden y de forma
+     * que cada paso tenga sentido aunque el siguiente falle:
+     *
+     *  1. Da de alta el proveedor si no existía, y lo activa.
+     *  2. Guarda la API key cifrada, si se escribió una. Vacío conserva la
+     *     que hubiera: es lo que permite cambiar de modelo sin volver a
+     *     pegar la llave.
+     *  3. Registra el modelo elegido si no estaba, con su costo.
+     *  4. Lo activa y lo asciende a primario si el gate lo permite.
+     *
+     * El costo se pide aquí y no en otra pantalla porque es la única puerta
+     * que no se puede saltar: sin él, el corte por `presupuesto_ia_mensual_usd`
+     * no corta nunca, y un guardia que deja de guardar en silencio es peor
+     * que no tenerlo.
+     */
+    public function configurar(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+
+        $clave = mb_strtolower(trim($ctx->campo('proveedor')));
+        $identificador = trim($ctx->campo('modelo'));
+        $llave = $ctx->campo('api_key');
+        $proposito = $ctx->campo('proposito', 'conversacion');
+
+        if ($identificador === '') {
+            return $this->redirigirCon('/panel/ia', 'error', 'Elija un modelo.');
+        }
+
+        $proveedor = $this->proveedorPorClave($clave);
+
+        // 1. Alta del proveedor si hace falta.
+        if ($proveedor === null) {
+            $conocido = CatalogoProveedores::CONOCIDOS[$clave] ?? null;
+            $baseUrl = $ctx->campo('base_url') !== ''
+                ? rtrim($ctx->campo('base_url'), '/')
+                : ($conocido['base_url'] ?? '');
+
+            if (preg_match('#^https?://#i', $baseUrl) !== 1) {
+                return $this->redirigirCon(
+                    '/panel/ia',
+                    'error',
+                    'Falta la URL base del endpoint, o no empieza por http:// ni https://.',
+                );
+            }
+
+            $this->bd->pdo()->prepare(
+                'INSERT INTO proveedores_ia (clave, nombre, base_url, formato_api, pais_servidor, activo)
+                 VALUES (?, ?, ?, ?, ?, 1)'
+            )->execute([
+                $clave,
+                $conocido['nombre'] ?? $clave,
+                $baseUrl,
+                $conocido['formato_api'] ?? 'openai_compatible',
+                $conocido['pais_servidor'] ?? $ctx->campo('pais_servidor'),
+            ]);
+
+            $proveedor = $this->proveedorPorClave($clave);
+        }
+
+        if ($proveedor === null) {
+            return $this->redirigirCon('/panel/ia', 'error', 'No se pudo registrar el proveedor.');
+        }
+
+        // 2. La llave. Vacía conserva la guardada.
+        if ($llave !== '') {
+            $claveCredencial = self::CLAVE_POR_FORMATO[(string) $proveedor['formato_api']] ?? null;
+
+            if ($claveCredencial !== null) {
+                $this->credenciales->guardar(
+                    $clave,
+                    $claveCredencial,
+                    $llave,
+                    'produccion',
+                    (string) $ctx->usuario?->id,
+                );
+            }
+        }
+
+        $this->bd->pdo()
+            ->prepare('UPDATE proveedores_ia SET activo = 1 WHERE id = ?')
+            ->execute([$proveedor['id']]);
+
+        // 3. El modelo, con su costo.
+        $entrada = $ctx->campo('costo_entrada_usd_1m');
+        $salida = $ctx->campo('costo_salida_usd_1m');
+        $numero = '/^\d{1,5}(\.\d{1,4})?$/';
+        $conCosto = preg_match($numero, $entrada) === 1 && preg_match($numero, $salida) === 1;
+
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT * FROM modelos_ia WHERE proveedor_id = ? AND identificador = ? AND proposito = ?'
+        );
+        $stmt->execute([$proveedor['id'], $identificador, $proposito]);
+        $modelo = $stmt->fetch();
+
+        if ($modelo === false) {
+            $this->bd->pdo()->prepare(
+                'INSERT INTO modelos_ia
+                    (proveedor_id, identificador, nombre_visible, proposito, origen,
+                     descubierto_en, es_primario, orden_fallback, activo, costos_verificados)
+                 VALUES (?, ?, ?, ?, \'manual\', NOW(), 0, 99, 0, 0)'
+            )->execute([$proveedor['id'], $identificador, $identificador, $proposito]);
+
+            $stmt->execute([$proveedor['id'], $identificador, $proposito]);
+            $modelo = $stmt->fetch();
+        }
+
+        if ($conCosto) {
+            $this->bd->pdo()->prepare(
+                'UPDATE modelos_ia
+                    SET costo_entrada_usd_1m = ?, costo_salida_usd_1m = ?,
+                        costos_verificados = 1, costos_verificados_por = ?,
+                        costos_verificados_en = NOW()
+                  WHERE id = ?'
+            )->execute([$entrada, $salida, $ctx->usuario?->id, $modelo['id']]);
+
+            $modelo['costos_verificados'] = 1;
+        }
+
+        $this->auditoria->registrar(
+            'modelo_ia',
+            (string) $modelo['id'],
+            'configurar',
+            $ctx->actor(),
+            ['proveedor' => $clave, 'modelo' => $identificador, 'proposito' => $proposito],
+            $ctx->ip(),
+        );
+
+        if ((int) $modelo['costos_verificados'] === 0) {
+            return $this->redirigirCon(
+                '/panel/ia',
+                'error',
+                'Guardado el proveedor y la llave, pero ' . $identificador . ' queda inactivo: '
+                . 'falta su costo por millón de tokens. Sin él el presupuesto mensual no corta nunca.',
+            );
+        }
+
+        // 4. Activar y, si el gate lo permite, ascender.
+        $this->bd->pdo()
+            ->prepare('UPDATE modelos_ia SET activo = 1 WHERE id = ?')
+            ->execute([$modelo['id']]);
+
+        $modelo['activo'] = 1;
+
+        return $this->ascenderTrasConfigurar($ctx, $modelo, $clave, $identificador);
+    }
+
+    /**
+     * Prueba la conexión con lo que está guardado.
+     *
+     * Una llamada real y mínima al modelo elegido. Es la única forma de
+     * distinguir «la llave está guardada» de «la llave sirve», que no es lo
+     * mismo y se confunde justo cuando importa.
+     */
+    public function probar(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+
+        $modelo = $this->modelo($ctx->campo('id'));
+
+        if ($modelo === null) {
+            return $this->redirigirCon('/panel/ia', 'error', 'Ese modelo no existe.');
+        }
+
+        $inicio = microtime(true);
+
+        try {
+            // Por `chatParaConjuntoDorado()` y no por `chat()`: esto corre
+            // antes de que exista corrida dorada —es lo que se prueba— y al
+            // otro lado no hay ningún cliente, hay un «ok».
+            $respuesta = $this->llm->chatParaConjuntoDorado(
+                'Responda únicamente con la palabra: ok',
+                [['rol' => 'user', 'contenido' => 'ok']],
+                (string) $modelo['id'],
+                maxTokens: 16,
+            );
+        } catch (\Throwable $e) {
+            return $this->redirigirCon(
+                '/panel/ia',
+                'error',
+                'No respondió: ' . mb_substr($e->getMessage(), 0, 240),
+            );
+        }
+
+        $segundos = round(microtime(true) - $inicio, 2);
+
+        return $this->redirigirCon(
+            '/panel/ia',
+            'ok',
+            $modelo['identificador'] . ' respondió en ' . $segundos . ' s. '
+            . 'Dijo: «' . mb_substr(trim($respuesta->texto), 0, 60) . '».',
+        );
+    }
+
+    /** @param array<string,mixed> $modelo */
+    private function ascenderTrasConfigurar(
+        Contexto $ctx,
+        array $modelo,
+        string $clave,
+        string $identificador,
+    ): Respuesta {
+        $gate = $this->gate->puedePromover($modelo);
+
+        if (!$gate['ok']) {
+            return $this->redirigirCon(
+                '/panel/ia',
+                'ok',
+                $identificador . ' quedó configurado y activo en ' . $clave . '. '
+                . 'Todavía no es el modelo con el que habla el bot: ' . $gate['motivo'],
+            );
+        }
+
+        if (!$ctx->puede('ia.modelos.promover')) {
+            return $this->redirigirCon(
+                '/panel/ia',
+                'ok',
+                $identificador . ' quedó configurado y activo. Falta que el abogado lo ascienda: '
+                . 'cambiar el modelo cambia lo que el bot dice, y esa firma no es del perfil técnico.',
+            );
+        }
+
+        return $this->promoverModelo($ctx, $modelo);
+    }
+
+    /** @return array<string,mixed>|null */
+    private function proveedorPorClave(string $clave): ?array
+    {
+        if ($clave === '') {
+            return null;
+        }
+
+        $stmt = $this->bd->pdo()->prepare('SELECT * FROM proveedores_ia WHERE clave = ?');
+        $stmt->execute([$clave]);
+        $fila = $stmt->fetch();
+
+        return $fila === false ? null : $fila;
+    }
+
     /**
      * Registra el costo de un modelo y lo marca verificado.
      *
@@ -662,6 +994,20 @@ final class IaControlador extends ControladorBase
             return $this->redirigirCon('/panel/ia', 'error', $gate['motivo']);
         }
 
+        return $this->promoverModelo($ctx, $modelo);
+    }
+
+    /**
+     * El ascenso en sí, ya pasadas las comprobaciones.
+     *
+     * Separado porque lo usan dos caminos —el botón «Ascender» y el guardado
+     * de la pantalla de configuración— y duplicar una transacción que deja el
+     * propósito sin primario a mitad es la clase de copia que se desincroniza.
+     *
+     * @param array<string,mixed> $modelo
+     */
+    private function promoverModelo(Contexto $ctx, array $modelo): Respuesta
+    {
         $pdo = $this->bd->pdo();
         $anterior = null;
 

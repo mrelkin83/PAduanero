@@ -119,6 +119,74 @@ final class CatalogoModelos
     }
 
     /**
+     * Los identificadores que el proveedor anuncia AHORA, para poblar un
+     * desplegable. No toca la base.
+     *
+     * Es distinto de `sincronizar()` a propósito. Aquél es un acto de
+     * inventario —da de alta filas, marca retiros, deja bitácora—; esto es
+     * una consulta para pintar una lista mientras alguien elige. Mezclarlos
+     * haría que abrir un desplegable escribiera en `modelos_ia`.
+     *
+     * Si el proveedor no contesta se cae a la lista de referencia, y el
+     * campo `origen` dice cuál de las dos se está viendo: una lista escrita
+     * a mano envejece, y quien elige tiene derecho a saber que la está
+     * mirando.
+     *
+     * @param  array<string,mixed> $proveedor fila de `proveedores_ia`
+     * @return array{modelos:list<string>,origen:string,nota:string}
+     */
+    public function listarEnVivo(array $proveedor): array
+    {
+        $clave = (string) $proveedor['clave'];
+
+        try {
+            $descubridor = $this->descubridores[(string) $proveedor['formato_api']]
+                ?? throw new DescubrimientoFallido(
+                    "No hay descubridor para el formato «{$proveedor['formato_api']}»"
+                );
+
+            $modelos = $descubridor->listar(
+                (string) $proveedor['base_url'],
+                $this->secreto($descubridor, $clave),
+            );
+
+            $identificadores = array_map(
+                static fn (ModeloDescubierto $m): string => $m->identificador,
+                $modelos,
+            );
+
+            sort($identificadores);
+
+            if ($identificadores === []) {
+                return [
+                    'modelos' => CatalogoProveedores::modelosDeReferencia($clave),
+                    'origen' => 'referencia',
+                    'nota' => 'El proveedor contestó pero no anunció ningún modelo. '
+                        . 'Suele ser una credencial sin acceso al catálogo. Lista de referencia.',
+                ];
+            }
+
+            return [
+                'modelos' => $identificadores,
+                'origen' => 'api',
+                'nota' => count($identificadores)
+                    . ' modelos consultados en vivo desde la API del proveedor.',
+            ];
+        } catch (DescubrimientoFallido | CredencialNoEncontradaException $e) {
+            $referencia = CatalogoProveedores::modelosDeReferencia($clave);
+
+            return [
+                'modelos' => $referencia,
+                'origen' => 'referencia',
+                'nota' => 'No se pudo consultar al proveedor (' . mb_substr($e->getMessage(), 0, 160)
+                    . ($referencia === []
+                        ? '). No hay lista de referencia para este proveedor.'
+                        : '). Se muestra una lista de referencia, que puede estar desactualizada.'),
+            ];
+        }
+    }
+
+    /**
      * @param  array<string,mixed> $proveedor fila de `proveedores_ia`
      * @return array{proveedor:string,ok:bool,nuevos:int,vistos:int,retirados:int,error:?string}
      */
