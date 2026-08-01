@@ -90,6 +90,27 @@ APP_URL=http://padu.test
 se marcan `Secure` y el navegador no las guarda sobre `http://`, así que
 **entrarías y volverías al formulario de entrada sin ningún mensaje de error**.
 
+### 2.2 bis — Guarda el `.env` SIN BOM
+
+Windows es propenso a añadir la marca de orden de bytes (`EF BB BF`) al
+principio del archivo: la ponen Notepad y `Out-File` de PowerShell. El
+cargador la quita desde el 2026-08-01, pero conviene no meterla:
+
+```powershell
+# Comprobar: si los tres primeros bytes son 239,187,191 hay BOM
+[System.IO.File]::ReadAllBytes(".env")[0..2] -join ','
+
+# Quitarlo
+$c = Get-Content .env -Raw -Encoding UTF8
+[System.IO.File]::WriteAllText("$PWD\.env", $c, (New-Object System.Text.UTF8Encoding $false))
+```
+
+Antes de arreglarlo, un `.env` con BOM **perdía su primera variable en
+silencio**, porque la clave pasaba a llamarse `\u{FEFF}APP_ENV`. Y el peor
+caso era el más probable: si la primera línea era `APP_ENV`, se asumía
+`produccion` y aparecía justo el rebote de sesión sin mensaje de error que se
+describe arriba.
+
 ### 2.3 El secreto del webhook
 
 Hace falta más adelante, pero se genera ahora para no dejarlo vacío:
@@ -158,10 +179,28 @@ Tres cosas tienen que estar bien:
    así por defecto. Si al entrar a `/panel/entrar` ves un 404 de Apache en vez
    del formulario, es esto.
 3. **Recargar los hosts virtuales** tras crear la carpeta: Menú → Apache →
-   Recargar, o Menú → Recargar todo.
+   Recargar, o Menú → **Recargar todo**.
 
 Si no sabes qué URL te asignó: Menú → **www** → aparece la lista de proyectos
 con su enlace.
+
+### Si el navegador dice que no encuentra el sitio
+
+No es un problema de la aplicación: es que **Laragon no ha registrado el
+proyecto todavía**. Los vhosts los genera al arrancar o al recargar, así que
+una carpeta añadida después no existe para Apache. Se comprueba en dos sitios:
+
+```powershell
+# ¿Existe el vhost?
+Get-ChildItem C:\laragon\etc\apache2\sites-enabled\auto.*.conf | Select-Object Name
+
+# ¿Existe la entrada de hosts?
+Select-String -Path C:\Windows\System32\drivers\etc\hosts -Pattern "aduanero"
+```
+
+Si falta alguno de los dos, **Menú → Recargar todo** los crea. Laragon
+necesita permisos de administrador para escribir en `hosts`; si arrancó sin
+ellos, ciérralo y ábrelo como administrador.
 
 ### Opción B — servidor embebido (si Laragon da problemas)
 

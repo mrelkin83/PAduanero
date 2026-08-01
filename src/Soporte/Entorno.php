@@ -37,6 +37,23 @@ final class Entorno
         }
 
         $lineas = file($ruta, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+        // Quitar el BOM de la primera línea.
+        //
+        // No es una rareza teórica: en Windows, guardar el .env con Notepad o
+        // escribirlo con `Out-File` deja EF BB BF al principio, y sin esto la
+        // clave de la primera línea pasa a llamarse "\u{FEFF}APP_ENV" — es
+        // decir, **la primera variable del archivo desaparece en silencio**.
+        //
+        // El modo de falla depende de qué variable esté arriba, y el peor es
+        // el más probable: si es `MASTER_KEY`, la aplicación no arranca y se
+        // ve; si es `APP_ENV`, se asume `produccion`, las cookies se marcan
+        // `Secure`, el navegador las descarta sobre http:// y uno entra al
+        // panel y vuelve al formulario **sin ningún mensaje de error**. Pasó.
+        if (isset($lineas[0])) {
+            $lineas[0] = preg_replace('/^\x{FEFF}/u', '', $lineas[0]) ?? $lineas[0];
+        }
+
         foreach ($lineas as $linea) {
             $linea = trim($linea);
             if ($linea === '' || str_starts_with($linea, '#')) {

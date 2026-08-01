@@ -126,4 +126,36 @@ final class ArranqueTest extends TestCase
         // o el chequeo del cron no serviría de nada.
         self::assertSame($cuerpo['ok'] === true ? 200 : 503, $respuesta->estado);
     }
+
+    #[Test]
+    public function unEnvConBomNoPierdeLaPrimeraVariable(): void
+    {
+        // En Windows, guardar el .env con Notepad o escribirlo con `Out-File`
+        // deja EF BB BF al principio. Sin quitarlo, la clave de la primera
+        // línea pasa a llamarse "\u{FEFF}APP_ENV" y **la primera variable
+        // desaparece en silencio**.
+        //
+        // El peor caso es el más probable: si la primera línea es `APP_ENV`,
+        // se asume `produccion`, las cookies de sesión se marcan `Secure`, el
+        // navegador las descarta sobre http:// y uno entra al panel y vuelve
+        // al formulario sin ningún mensaje de error. Pasó en el arranque
+        // local del 2026-08-01.
+        $ruta = sys_get_temp_dir() . '/padu-env-bom-' . bin2hex(random_bytes(4));
+
+        // La primera clave es sintética a propósito: `Entorno::obtener()` da
+        // precedencia al entorno real del proceso, y `APP_ENV` llega ahí desde
+        // `phpunit.xml`. Con esa no se vería si el BOM la rompió.
+        file_put_contents($ruta, "\xEF\xBB\xBFPRIMERA_DEL_ARCHIVO=desarrollo\nSEGUNDA=ok\n");
+
+        try {
+            Entorno::reiniciar();
+            Entorno::cargar($ruta);
+
+            self::assertSame('desarrollo', Entorno::obtener('PRIMERA_DEL_ARCHIVO'));
+            self::assertSame('ok', Entorno::obtener('SEGUNDA'));
+        } finally {
+            @unlink($ruta);
+            pruebas_cargar_entorno();
+        }
+    }
 }
