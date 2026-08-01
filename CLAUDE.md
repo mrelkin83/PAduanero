@@ -348,6 +348,38 @@ Uso: orden de atención en la bandeja y priorización de respuesta de Pedro.
     un caso penal en curso queden copiados en el outbox, en logs de correo y en el
     historial de WhatsApp del teléfono personal de Pedro.
 
+    **Cómo se hace cumplir: por firma, no por convención.** `Outbox` no ofrece
+    un `encolar('alerta.escalamiento', $payload)` genérico para esta ruta.
+    Ofrece `encolarAlertaEscalamiento(string $telefono, MotivoEscalamiento
+    $motivo, int $chatwootConvId)`, que construye el payload él mismo y **no
+    tiene ningún parámetro por el que quepa un texto**. El mensaje que llega al
+    teléfono lo compone `ManejadorAlertaAbogado` a partir del motivo —una
+    constante nuestra— y del número de conversación.
+
+    La razón de blindarlo así y no con un comentario: de los tres destinos que
+    la regla nombra, el teléfono de Pedro es el único **fuera del sistema**. Una
+    tabla se purga, un log rota, un evento del outbox caduca. El historial de
+    WhatsApp de un teléfono personal no lo controla este proyecto, no aparece en
+    `docs/RESPALDOS.md` ni en ninguna política de retención, y no hay forma de
+    borrarlo desde aquí. Un extracto de un caso penal que llegue ahí se queda
+    ahí para siempre.
+
+    Y la presión para violarla va a ser razonable, que es lo que la hace
+    peligrosa: alguien querrá meter dos líneas del mensaje «para que Pedro no
+    tenga que abrir Chatwoot». Con un comentario, ese cambio se hace en treinta
+    segundos y pasa la revisión. Con esta firma, hay que añadir un parámetro —y
+    eso se ve.
+
+    **Principio general, aplicable más allá de esta regla:** donde una regla se
+    pueda hacer imposible de violar por la firma de un método en vez de por
+    convención, se hace así. Ya está aplicado en tres sitios:
+    `encolarAlertaEscalamiento()`, `GateDorado::registrarCorrida()` —que no
+    recibe el prompt sino que lo mira, para que nadie pueda atribuir una corrida
+    dorada a un prompt que no era el activo— y `Llm::registrarConsumo()`, que
+    calcula el costo en vez de aceptarlo, para que un fallo no pueda reportarlo
+    como cero. Vale sobre todo para lo que se le pasa al proveedor del LLM
+    (regla 13).
+
 ---
 
 ## 5. Catálogo de tipos de caso

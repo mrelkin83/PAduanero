@@ -167,6 +167,22 @@ firma, confirmación automática, recordatorios, `expirarVencidas` en cron.
 pago → `pagada` → confirmación en WhatsApp → recordatorio a 24 h. Y un webhook
 duplicado no confirma dos veces.
 
+### Deuda anotada, con disparador
+
+`eventos_outbox.disponible_en` tiene **dos significados según el estado**: en
+`pendiente` es cuándo el evento estará listo; en `procesando` es cuándo se
+reclamó. Se reutilizó así para no pedir un cambio de esquema por algo que se
+resolvía sin él, y está documentado en `docs/CONTRATOS.md`.
+
+El riesgo es concreto: la siguiente consulta que razone sobre esa columna se
+puede escribir mal sin que nada falle en rojo. Ya pasó una vez en `bin/salud.sh`,
+que medía el atasco contra `creado_en`.
+
+**Disparador:** si en esta etapa aparece una segunda consulta que necesite
+razonar sobre `disponible_en` —recordatorios, reintentos de pasarela, cualquier
+cosa que mire la cola— se añade la columna `tomado_en` y se deja de sobrecargar.
+Una columna nueva es más barata que la documentación que hay que recordar leer.
+
 ---
 
 ## Etapa 6 — Envío automático

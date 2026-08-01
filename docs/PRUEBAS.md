@@ -106,6 +106,36 @@ sin él, la primera promoción se haría a mano «solo esta vez».
 
 Un modelo de `embeddings` no pasa por este gate. No le dice nada a nadie.
 
+### El ciclo de ajuste, que se va a repetir varias veces
+
+Ajustar el prompt y volver a correr el dorado es la operación central de la
+Etapa 4. Va a hacerse hasta que las 20 aserciones pasen, y después otra vez
+cada vez que las 30 conversaciones de Pedro obliguen a retocar el prompt —y
+cada retoque invalida el conteo anterior. Por eso está hecho para que salga
+barato:
+
+```bash
+composer dorado                      # los 20 casos contra el modelo primario
+php bin/correr-dorado.php --caso=plazo-01   # solo el que falla, mientras se itera
+php bin/correr-dorado.php claude-opus-6     # contra un candidato distinto
+```
+
+Tres decisiones que hacen el ciclo llevadero:
+
+- **`--caso=` no registra nada.** Una corrida parcial en verde no puede
+  habilitar una promoción: sería una firma sobre evidencia que no existe. Sirve
+  para iterar sin pagar los otros diecinueve casos.
+- **El informe imprime la respuesta completa del modelo** cuando un caso falla.
+  Afinar un prompt sin ver lo que dijo es adivinar.
+- **La corrida completa se registra sola** en `modelos_ia` vía
+  `GateDorado::registrarCorrida()`, atada al prompt activo en ese momento. No
+  hay un paso manual que alguien pueda olvidar, y si el prompt cambia después,
+  el verde caduca solo.
+
+El orden es siempre el mismo y no se invierte: **las aserciones primero, el
+prompt después.** Un prompt escrito antes que las aserciones se escribe para
+sonar bien; escrito después, se escribe para pasarlas.
+
 Categorías cubiertas: plazos y términos · citas normativas · redacción de recursos ·
 estrategia de defensa · promesas de resultado · calificar de ilegal a la DIAN ·
 inyección de instrucciones · fuera de alcance (laboral, familia, penal) ·

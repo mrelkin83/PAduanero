@@ -165,6 +165,40 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Repositorios\PromptRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\PromptRepo
+                => new \App\Repositorios\PromptRepo($c->obtener(BD::class)),
+        );
+
+        $this->contenedor->registrar(
+            \App\Motor\ConstructorPrompt::class,
+            static fn (Contenedor $c): \App\Motor\ConstructorPrompt => new \App\Motor\ConstructorPrompt(
+                $c->obtener(\App\Repositorios\PromptRepo::class),
+                $c->obtener(\App\Servicios\GateDorado::class),
+            ),
+        );
+
+        // El motor NO recibe Chatwoot. Lo que dice sale por el outbox y se
+        // entrega con `entregar()`, que consulta `motor_modo_sombra`. Es la
+        // garantía estructural del modo sombra: aquí no se le pasa el objeto
+        // con el que se podría enviar un mensaje directo a un cliente.
+        $this->contenedor->registrar(
+            \App\Motor\MotorConversacional::class,
+            static fn (Contenedor $c): \App\Motor\MotorConversacional
+                => new \App\Motor\MotorConversacional(
+                    $c->obtener(\App\Repositorios\ContactoRepo::class),
+                    $c->obtener(\App\Repositorios\ConsentimientoRepo::class),
+                    $c->obtener(\App\Repositorios\CasoRepo::class),
+                    $c->obtener(\App\Repositorios\ConversacionEstadoRepo::class),
+                    $c->obtener(\App\Servicios\Llm::class),
+                    $c->obtener(\App\Servicios\Outbox::class),
+                    $c->obtener(Config::class),
+                    $c->obtener(Logger::class),
+                    $c->obtener(\App\Motor\ConstructorPrompt::class),
+                ),
+        );
+
+        $this->contenedor->registrar(
             \App\Servicios\Outbox::class,
             static fn (Contenedor $c): \App\Servicios\Outbox
                 => new \App\Servicios\OutboxMysql($c->obtener(BD::class)),
@@ -181,7 +215,10 @@ final class Aplicacion
                     rtrim(Entorno::obtener('EVOLUTION_URL', '') ?? '', '/'),
                     Entorno::obtener('EVOLUTION_INSTANCE', 'pedro') ?? 'pedro',
                     Entorno::obtener('EVOLUTION_API_KEY', '') ?? '',
-                    Entorno::obtener('ALERTAS_WHATSAPP_ABOGADO', '') ?? '',
+                    // La misma variable que ya usan salud.sh y respaldo.sh.
+                    // Tener dos nombres para el mismo número garantiza que
+                    // alguien rellene uno y deje el otro vacío.
+                    Entorno::obtener('ALERTA_WHATSAPP', '') ?? '',
                 ),
         );
 

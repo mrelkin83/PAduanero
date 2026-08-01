@@ -58,16 +58,68 @@ final readonly class Accion
     }
 
     /**
-     * Extrae la primera acción válida de la respuesta del modelo.
+     * Extrae la primera acción válida, o `null`.
      *
-     * Devuelve `null` cuando no hay acción, que es el caso normal: la mayoría
-     * de los turnos son conversación.
+     * Atajo para quien de verdad no necesita saber por qué no hubo acción.
+     * **El motor no usa esto**: usa `analizar()`, porque un `null` no permite
+     * distinguir «era un turno conversacional» de «el modelo inventó una
+     * acción» y esas dos cosas piden respuestas distintas
+     * (`docs/CONTRATOS.md` §Errores 15).
      */
     public static function extraer(string $respuesta): ?self
     {
+        return self::analizar($respuesta)->accion;
+    }
+
+    /**
+     * Mira la respuesta del modelo y dice qué encontró **y por qué**.
+     *
+     * Este es el método bueno. El motor deja `explicacion()` en la nota de
+     * diagnóstico, y eso es lo que convierte «el bot respondió raro» en «el
+     * modelo pidió REGISTRAR_CASO con una fecha en prosa y se descartó».
+     */
+    public static function analizar(string $respuesta): AnalisisAccion
+    {
         $crudo = self::primerObjetoBalanceado($respuesta);
 
-        return $crudo === null ? null : self::sanear($crudo);
+        if ($crudo === null) {
+            // Se distingue «no había ningún objeto» de «había uno y no
+            // parseaba»: lo primero es un turno de conversación normal y lo
+            // segundo es un prompt que hay que revisar.
+            return new AnalisisAccion(
+                null,
+                str_contains($respuesta, '{') ? AnalisisAccion::JSON_INVALIDO : AnalisisAccion::SIN_JSON,
+            );
+        }
+
+        $nombre = is_string($crudo['accion'] ?? null) ? $crudo['accion'] : '';
+        $permitidos = self::ESQUEMAS[$nombre] ?? null;
+
+        if ($permitidos === null) {
+            return new AnalisisAccion(
+                null,
+                AnalisisAccion::ACCION_DESCONOCIDA,
+                nombreCrudo: $nombre === '' ? null : $nombre,
+            );
+        }
+
+        $datos = [];
+
+        foreach ($permitidos as $campo) {
+            if (array_key_exists($campo, $crudo)) {
+                $datos[$campo] = $crudo[$campo];
+            }
+        }
+
+        $descartados = [];
+        $saneados = self::normalizar($nombre, $datos, $descartados);
+
+        return new AnalisisAccion(
+            new self($nombre, $saneados),
+            AnalisisAccion::OK,
+            $descartados,
+            $nombre,
+        );
     }
 
     /**
@@ -174,59 +226,74 @@ final readonly class Accion
         return null;
     }
 
-    /** @param array<string,mixed> $crudo */
-    private static function sanear(array $crudo): ?self
-    {
-        $nombre = is_string($crudo['accion'] ?? null) ? $crudo['accion'] : '';
-        $permitidos = self::ESQUEMAS[$nombre] ?? null;
-
-        if ($permitidos === null) {
-            return null;
-        }
-
-        $datos = [];
-
-        foreach ($permitidos as $campo) {
-            if (array_key_exists($campo, $crudo)) {
-                $datos[$campo] = $crudo[$campo];
-            }
-        }
-
-        return new self($nombre, self::normalizar($nombre, $datos));
-    }
-
     /**
-     * @param  array<string,mixed> $datos
+     * @param  array<string,mixed>  $datos
+     * @param  array<string,string> $descartados  se llena por referencia: qué
+     *                                            campo se cayó y por qué
      * @return array<string,mixed>
      */
-    private static function normalizar(string $nombre, array $datos): array
+    private static function normalizar(string $nombre, array $datos, array &$descartados = []): array
     {
+        // Anota el campo cuando el valor que traía se cae o se sustituye. No
+        // guarda el valor original, solo el motivo: un `numero_acto` o una
+        // `descripcion` en los registros es justo lo que la regla 13 quiere
+        // fuera de ahí.
+        $anotar = static function (string $campo, string $porQue) use (&$descartados): void {
+            $descartados[$campo] = $porQue;
+        };
+
         if (isset($datos['tipo_caso'])) {
-            $datos['tipo_caso'] = Catalogo::normalizarTipo($datos['tipo_caso']);
+            $original = $datos['tipo_caso'];
+            $datos['tipo_caso'] = Catalogo::normalizarTipo($original);
+
+            if ($datos['tipo_caso'] !== $original) {
+                $anotar('tipo_caso', 'no está en el catálogo, forzado a «otro»');
+            }
         }
 
         if (isset($datos['entidad'])) {
             $entidad = is_string($datos['entidad']) ? mb_strtolower($datos['entidad']) : '';
             $datos['entidad'] = in_array($entidad, Catalogo::ENTIDADES, true) ? $entidad : null;
+
+            if ($datos['entidad'] === null) {
+                $anotar('entidad', 'no está en el catálogo de entidades');
+            }
         }
 
         if (isset($datos['urgencia'])) {
             $urgencia = is_string($datos['urgencia']) ? mb_strtolower($datos['urgencia']) : '';
+
+            if (!in_array($urgencia, Catalogo::URGENCIAS, true)) {
+                $anotar('urgencia', 'valor desconocido, asumida «media»');
+            }
+
             $datos['urgencia'] = in_array($urgencia, Catalogo::URGENCIAS, true) ? $urgencia : 'media';
         }
 
         if (isset($datos['area'])) {
             $area = is_string($datos['area']) ? mb_strtolower($datos['area']) : '';
             $datos['area'] = in_array($area, Catalogo::AREAS, true) ? $area : null;
+
+            if ($datos['area'] === null) {
+                $anotar('area', 'no es aduanero, tributario ni mixto');
+            }
         }
 
         if (isset($datos['tipo_persona'])) {
             $datos['tipo_persona'] = in_array($datos['tipo_persona'], ['natural', 'juridica'], true)
                 ? $datos['tipo_persona']
                 : null;
+
+            if ($datos['tipo_persona'] === null) {
+                $anotar('tipo_persona', 'no es natural ni jurídica');
+            }
         }
 
-        if (array_key_exists('tiene_acto_admin', $datos)) {
+        if (array_key_exists('tiene_acto_admin', $datos) && $datos['tiene_acto_admin'] !== null) {
+            if (!is_bool($datos['tiene_acto_admin'])) {
+                $anotar('tiene_acto_admin', 'no es booleano');
+            }
+
             $datos['tiene_acto_admin'] = is_bool($datos['tiene_acto_admin'])
                 ? $datos['tiene_acto_admin']
                 : null;
@@ -234,9 +301,13 @@ final readonly class Accion
 
         if (isset($datos['valor_estimado_cop'])) {
             $valor = $datos['valor_estimado_cop'];
-            $datos['valor_estimado_cop'] = (is_numeric($valor) && $valor >= 0)
-                ? (int) round((float) $valor)
-                : null;
+            $valido = is_numeric($valor) && $valor >= 0;
+
+            if (!$valido) {
+                $anotar('valor_estimado_cop', 'no es un número no negativo');
+            }
+
+            $datos['valor_estimado_cop'] = $valido ? (int) round((float) $valor) : null;
         }
 
         // Las fechas del modelo no son de fiar: se acepta el formato exacto o
@@ -245,17 +316,30 @@ final readonly class Accion
         foreach (['fecha_acto', 'fecha'] as $campo) {
             if (isset($datos[$campo])) {
                 $datos[$campo] = self::fechaValida($datos[$campo]);
+
+                if ($datos[$campo] === null) {
+                    $anotar($campo, 'no es una fecha AAAA-MM-DD real');
+                }
             }
         }
 
         if (isset($datos['horaInicio'])) {
             $datos['horaInicio'] = self::horaValida($datos['horaInicio']);
+
+            if ($datos['horaInicio'] === null) {
+                $anotar('horaInicio', 'no es una hora válida');
+            }
         }
 
         if ($nombre === 'ESCALAR_HUMANO') {
-            $datos['motivo'] = MotivoEscalamiento::desde(
-                is_string($datos['motivo'] ?? null) ? $datos['motivo'] : null,
-            )->value;
+            $crudo = is_string($datos['motivo'] ?? null) ? $datos['motivo'] : null;
+            $motivo = MotivoEscalamiento::desde($crudo);
+
+            if ($crudo !== null && $crudo !== $motivo->value) {
+                $anotar('motivo', 'no está en los seis motivos, asumido «solicitud_expresa»');
+            }
+
+            $datos['motivo'] = $motivo->value;
         }
 
         // Los textos libres se recortan: el modelo puede devolver una novela y
@@ -263,6 +347,11 @@ final readonly class Accion
         foreach (['seccional' => 80, 'numero_acto' => 80, 'descripcion' => 1000, 'nombre' => 150] as $campo => $max) {
             if (isset($datos[$campo]) && is_string($datos[$campo])) {
                 $limpio = trim(preg_replace('/[\x00-\x1F\x7F]/u', '', $datos[$campo]) ?? '');
+
+                if (mb_strlen($limpio) > $max) {
+                    $anotar($campo, "recortado a {$max} caracteres");
+                }
+
                 $datos[$campo] = $limpio === '' ? null : mb_substr($limpio, 0, $max);
             }
         }

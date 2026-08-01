@@ -63,6 +63,28 @@ final class ArquitecturaTest extends TestCase
     }
 
     #[Test]
+    public function elMotorNoTieneConQueHablarleAUnCliente(): void
+    {
+        // Esta es la garantía estructural, y es más fuerte que la de abajo: el
+        // motor no depende de `Chatwoot` en absoluto. Lo que dice sale por el
+        // outbox, y el manejador lo entrega con `entregar()`, que consulta
+        // `motor_modo_sombra`.
+        //
+        // No es una convención que alguien pueda olvidar: es que dentro de
+        // `src/Motor/` no existe el objeto con el que se enviaría un mensaje
+        // directo a un contacto. Con `motor_modo_sombra` en true, la única
+        // salida que hay es la nota privada.
+        foreach ($this->fuentes('Motor') as $ruta => $codigo) {
+            self::assertDoesNotMatchRegularExpression(
+                '/\bChatwoot\b/',
+                $this->sinComentarios($codigo),
+                "{$ruta} conoce Chatwoot. El motor habla por Outbox; el modo sombra "
+                . 'se decide al entregar, no aquí.',
+            );
+        }
+    }
+
+    #[Test]
     public function elMotorNoPuedeSaltarseElModoSombra(): void
     {
         // El motor habla por `entregar()`, que consulta `motor_modo_sombra`.

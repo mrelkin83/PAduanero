@@ -32,7 +32,12 @@ else mal "worker del outbox detenido"; fi
 # --- Base de datos ---------------------------------------------------
 echo
 echo "Base de datos"
-MYSQL="mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASS} ${DB_NAME} -N -B -e"
+# `--init-command` fija la misma zona que usa la aplicación al escribir
+# (BD::pdo hace `SET time_zone = '+00:00'`). Sin esto, las consultas de abajo
+# comparan columnas escritas en UTC contra un NOW() en la zona del servidor, y
+# los conteos por ventana de tiempo salen desplazados sin que nada falle.
+MYSQL="mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASS} ${DB_NAME} -N -B \
+  --init-command=SET time_zone='+00:00' -e"
 
 if $MYSQL "SELECT 1" >/dev/null 2>&1; then ok "MySQL responde"
 else mal "MySQL no responde"; fi
@@ -49,8 +54,17 @@ else mal "FALTA la columna slot_unico: se pueden agendar dos consultas a la mism
 # --- Chatwoot --------------------------------------------------------
 echo
 echo "Chatwoot"
-if curl -sf -m 10 "${CHATWOOT_URL}/api" >/dev/null; then ok "Chatwoot responde"
-else mal "Chatwoot no responde"; fi
+# Se consulta el MISMO endpoint que usa la aplicación (ChatwootAgentes::responde),
+# y autenticado. `/api` a secas no es una ruta de Chatwoot: devuelve 404, `curl
+# -sf` lo trata como fallo, y esto reportaba «Chatwoot no responde» con Chatwoot
+# perfectamente vivo. Una alerta que salta sin motivo se termina ignorando, y
+# ese día tapa la que sí importaba.
+if curl -sf -m 10 -H "api_access_token: ${CHATWOOT_BOT_TOKEN}" \
+     "${CHATWOOT_URL}/api/v1/accounts/${CHATWOOT_ACCOUNT_ID}/inboxes" >/dev/null; then
+  ok "Chatwoot responde y el token del bot es válido"
+else
+  mal "Chatwoot no responde o el CHATWOOT_BOT_TOKEN no sirve"
+fi
 
 # --- WhatsApp --------------------------------------------------------
 echo
@@ -106,8 +120,18 @@ SOMBRA=$($MYSQL "SELECT valor FROM configuraciones WHERE clave='motor_modo_sombr
 [[ "$PAUSA" == "true" ]]  && aviso "la IA está PAUSADA" || ok "IA activa"
 [[ "$SOMBRA" == "true" ]] && aviso "modo sombra encendido (no envía al cliente)" || ok "envío automático"
 
+# El mes es el de BOGOTÁ, no el de UTC, porque el presupuesto es del negocio y
+# el negocio vive aquí. `creado_en` está en UTC, así que el inicio del mes local
+# se traduce sumando cinco horas. Colombia no tiene horario de verano, que es
+# lo que hace seguro un desplazamiento fijo — en casi cualquier otro país esto
+# habría que hacerlo con tablas de zona.
+#
+# Con `DATE_FORMAT(NOW(),'%Y-%m-01')` a secas el corte se desplazaba, y el día 1
+# por la mañana este número incluía la cola del mes anterior. El corte que de
+# verdad manda vive en Llm::gastoDelMes(); esto es la lectura.
 GASTO=$($MYSQL "SELECT COALESCE(ROUND(SUM(costo_usd),2),0) FROM consumo_ia
-  WHERE creado_en >= DATE_FORMAT(NOW(),'%Y-%m-01')" 2>/dev/null || echo '?')
+  WHERE creado_en >= DATE_FORMAT(NOW() - INTERVAL 5 HOUR, '%Y-%m-01') + INTERVAL 5 HOUR" \
+  2>/dev/null || echo '?')
 echo "  · gasto de IA este mes: USD ${GASTO}"
 
 # --- Purga de datos personales ---------------------------------------

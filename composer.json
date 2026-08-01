@@ -31,7 +31,7 @@
   "scripts": {
     "test": "phpunit",
     "test:criticas": "phpunit --group critica",
-    "test:golden": "phpunit --group golden",
+    "dorado": "php bin/correr-dorado.php",
     "migrar": "php bin/migrar.php"
   },
   "config": {
