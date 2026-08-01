@@ -129,6 +129,40 @@ final class Aplicacion
             ),
         );
 
+        // ── Motor (Etapa 4) ──────────────────────────────────────────────
+        $this->contenedor->registrar(
+            \App\Repositorios\ContactoRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\ContactoRepo => new \App\Repositorios\ContactoRepo(
+                $c->obtener(BD::class),
+                $c->obtener(Cifrado::class),
+                $c->obtener(\App\Repositorios\AuditoriaRepo::class),
+            ),
+        );
+
+        $this->contenedor->registrar(
+            \App\Repositorios\ConsentimientoRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\ConsentimientoRepo
+                => new \App\Repositorios\ConsentimientoRepo($c->obtener(BD::class)),
+        );
+
+        $this->contenedor->registrar(
+            \App\Repositorios\CasoRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\CasoRepo
+                => new \App\Repositorios\CasoRepo($c->obtener(BD::class)),
+        );
+
+        $this->contenedor->registrar(
+            \App\Repositorios\ConversacionEstadoRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\ConversacionEstadoRepo
+                => new \App\Repositorios\ConversacionEstadoRepo($c->obtener(BD::class)),
+        );
+
+        $this->contenedor->registrar(
+            \App\Repositorios\ConsultaRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\ConsultaRepo
+                => new \App\Repositorios\ConsultaRepo($c->obtener(BD::class)),
+        );
+
         // La regla «¿puede este modelo hablar con clientes?» en un solo sitio.
         // La usan el panel al promover y el corredor del conjunto dorado al
         // terminar; duplicada, uno de los dos se quedaría atrás.

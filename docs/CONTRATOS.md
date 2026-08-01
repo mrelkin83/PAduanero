@@ -470,3 +470,13 @@ compilada en el servidor.
     semillas se restauran con UUID nuevos y lo que se rompe son las foráneas
     de otras pruebas, por motivos aparentemente inconexos. Pasó en
     `CasoBaseBd::restaurarSemillas()`.
+17. Comparar un `DATETIME` de la base con el reloj de PHP usando
+    `strtotime()`. La conexión fija `time_zone = '+00:00'`: **la base guarda
+    UTC** y la aplicación convierte a Bogotá al presentar. `strtotime()` lee
+    la cadena en la zona por defecto de PHP, así que el resultado se desvía
+    cinco horas — y hacia el lado peligroso, porque una pausa parece haber
+    vencido cuando no. Usar `Fechas::deUtc()` y comparar objetos
+    `DateTimeImmutable`, que es una comparación absoluta. Síntoma
+    característico: la prueba pasa aislada y falla en la suite completa,
+    según qué otra clase haya construido `Aplicacion` —y con ella fijado la
+    zona— antes.
