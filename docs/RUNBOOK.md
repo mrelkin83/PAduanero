@@ -294,6 +294,43 @@ cd /opt/chatwoot && docker compose logs --tail=200 && docker compose restart
 Causa habitual: disco lleno o el Postgres de Chatwoot sin espacio. Revisar `df -h`
 antes que nada.
 
+### 3.10 Una credencial quedó expuesta
+
+Pegada en un chat, en un correo, en una captura de pantalla, en un repositorio,
+en un ticket de soporte. Da igual cómo: **si salió del panel, está quemada.**
+
+No hay que evaluar el riesgo ni buscar quién la vio. Rotar cuesta cinco minutos
+y averiguar si alguien la usó cuesta un incidente. Cuatro pasos, en este orden:
+
+1. **Revocar en el proveedor.** Primero eso, antes que nada. Mientras la llave
+   vieja siga viva, todo lo demás es cosmético. En Wompi: panel de comercio →
+   Desarrolladores → revocar. Anthropic: consola → API keys → revoke.
+2. **Regenerar** la nueva en el mismo sitio. No reutilizar la anterior aunque
+   el proveedor lo permita.
+3. **Guardarla en el panel** (`/panel/pagos` → credenciales, o el módulo que
+   corresponda) y **probar conexión** desde el mismo botón. Nunca en el `.env`,
+   nunca en un archivo: van cifradas en `credenciales` (ADR-011).
+4. **Registrar el incidente en la bitácora.** El paso 3 ya deja huella de la
+   escritura, pero no dice *por qué*. Añadir la anotación con el motivo:
+
+   ```bash
+   php -r 'require "/var/www/pedro/vendor/autoload.php";
+     App\Soporte\Entorno::cargar("/var/www/pedro/.env");
+     (new App\Repositorios\AuditoriaRepo(App\Core\BD::desdeEntorno()))
+       ->registrar("credencial", null, "rotar_por_exposicion", "pedro",
+                   ["servicio" => "wompi", "motivo" => "pegada en un chat"]);'
+   ```
+
+   Sin esta línea, dentro de seis meses la rotación parece mantenimiento
+   rutinario y nadie sabe que hubo una exposición.
+
+**Lo que NO hay que hacer:** borrar el mensaje donde se pegó y dar el asunto por
+cerrado. Borrarlo no revoca nada, y además destruye la evidencia de cuándo
+ocurrió. Rotar primero; limpiar después, si se quiere.
+
+**Si la expuesta fue la `MASTER_KEY` o el `PEPPER_TELEFONO`,** este
+procedimiento no aplica: ver §3.7, que es un incidente de otra magnitud.
+
 ---
 
 ## 4. Rutinas

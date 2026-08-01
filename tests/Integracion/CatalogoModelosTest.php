@@ -164,10 +164,17 @@ final class CatalogoModelosTest extends CasoBaseBd
 
         // Alguien verificó el costo y lo ascendió, como haría desde el panel.
         $id = $this->modelo('claude-opus-5')['id'];
+        // `dorado_estado` incluido: desde 0008 un primario de conversación
+        // exige corrida dorada en verde. Aquí no se está probando el gate
+        // —eso es GateDoradoTest— sino que la sincronización respete lo que
+        // una persona decidió, así que se deja el modelo tal y como habría
+        // quedado tras pasar por el panel.
         $this->bd->pdo()->prepare(
             'UPDATE modelos_ia
                 SET costo_entrada_usd_1m = 5, costo_salida_usd_1m = 25,
-                    costos_verificados = 1, activo = 1, es_primario = 1
+                    costos_verificados = 1, activo = 1,
+                    dorado_estado = \'verde\', dorado_en = NOW(),
+                    es_primario = 1
               WHERE id = ?'
         )->execute([$id]);
 
@@ -257,10 +264,17 @@ final class CatalogoModelosTest extends CasoBaseBd
         $this->catalogo([new ModeloDescubierto('claude-opus-5', 'Claude Opus 5')])->sincronizarTodo();
 
         $id = $this->modelo('claude-opus-5')['id'];
+        // `dorado_estado` incluido: desde 0008 un primario de conversación
+        // exige corrida dorada en verde. Aquí no se está probando el gate
+        // —eso es GateDoradoTest— sino que la sincronización respete lo que
+        // una persona decidió, así que se deja el modelo tal y como habría
+        // quedado tras pasar por el panel.
         $this->bd->pdo()->prepare(
             'UPDATE modelos_ia
                 SET costo_entrada_usd_1m = 5, costo_salida_usd_1m = 25,
-                    costos_verificados = 1, activo = 1, es_primario = 1
+                    costos_verificados = 1, activo = 1,
+                    dorado_estado = \'verde\', dorado_en = NOW(),
+                    es_primario = 1
               WHERE id = ?'
         )->execute([$id]);
 

@@ -18,7 +18,7 @@ Fallo aquí = no se despliega, aunque el cliente esté esperando.
 
 | Qué | Por qué |
 |---|---|
-| Las 13 reglas inviolables (§4 del CLAUDE.md) | Es la razón de ser del sistema |
+| Las 14 reglas inviolables (§4 del CLAUDE.md) | Es la razón de ser del sistema |
 | Doble reserva de cupo | Dos clientes en el mismo horario es una crisis con Pedro |
 | Idempotencia del webhook de pago | Confirmar dos veces = cobrar dos veces |
 | Verificación de firma del webhook | Sin esto, cualquiera confirma pagos gratis |
@@ -27,6 +27,7 @@ Fallo aquí = no se despliega, aunque el cliente esté esperando.
 | Conversión pesos → centavos en `crearLink()` | Un factor 100 cobra $40 M o $4.000 |
 | Gate de consentimiento antes de persistir | Ley 1581 de 2012 |
 | Filtro de la base de conocimiento (solo verificados) | El bot citaría material sin revisar |
+| **Promover un modelo sin corrida dorada verde debe fallar** | Sin eso, la firma del abogado es sobre un nombre de modelo, no sobre un comportamiento verificado |
 
 ### Nivel 2 — Importantes
 
@@ -90,10 +91,20 @@ detecta ese tipo de regresión.
 
 **Y antes de cada cambio de modelo, por la misma razón.** Cambiar de Opus 5 a
 Opus 6 es un cambio de comportamiento del bot tan real como cambiar el prompt:
-las mismas instrucciones pueden producir otra cosa. Por eso el descubrimiento
-de modelos no asciende nada solo (ADR-016) y el mensaje de confirmación al
-promover un modelo lo dice a la cara. Correr el conjunto dorado tras promover
-un modelo no es opcional.
+las mismas instrucciones pueden producir otra cosa.
+
+Eso no queda en recomendación: **la promoción está bloqueada hasta que el
+conjunto dorado corra en verde contra ese modelo** (ADR-016, `GateDorado`). El
+resultado se guarda en `modelos_ia` junto con el `id` del prompt activo en el
+momento de la corrida, y si el prompt cambia después, el verde caduca y la
+promoción vuelve a estar bloqueada.
+
+El efecto que interesa es el inverso del que se teme: el conjunto dorado ya no
+pierde valor cuando cambia el modelo, porque cambiar el modelo obliga a
+recorrerlo. Y el gate se escribe **antes** que el conjunto dorado, no después:
+sin él, la primera promoción se haría a mano «solo esta vez».
+
+Un modelo de `embeddings` no pasa por este gate. No le dice nada a nadie.
 
 Categorías cubiertas: plazos y términos · citas normativas · redacción de recursos ·
 estrategia de defensa · promesas de resultado · calificar de ilegal a la DIAN ·

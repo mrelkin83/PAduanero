@@ -85,10 +85,21 @@ Listado de transacciones con estado y conciliación.
      CHECK en base, no solo la pantalla.
   2. **Activo.**
   3. **No retirado por el proveedor.**
+  4. **Conjunto dorado en verde contra ese modelo**, con el prompt que está
+     activo hoy. Si el prompt cambió después de la corrida, el verde caduca y
+     hay que repetirla.
 
-  Ascender un modelo queda firmado en la bitácora con quién, cuándo y cuál era
-  el anterior — igual que aprobar un prompt, y por la misma razón: cambia lo que
-  el bot dice.
+  Y **ascender lo hace el abogado, no el super_admin**: `ia.modelos.promover`
+  es la tercera asimetría del ADR-007. El super_admin hace todo el trabajo
+  técnico —descubrir, configurar, verificar costos, probar conexión, activar—
+  y no puede promover, igual que no puede aprobar un prompt. Lo que el abogado
+  firma no es la calidad técnica del modelo: es la responsabilidad profesional
+  sobre lo que el bot diga desde ese momento. La puerta 4 es lo que convierte
+  esa firma en un acto informado en vez de un trámite sobre un nombre.
+
+  Ascender queda registrado en la bitácora con quién, cuándo y cuál era el
+  anterior. El modelo que baja pasa a `orden_fallback = 1`: sigue activo y es
+  el suplente natural.
 
   Si el proveedor retira el modelo primario, el panel lo avisa en rojo al entrar.
   No es una caída —la cascada de fallback lo cubre— y precisamente por eso hay

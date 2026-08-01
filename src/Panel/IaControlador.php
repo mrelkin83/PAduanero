@@ -8,6 +8,7 @@ use App\Core\BD;
 use App\Core\Respuesta;
 use App\Repositorios\AuditoriaRepo;
 use App\Servicios\CatalogoModelos;
+use App\Servicios\GateDorado;
 
 /**
  * Proveedores y modelos de IA (docs/PANEL_ADMIN.md §2.5).
@@ -16,7 +17,7 @@ use App\Servicios\CatalogoModelos;
  * donde deja de ser automático. Lo que el cron trajo aparece como «nuevo,
  * sin revisar»; lo que el bot usa lo elige una persona.
  *
- * Tres puertas antes de que un modelo pueda ser primario:
+ * Cuatro puertas antes de que un modelo pueda ser primario:
  *
  *  1. Costo registrado y marcado como verificado. Sin esto el corte por
  *     `presupuesto_ia_mensual_usd` no corta: un modelo a coste cero nunca
@@ -26,12 +27,20 @@ use App\Servicios\CatalogoModelos;
  *     propósito: el cron tiene que poder anotar el retiro de un modelo que
  *     está en uso, y no podría si la restricción se lo prohibiera. Ver
  *     `0006_catalogo_modelos.sql` §3.
+ *  4. Conjunto dorado en verde contra ese modelo y con el prompt activo
+ *     (`GateDorado`). Es lo que convierte la firma del abogado en un acto
+ *     informado en vez de un trámite sobre un nombre de modelo.
+ *
+ * Y las dos mitades del ADR-007 dentro de este mismo archivo: todo lo
+ * técnico es `ia.proveedores.escribir` (super_admin); ascender es
+ * `ia.modelos.promover` (abogado).
  */
 final class IaControlador extends ControladorBase
 {
     public function __construct(
         private readonly BD $bd,
         private readonly CatalogoModelos $catalogo,
+        private readonly GateDorado $gate,
         private readonly AuditoriaRepo $auditoria,
     ) {
     }
@@ -67,11 +76,21 @@ final class IaControlador extends ControladorBase
                        p.clave, m.proposito, m.orden_fallback, m.identificador'
         )->fetchAll();
 
+        // El motivo del gate se calcula aquí y se enseña en la ficha: un
+        // botón deshabilitado sin explicación manda a alguien a leer código.
+        $gates = [];
+
+        foreach ($modelos as $m) {
+            $gates[(string) $m['id']] = $this->gate->puedePromover($m);
+        }
+
         return $this->vista('panel/ia', [
             'ctx' => $ctx,
             'proveedores' => $proveedores,
             'modelos' => $modelos,
+            'gates' => $gates,
             'puedeEscribir' => $ctx->puede('ia.proveedores.escribir'),
+            'puedePromover' => $ctx->puede('ia.modelos.promover'),
             'avisos' => $this->avisos($ctx),
         ]);
     }
@@ -251,12 +270,20 @@ final class IaControlador extends ControladorBase
      * Asciende un modelo a primario de su propósito.
      *
      * Este es el acto que el descubrimiento automático deliberadamente no
-     * hace. Cambia lo que el bot dice, así que se comporta como un cambio de
-     * prompt: queda firmado en `auditoria` con quién y cuándo.
+     * hace, y lo firma **el abogado**, no el super_admin: `ia.modelos.promover`
+     * es la tercera asimetría del ADR-007, junto a `ia.prompts.aprobar`,
+     * `kb.verificar` y `contenido.publicar`. Lo que se firma no es la calidad
+     * técnica del modelo —el abogado no la evalúa, igual que no redacta el
+     * prompt que aprueba— sino la responsabilidad profesional sobre lo que el
+     * bot diga a partir de aquí.
+     *
+     * Y para que esa firma sea informada y no un trámite, antes pasa el
+     * `GateDorado`: no se aprueba un nombre de modelo, se aprueba un modelo
+     * que ya demostró no violar las reglas inviolables.
      */
     public function promover(Contexto $ctx): Respuesta
     {
-        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+        $ctx->permisos->exigir($ctx->usuario, 'ia.modelos.promover');
 
         $modelo = $this->modelo($ctx->campo('id'));
 
@@ -278,6 +305,12 @@ final class IaControlador extends ControladorBase
                 'error',
                 'El proveedor retiró ' . $modelo['identificador'] . '. No puede ser primario.',
             );
+        }
+
+        $gate = $this->gate->puedePromover($modelo);
+
+        if (!$gate['ok']) {
+            return $this->redirigirCon('/panel/ia', 'error', $gate['motivo']);
         }
 
         $pdo = $this->bd->pdo();

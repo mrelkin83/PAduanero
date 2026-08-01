@@ -129,6 +129,15 @@ final class Aplicacion
             ),
         );
 
+        // La regla «¿puede este modelo hablar con clientes?» en un solo sitio.
+        // La usan el panel al promover y el corredor del conjunto dorado al
+        // terminar; duplicada, uno de los dos se quedaría atrás.
+        $this->contenedor->registrar(
+            \App\Servicios\GateDorado::class,
+            static fn (Contenedor $c): \App\Servicios\GateDorado
+                => new \App\Servicios\GateDorado($c->obtener(BD::class)),
+        );
+
         // ── Panel (Etapa 3) ──────────────────────────────────────────────
         $this->contenedor->registrar(
             \App\Repositorios\UsuarioRepo::class,

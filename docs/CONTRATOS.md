@@ -461,3 +461,12 @@ compilada en el servidor.
     devuelve el contador con el que casó, no un `true`: sin ese dato no se
     puede aplicar el antirreplay del RFC 6238 §5.2, y el fallo es silencioso
     — todo parece funcionar y un código robado sirve treinta segundos.
+16. Detectar columnas generadas con `EXTRA NOT LIKE '%GENERATED%'`. MySQL
+    también pone `DEFAULT_GENERATED` en `EXTRA` para toda columna con
+    `DEFAULT (UUID())` o `DEFAULT CURRENT_TIMESTAMP` — es decir, casi todas
+    las claves primarias de este esquema. El filtro correcto es
+    `GENERATION_EXPRESSION`, que está vacía salvo en columnas realmente
+    generadas. El modo de falla no se ve en rojo donde está el error: las
+    semillas se restauran con UUID nuevos y lo que se rompe son las foráneas
+    de otras pruebas, por motivos aparentemente inconexos. Pasó en
+    `CasoBaseBd::restaurarSemillas()`.

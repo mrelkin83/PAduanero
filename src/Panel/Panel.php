@@ -189,6 +189,7 @@ final class Panel
             'ia' => new IaControlador(
                 $this->c->obtener(BD::class),
                 $this->c->obtener(\App\Servicios\CatalogoModelos::class),
+                $this->c->obtener(\App\Servicios\GateDorado::class),
                 $this->c->obtener(AuditoriaRepo::class),
             ),
             'usuarios' => new UsuariosControlador(

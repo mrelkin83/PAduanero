@@ -687,9 +687,35 @@ Tres razones, en orden de peso:
    Cambiar el modelo por debajo las deja sin valor, y nadie se entera hasta
    que un cliente lee algo que no debía.
 
-Queda **pendiente de decisión del PO**: bajo la matriz actual, ascender un
-modelo a primario es `ia.proveedores.escribir`, que solo tiene el
-`super_admin`. Si se quiere que ese acto lo firme el abogado —que es lo que
-ADR-007 y ADR-008 sugieren para todo lo que cambia lo que el bot dice—, hay
-que añadirle el permiso o crear uno propio, `ia.modelos.promover`. No se tocó
-la matriz sin autorización.
+**Quién asciende — resuelto por el PO (2026-07-31).** Se crea
+`ia.modelos.promover` y es **del abogado**, no del `super_admin`. Es la tercera
+asimetría del ADR-007, junto a `ia.prompts.aprobar`, `kb.verificar` y
+`contenido.publicar`:
+
+| Rol | Puede |
+|---|---|
+| `super_admin` | Descubrir, configurar, verificar costos, probar conexión, activar y desactivar. Todo el trabajo técnico. **No puede promover.** |
+| `abogado` | `ia.modelos.promover`. Firma que el bot va a hablar con otro modelo. |
+
+La objeción previsible —Pedro no sabe evaluar un modelo— es correcta y no
+importa: tampoco redacta el prompt que aprueba. Lo que firma no es la calidad
+técnica, es que asume la responsabilidad profesional de lo que el bot diga a
+partir de ese momento.
+
+**El gate que hace la firma significativa.** Un modelo no puede ser primario de
+`conversacion` sin que el conjunto dorado haya corrido **en verde contra ese
+modelo**, y sin que la corrida siga vigente: se guarda en `modelos_ia` el
+resultado, la fecha y el `id` del prompt que estaba activo, y si el prompt
+cambia después, el verde caduca.
+
+Así Pedro no aprueba «claude-opus-6»: aprueba un modelo que ya demostró no
+soltar un plazo, no citar una norma numerada y no prometer un resultado. Y la
+razón 3 de arriba se da la vuelta — el conjunto dorado deja de perder valor al
+cambiar de modelo, porque cambiar de modelo obliga a recorrerlo.
+
+La regla vive en `App\Servicios\GateDorado`, en un solo sitio, porque la usan
+el panel al promover y el corredor del dorado al terminar. Las dos mitades que
+caben en un CHECK están en `ck_modelo_primario_dorado`; la vigencia frente al
+prompt cruza dos tablas y por eso no cabe.
+
+Un modelo de `embeddings` no pasa por el gate: no le dice nada a nadie.

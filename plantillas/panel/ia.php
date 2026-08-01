@@ -8,14 +8,24 @@ use App\Soporte\Vista;
  * @var \App\Panel\Contexto $ctx
  * @var list<array<string,mixed>> $proveedores
  * @var list<array<string,mixed>> $modelos
+ * @var array<string,array{ok:bool,motivo:string}> $gates
  * @var bool $puedeEscribir
+ * @var bool $puedePromover
  * @var array{ok:string,error:string} $avisos
  */
 
 $e = Vista::e(...);
 $titulo = 'Modelos de IA';
 
-$contenido = static function () use ($e, $ctx, $proveedores, $modelos, $puedeEscribir): void {
+$contenido = static function () use (
+    $e,
+    $ctx,
+    $proveedores,
+    $modelos,
+    $gates,
+    $puedeEscribir,
+    $puedePromover,
+): void {
     $nuevos = array_filter(
         $modelos,
         static fn (array $m): bool => $m['origen'] === 'descubierto'
@@ -34,8 +44,10 @@ $contenido = static function () use ($e, $ctx, $proveedores, $modelos, $puedeEsc
             El catálogo se sincroniza solo con lo que cada proveedor anuncia: si sale un
             modelo nuevo, aparece aquí al día siguiente sin tocar código.
             <strong>Lo que no es automático es empezar a usarlo.</strong> Un modelo nuevo
-            entra inactivo y sin costo, y ascenderlo a primario es una decisión firmada:
-            cambia lo que el bot dice, igual que cambiar un prompt.
+            entra inactivo y sin costo. Ascenderlo a primario lo firma el abogado —igual
+            que aprobar un prompt, y por la misma razón: cambia lo que el bot dice— y
+            solo después de que el conjunto dorado haya corrido en verde contra ese
+            modelo con el prompt que está activo hoy.
         </p>
     </section>
 
@@ -195,9 +207,27 @@ $contenido = static function () use ($e, $ctx, $proveedores, $modelos, $puedeEsc
                 </p>
             <?php endif; ?>
 
-            <?php if ($puedeEscribir && !$retirado): ?>
+            <?php if ((string) $m['proposito'] === 'conversacion'): ?>
+                <p class="mt-1 text-xs text-acero">
+                    Conjunto dorado:
+                    <?php if ((string) $m['dorado_estado'] === 'verde'): ?>
+                        <span class="text-verde">verde</span>
+                        el <?= $e((string) $m['dorado_en']) ?>
+                        · <?= (int) $m['dorado_casos'] ?> casos
+                    <?php elseif ((string) $m['dorado_estado'] === 'rojo'): ?>
+                        <span class="text-sello">rojo</span>
+                        el <?= $e((string) $m['dorado_en']) ?>
+                        · <?= (int) $m['dorado_fallos'] ?> de <?= (int) $m['dorado_casos'] ?> en rojo
+                    <?php else: ?>
+                        <span class="text-sello">sin correr</span>
+                    <?php endif; ?>
+                </p>
+            <?php endif; ?>
+
+            <?php if (($puedeEscribir || $puedePromover) && !$retirado): ?>
             <div class="mt-3 flex flex-wrap items-end gap-3 border-t border-acero/15 pt-3">
 
+                <?php if ($puedeEscribir): ?>
                 <form method="post" action="/panel/ia/costo" class="flex flex-wrap items-end gap-2">
                     <?= $ctx->csrf->campoOculto() ?>
                     <input type="hidden" name="id" value="<?= $e((string) $m['id']) ?>">
@@ -215,8 +245,9 @@ $contenido = static function () use ($e, $ctx, $proveedores, $modelos, $puedeEsc
                     </label>
                     <button type="submit" class="boton-secundario">Guardar costo</button>
                 </form>
+                <?php endif; ?>
 
-                <?php if (!$primario): ?>
+                <?php if ($puedeEscribir && !$primario): ?>
                 <form method="post" action="/panel/ia/activo">
                     <?= $ctx->csrf->campoOculto() ?>
                     <input type="hidden" name="id" value="<?= $e((string) $m['id']) ?>">
@@ -224,15 +255,31 @@ $contenido = static function () use ($e, $ctx, $proveedores, $modelos, $puedeEsc
                         <?= (int) $m['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
                     </button>
                 </form>
+                <?php endif; ?>
 
+                <?php
+                /* Ascender es del abogado (ia.modelos.promover), no del
+                   super_admin: es la firma sobre lo que el bot dirá, no una
+                   tarea técnica. Ver ADR-007 y ADR-016. */
+                ?>
+                <?php if ($puedePromover && !$primario):
+                    $gate = $gates[(string) $m['id']] ?? ['ok' => false, 'motivo' => ''];
+                    $listo = $verificado && $gate['ok'];
+                    ?>
                 <form method="post" action="/panel/ia/promover">
                     <?= $ctx->csrf->campoOculto() ?>
                     <input type="hidden" name="id" value="<?= $e((string) $m['id']) ?>">
-                    <button type="submit" class="boton"
-                            <?= $verificado ? '' : 'disabled' ?>>
+                    <button type="submit" class="boton" <?= $listo ? '' : 'disabled' ?>>
                         Hacer primario
                     </button>
                 </form>
+                <?php if (!$listo): ?>
+                    <p class="text-xs text-sello">
+                        <?= $e($verificado
+                            ? (string) $gate['motivo']
+                            : 'Falta registrar y verificar el costo.') ?>
+                    </p>
+                <?php endif; ?>
                 <?php endif; ?>
             </div>
             <?php endif; ?>
