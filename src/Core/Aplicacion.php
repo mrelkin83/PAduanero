@@ -130,6 +130,20 @@ final class Aplicacion
             ),
         );
 
+        // ── Cobro (Etapa 5) ──────────────────────────────────────────────
+        $this->contenedor->registrar(
+            \App\Servicios\Pagos::class,
+            static fn (Contenedor $c): \App\Servicios\Pagos => new \App\Servicios\PagosWompi(
+                $c->obtener(BD::class),
+                $c->obtener(Credenciales::class),
+                $c->obtener(\App\Repositorios\ConsultaRepo::class),
+                $c->obtener(Config::class),
+                $c->obtener(\App\Servicios\Outbox::class),
+                $c->obtener(\App\Soporte\Http::class),
+                $c->obtener(Logger::class),
+            ),
+        );
+
         // ── Motor (Etapa 4) ──────────────────────────────────────────────
         $this->contenedor->registrar(
             \App\Repositorios\ContactoRepo::class,
@@ -195,6 +209,12 @@ final class Aplicacion
                     $c->obtener(Config::class),
                     $c->obtener(Logger::class),
                     $c->obtener(\App\Motor\ConstructorPrompt::class),
+                    new \App\Motor\Agenda(
+                        $c->obtener(\App\Repositorios\ConsultaRepo::class),
+                        $c->obtener(\App\Servicios\Pagos::class),
+                        $c->obtener(Config::class),
+                        $c->obtener(Logger::class),
+                    ),
                 ),
         );
 
@@ -472,6 +492,36 @@ final class Aplicacion
             }
 
             return Respuesta::json($resultado);
+        });
+
+        // Webhook de la pasarela de pago. Sin secreto en la ruta: aquí la
+        // autenticación ES la firma del evento (regla 6), verificada contra
+        // el cuerpo crudo. Un evento sin firma válida no escribe nada.
+        $this->router->post('/webhook/pago/wompi', function (Peticion $p): Respuesta {
+            try {
+                $resultado = $this->contenedor->obtener(\App\Servicios\Pagos::class)
+                    ->procesarWebhook($p->cuerpoCrudo, $p->cabeceras);
+            } catch (\Throwable $e) {
+                $this->contenedor->obtener(Logger::class)->error('webhook_pago.excepcion', [
+                    'excepcion' => $e::class,
+                    'mensaje' => $e->getMessage(),
+                ]);
+
+                // 500 a propósito, al contrario que el webhook de Chatwoot:
+                // si el fallo es nuestro (base caída a mitad), QUEREMOS que
+                // Wompi reintente — perder un evento de pago aprobado deja a
+                // un cliente que pagó sin su cita.
+                return new Respuesta('', 500);
+            }
+
+            if (!$resultado['valido']) {
+                return new Respuesta('', 403);
+            }
+
+            return Respuesta::json([
+                'procesado' => $resultado['procesado'],
+                'referencia' => $resultado['referencia'],
+            ]);
         });
 
         $this->router->get('/salud', function (): Respuesta {

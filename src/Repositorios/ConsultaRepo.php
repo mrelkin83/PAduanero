@@ -390,13 +390,33 @@ final class ConsultaRepo
     }
 
     /** @return array<string,mixed>|null */
-    private function modalidad(string $id): ?array
+    public function modalidad(string $id): ?array
     {
         $stmt = $this->bd->pdo()->prepare(
-            'SELECT duracion_min, precio_cop FROM modalidades_asesoria WHERE id = ? AND activo = 1'
+            'SELECT id, nombre, duracion_min, precio_cop
+               FROM modalidades_asesoria WHERE id = ? AND activo = 1'
         );
         $stmt->execute([$id]);
         $fila = $stmt->fetch();
+
+        return $fila === false ? null : $fila;
+    }
+
+    /**
+     * La modalidad que se ofrece cuando el modelo no nombró ninguna.
+     *
+     * El negocio de hoy tiene UNA (virtual, 60 min); si mañana hay varias, el
+     * `orden` del panel decide cuál es la propuesta por defecto. El precio
+     * sale SIEMPRE de aquí — jamás del texto del LLM.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function modalidadPorDefecto(): ?array
+    {
+        $fila = $this->bd->pdo()->query(
+            'SELECT id, nombre, duracion_min, precio_cop
+               FROM modalidades_asesoria WHERE activo = 1 ORDER BY orden, nombre LIMIT 1'
+        )->fetch();
 
         return $fila === false ? null : $fila;
     }

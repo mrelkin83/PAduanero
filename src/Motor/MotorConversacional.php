@@ -63,6 +63,10 @@ final class MotorConversacional
         private readonly Config $config,
         private readonly Logger $log,
         private readonly ConstructorPrompt $prompt,
+        // Etapa 5. Opcional para que el motor de las etapas anteriores siga
+        // armándose sin la maquinaria de cobro; sin agenda, las acciones de
+        // reserva se ignoran y el bot solo conversa.
+        private readonly ?Agenda $agenda = null,
     ) {
     }
 
@@ -246,6 +250,38 @@ final class MotorConversacional
         }
 
         $casoId = $this->aplicarAccion($analisis, $contactoId, $estado);
+
+        // ── Acciones de agenda (Etapa 5) ─────────────────────────────────
+        //
+        // El modelo propone; la base dispone. Horarios, precio y enlace de
+        // pago salen de plantillas con datos reales y se AÑADEN al texto del
+        // modelo: lo factual nunca viene de lo generado.
+        if ($this->agenda !== null && $analisis->hayAccion()) {
+            $contacto = $this->contactos->porId($contactoId);
+
+            if ($contacto !== null) {
+                $resultado = $this->agenda->despachar($analisis->accion, $contactoId, $casoId, $contacto);
+
+                if ($resultado->apendice !== null) {
+                    $texto = rtrim($texto) . "\n\n" . $resultado->apendice;
+                }
+
+                if ($resultado->nuevoEstado !== null) {
+                    $this->conversaciones->cambiarEstado($chatwootConvId, $resultado->nuevoEstado);
+                }
+
+                // Tocar una asesoría PAGADA lo resuelve una persona. El aviso
+                // va sin carga útil, como manda la regla 14: motivo y número
+                // de conversación, cero texto del contacto.
+                if ($resultado->escalarPagada) {
+                    $this->outbox->encolarAlertaEscalamiento(
+                        $telefono,
+                        MotivoEscalamiento::SOLICITUD_EXPRESA,
+                        $chatwootConvId,
+                    );
+                }
+            }
+        }
 
         $this->conversaciones->guardarTurno(
             $chatwootConvId,

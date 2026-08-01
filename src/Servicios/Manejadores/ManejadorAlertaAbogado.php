@@ -35,7 +35,12 @@ final class ManejadorAlertaAbogado implements ManejadorEvento
 
     public function tipos(): array
     {
-        return ['alerta.escalamiento', 'alerta.modelo_retirado'];
+        return [
+            'alerta.escalamiento',
+            'alerta.modelo_retirado',
+            'alerta.pago_confirmado',
+            'alerta.pago_huerfano',
+        ];
     }
 
     public function manejar(EventoOutbox $evento): void
@@ -43,6 +48,8 @@ final class ManejadorAlertaAbogado implements ManejadorEvento
         $texto = match ($evento->tipo) {
             'alerta.escalamiento' => $this->textoEscalamiento($evento),
             'alerta.modelo_retirado' => $this->textoModeloRetirado($evento),
+            'alerta.pago_confirmado' => $this->textoPagoConfirmado($evento),
+            'alerta.pago_huerfano' => $this->textoPagoHuerfano($evento),
             default => throw new EventoDescartado("Tipo no soportado: {$evento->tipo}"),
         };
 
@@ -95,6 +102,37 @@ final class ManejadorAlertaAbogado implements ManejadorEvento
             . 'no hay caída visible — por eso conviene mirarlo hoy.',
             'Elija sustituto en /panel/ia.',
         ]);
+    }
+
+    private function textoPagoHuerfano(EventoOutbox $evento): string
+    {
+        // Dinero real sobre un cupo que ya no existe. Es de las pocas
+        // alertas que piden acción el mismo día: hay un cliente que pagó y
+        // no tiene cita.
+        $conv = (int) $evento->dato('chatwoot_conv_id', 0);
+
+        return implode("\n", array_filter([
+            '🔴 PAGO SIN CUPO — conciliar hoy',
+            'Llegó un pago aprobado sobre una reserva «' . $evento->dato('estado_consulta', '¿?') . '»'
+                . ' (era para el ' . $evento->dato('fecha', '¿?') . ' a las ' . $evento->dato('hora', '¿?') . ').',
+            'La consulta NO se confirmó sola: hay que reagendar o devolver, a mano.',
+            $conv > 0 ? 'Conversación #' . $conv : null,
+            $conv > 0 ? $this->enlace($conv) : null,
+        ]));
+    }
+
+    private function textoPagoConfirmado(EventoOutbox $evento): string
+    {
+        // Misma disciplina que la regla 14: al teléfono personal de Pedro va
+        // la agenda, nunca el contenido del caso. Fecha, hora y dónde mirar.
+        $conv = (int) $evento->dato('chatwoot_conv_id', 0);
+
+        return implode("\n", array_filter([
+            '💰 Pago confirmado',
+            'Asesoría agendada: ' . $evento->dato('fecha', '¿?') . ' a las ' . $evento->dato('hora', '¿?'),
+            $conv > 0 ? 'Conversación #' . $conv : null,
+            $conv > 0 ? $this->enlace($conv) : null,
+        ]));
     }
 
     private function enlace(int $conversacionId): string
