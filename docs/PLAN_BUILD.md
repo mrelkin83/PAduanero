@@ -43,6 +43,29 @@ valor y no dependen de nada que Pedro tenga pendiente.
 
 ---
 
+## Estado de construcción (2026-08-01)
+
+Con autorización global del PO de esta fecha, el **código de las nueve
+etapas está completo y probado** (523 pruebas). Lo que separa «código
+completo» de «etapa cerrada» es, en cada caso, un insumo externo que ningún
+código puede sustituir:
+
+| Etapa | Código | Cierre pendiente de |
+|---|---|---|
+| 0–3 | ✔ | — (cerradas; `CIERRE_ETAPA_3.md` es del PO) |
+| 4 | ✔ | **Llave del LLM válida.** La de OpenAI guardada el 2026-08-01 mide 108 caracteres y el proveedor la rechaza (`invalid_api_key`); parece un pegado incompleto. Con la llave buena: `/panel/ia` → Cargar modelos → elegir → `php bin/correr-dorado.php` → las 30 conversaciones de Pedro |
+| 5 | ✔ | Credenciales reales de Wompi (4 llaves en `/panel/pagos`) y el pago de prueba de ciclo completo |
+| 6 | ✔ | Decisión del PO de apagar `motor_modo_sombra` tras las dos semanas limpias |
+| 7 | ✔ | El archivo de los 130+ escenarios (nunca llegó) y la verificación de Pedro en `/panel/conocimiento` |
+| 8 | ✔ | Anotar la inversión mensual por canal (o los tokens de Meta/Google Ads para automatizarla) |
+
+Siguen siendo trabajo humano, no configuración: texto de habeas data,
+política de reembolso, segundo WhatsApp para alertas, confirmación del
+catálogo tributario y revisión del copy bajo la Ley 1123 de 2007. El
+tablero los enseña como pendientes que bloquean el cobro.
+
+---
+
 ## Etapa 0 — Cimientos (sin lógica de negocio)
 
 Estructura del repo con `index.php` en la raíz, front controller y router propios,
