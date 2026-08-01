@@ -205,6 +205,65 @@ de una hora y solo llenaría la cola.
 
 ---
 
+## `App\Servicios\Outbox`
+
+```php
+interface Outbox
+{
+    public function encolar(string $tipo, array $payload, int $retrasoSegundos = 0): int;
+
+    /** Regla 14: SIN carga útil. No acepta texto, y esa es toda su razón de ser. */
+    public function encolarAlertaEscalamiento(
+        string $telefonoContacto, MotivoEscalamiento $motivo, int $chatwootConvId): int;
+
+    /** @return EventoOutbox[] reclamados con FOR UPDATE SKIP LOCKED */
+    public function tomar(int $limite = 20): array;
+
+    public function marcarEnviado(int $id): void;
+    public function reprogramar(int $id, string $error): void;   // siguiente escalón del backoff
+    public function marcarFallido(int $id, string $error): void; // definitivo
+    public function recuperarAtascados(int $minutos = 15): int;
+}
+```
+
+`encolar()` es una escritura y nada más: **se puede llamar dentro de una
+transacción**. Todo lo que sale a la red lo hace el worker, fuera. Eso es
+ADR-004 entero.
+
+**Por qué hay un método específico para el escalamiento.** La regla 14 prohíbe
+el texto del mensaje «en ninguna tabla, cola o notificación», y el outbox es
+literalmente esa cola. Un `encolar('alerta.escalamiento', $payload)` genérico
+deja la puerta abierta a que alguien meta el texto en el payload con toda la
+buena intención — para que Pedro no tenga que abrir Chatwoot, por ejemplo.
+`encolarAlertaEscalamiento()` construye el payload a partir de argumentos
+tipados y **no tiene ningún parámetro por el que quepa un texto**. Mismo
+recurso que `GateDorado::registrarCorrida()`, que no recibe el prompt sino que
+lo mira: cuando una regla no debe poder saltarse, la firma del método es mejor
+sitio que un comentario. Hay prueba que afirma sobre la lista de parámetros.
+
+**Backoff:** 1 m · 5 m · 15 m · 1 h · 6 h, y después `fallido`. Seguir
+golpeando cada seis horas un endpoint que lleva un día rechazando no arregla
+nada y esconde el problema entre reintentos que parecen actividad normal.
+
+**Contrato de los manejadores:** excepción → se reprograma; `EventoDescartado`
+→ se marca fallido sin más intentos. Sin esa distinción, un evento imposible
+—payload inválido, conversación borrada— se reintenta cinco veces y retrasa a
+los que sí podían salir.
+
+**`disponible_en` tiene dos significados según el estado**, y conviene saberlo
+antes de escribir una consulta contra esta tabla: en `pendiente` es cuándo
+estará listo; en `procesando` es cuándo se reclamó. Lo segundo es lo que hace
+posible `recuperarAtascados()` sin añadir columna. Medir el atasco contra
+`creado_en` recuperaría al instante cualquier evento que llevara un rato en
+cola y que un worker vivo acabara de tomar.
+
+El worker corre como servicio (`pedro-outbox`, `--demonio`) y no por cron: una
+alerta urgente que espera al siguiente tic del minuto llega tarde. La línea de
+cron es la red por si el servicio queda caído; correr ambos es seguro gracias
+al `SKIP LOCKED`.
+
+---
+
 ## `App\Servicios\Agenda`
 
 ```php

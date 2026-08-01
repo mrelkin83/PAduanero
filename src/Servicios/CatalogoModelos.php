@@ -48,6 +48,10 @@ final class CatalogoModelos
         private readonly Credenciales $credenciales,
         private readonly Logger $log,
         iterable $descubridores,
+        // Opcional: sin outbox la sincronización sigue funcionando y el aviso
+        // queda solo en el registro y en el panel. Es lo que permite correr
+        // este servicio en pruebas sin montar la cola entera.
+        private readonly ?Outbox $outbox = null,
     ) {
         foreach ($descubridores as $descubridor) {
             $this->descubridores[$descubridor->formato()] = $descubridor;
@@ -268,10 +272,17 @@ final class CatalogoModelos
     /**
      * Un primario retirado no apaga el bot —la cascada de `orden_fallback` lo
      * recoge— pero sí significa que se está sirviendo desde el suplente sin
-     * que nadie lo haya decidido. Eso hay que decirlo fuerte.
+     * que nadie lo haya decidido.
      *
-     * Se registra en `error`, no en `warn`: es la única condición de este
-     * servicio que exige que alguien haga algo hoy.
+     * Y **precisamente por eso hay que gritarlo**: no hay caída visible que
+     * obligue a mirar. El registro en `error` lo ve quien lea los logs; el
+     * aviso por el outbox lo ve Pedro en su teléfono, que es quien tiene que
+     * elegir sustituto.
+     *
+     * Va por el outbox y no por una llamada directa: esto corre dentro de la
+     * sincronización, y ADR-004 dice que ningún I/O externo cuelga de ahí. Si
+     * Evolution estuviera lento, la sincronización entera se arrastraría con
+     * él.
      */
     private function avisarSiAlgunoEraPrimario(string $proveedorId): void
     {
@@ -287,6 +298,11 @@ final class CatalogoModelos
                 'proposito' => $fila['proposito'],
                 'accion' => 'El proveedor retiró el modelo primario. La cascada de '
                     . 'fallback lo cubre, pero hay que elegir sustituto en el panel.',
+            ]);
+
+            $this->outbox?->encolar('alerta.modelo_retirado', [
+                'modelo' => (string) $fila['identificador'],
+                'proposito' => (string) $fila['proposito'],
             ]);
         }
     }

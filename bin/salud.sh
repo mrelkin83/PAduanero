@@ -86,8 +86,13 @@ echo
 echo "Cola de salida"
 PEND=$($MYSQL "SELECT COUNT(*) FROM eventos_outbox WHERE estado='pendiente'" 2>/dev/null || echo "?")
 FALL=$($MYSQL "SELECT COUNT(*) FROM eventos_outbox WHERE estado='fallido'" 2>/dev/null || echo "?")
+# El atasco se mide desde que se RECLAMÓ el evento, no desde que se encoló.
+# En una fila `procesando`, `disponible_en` es la marca de la reclamación
+# (ver OutboxMysql::tomar). Con `creado_en` esto contaría como atascado
+# cualquier evento que llevara un rato en cola y que un worker vivo acabara
+# de tomar — una alarma falsa cada vez que hay carga.
 ATASC=$($MYSQL "SELECT COUNT(*) FROM eventos_outbox WHERE estado='procesando'
-  AND creado_en < NOW() - INTERVAL 15 MINUTE" 2>/dev/null || echo "?")
+  AND disponible_en < NOW() - INTERVAL 15 MINUTE" 2>/dev/null || echo "?")
 
 [[ "$PEND" -lt 50 ]]  2>/dev/null && ok "pendientes: ${PEND}" || aviso "pendientes acumulados: ${PEND}"
 [[ "$FALL" -eq 0 ]]   2>/dev/null && ok "sin fallidos" || mal "eventos fallidos: ${FALL}"

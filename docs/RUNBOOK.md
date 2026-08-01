@@ -53,7 +53,16 @@ Los crones:
 15   3 * * *  /var/www/pedro/bin/respaldo.sh
 30   4 * * *  php /var/www/pedro/bin/cron-purgar.php
 15   5 * * *  php /var/www/pedro/bin/cron-sincronizar-modelos.php
+*/5  * * * *  php /var/www/pedro/bin/worker-outbox.php
 ```
+
+El worker del outbox corre como **servicio** (`pedro-outbox`, modo `--demonio`,
+pasada cada 3 s), no como cron: una alerta de escalamiento urgente que espera
+al siguiente tic del minuto llega tarde a lo único que este sistema considera
+verdaderamente urgente. La línea de cron de arriba es la **red**, no el
+mecanismo: si alguien deja el servicio caído, impide que la cola se quede
+parada un fin de semana entero. Correr los dos a la vez es seguro — el
+`FOR UPDATE SKIP LOCKED` impide que dos procesos tomen el mismo evento.
 
 `cron-purgar.php` no es mantenimiento opcional: `intentos_acceso` guarda
 direcciones IP, que son dato personal bajo la Ley 1581 de 2012. Retención de

@@ -126,6 +126,7 @@ final class Aplicacion
                         $c->obtener(\App\Soporte\Http::class),
                     ),
                 ],
+                $c->obtener(\App\Servicios\Outbox::class),
             ),
         );
 
@@ -161,6 +162,45 @@ final class Aplicacion
             \App\Repositorios\ConsultaRepo::class,
             static fn (Contenedor $c): \App\Repositorios\ConsultaRepo
                 => new \App\Repositorios\ConsultaRepo($c->obtener(BD::class)),
+        );
+
+        $this->contenedor->registrar(
+            \App\Servicios\Outbox::class,
+            static fn (Contenedor $c): \App\Servicios\Outbox
+                => new \App\Servicios\OutboxMysql($c->obtener(BD::class)),
+        );
+
+        // Evolution SOLO para alertas internas al abogado (ADR-001). Lo que va
+        // a un cliente sale por Chatwoot, sin excepción.
+        $this->contenedor->registrar(
+            \App\Servicios\EvolucionAlertas::class,
+            static fn (Contenedor $c): \App\Servicios\EvolucionAlertas
+                => new \App\Servicios\EvolucionAlertas(
+                    $c->obtener(\App\Soporte\Http::class),
+                    $c->obtener(Logger::class),
+                    rtrim(Entorno::obtener('EVOLUTION_URL', '') ?? '', '/'),
+                    Entorno::obtener('EVOLUTION_INSTANCE', 'pedro') ?? 'pedro',
+                    Entorno::obtener('EVOLUTION_API_KEY', '') ?? '',
+                    Entorno::obtener('ALERTAS_WHATSAPP_ABOGADO', '') ?? '',
+                ),
+        );
+
+        $this->contenedor->registrar(
+            \App\Servicios\WorkerOutbox::class,
+            static fn (Contenedor $c): \App\Servicios\WorkerOutbox => new \App\Servicios\WorkerOutbox(
+                $c->obtener(\App\Servicios\Outbox::class),
+                $c->obtener(Logger::class),
+                [
+                    new \App\Servicios\Manejadores\ManejadorChatwoot(
+                        $c->obtener(\App\Servicios\Chatwoot::class),
+                    ),
+                    new \App\Servicios\Manejadores\ManejadorAlertaAbogado(
+                        $c->obtener(\App\Servicios\EvolucionAlertas::class),
+                        rtrim(Entorno::obtener('CHATWOOT_URL', '') ?? '', '/'),
+                        Entorno::obtener('CHATWOOT_ACCOUNT_ID', '1') ?? '1',
+                    ),
+                ],
+            ),
         );
 
         $this->contenedor->registrar(
