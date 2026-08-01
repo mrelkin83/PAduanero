@@ -9,6 +9,8 @@ use App\Soporte\Vista;
  * @var list<array<string,mixed>> $proveedores
  * @var list<array<string,mixed>> $modelos
  * @var array<string,array{clave:string,filas:list<array<string,mixed>>}> $credenciales
+ * @var array<string,list<string>> $referencia
+ * @var array<string,array<string,mixed>> $disponibles
  * @var array<string,array{ok:bool,motivo:string}> $gates
  * @var bool $puedeEscribir
  * @var bool $puedePromover
@@ -24,6 +26,8 @@ $contenido = static function () use (
     $proveedores,
     $modelos,
     $credenciales,
+    $referencia,
+    $disponibles,
     $gates,
     $puedeEscribir,
     $puedePromover,
@@ -109,6 +113,7 @@ $contenido = static function () use (
                     <th>Formato</th>
                     <th>País del servidor</th>
                     <th>Última sincronización</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -136,12 +141,104 @@ $contenido = static function () use (
                             </span>
                         <?php endif; ?>
                     </td>
+                    <td>
+                        <?php if ($puedeEscribir): ?>
+                        <form method="post" action="/panel/ia/proveedor/activo">
+                            <?= $ctx->csrf->campoOculto() ?>
+                            <input type="hidden" name="clave" value="<?= $e((string) $p['clave']) ?>">
+                            <button type="submit" class="boton-secundario">
+                                <?= (int) $p['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
+                            </button>
+                        </form>
+                        <?php endif; ?>
+                    </td>
                 </tr>
+
+                <?php
+                /* Modelos de referencia: solo cuando el proveedor todavía no ha
+                   descubierto ninguno. Sirve para que la ficha no aparezca
+                   vacía y sin explicación. NO son filas de `modelos_ia`: un
+                   modelo entra al catálogo cuando el proveedor lo anuncia
+                   (ADR-016), no porque figure en una lista escrita a mano. */
+                $refs = $referencia[(string) $p['clave']] ?? [];
+                ?>
+                <?php if ($refs !== []): ?>
+                <tr>
+                    <td colspan="5" class="text-xs text-acero">
+                        Sin descubrir todavía. Suele ofrecer:
+                        <span class="font-mono"><?= $e(implode(' · ', $refs)) ?></span>
+                        — lista de referencia, no del catálogo.
+                    </td>
+                </tr>
+                <?php endif; ?>
             <?php endforeach; ?>
             </tbody>
         </table>
         </div>
     </section>
+
+    <?php if ($puedeEscribir): ?>
+    <section class="mt-10">
+        <h2 class="rotulo">Añadir proveedor</h2>
+        <p class="mt-2 text-sm text-acero">
+            Elija uno conocido —rellena URL, formato y país— o escriba los datos de
+            cualquier endpoint compatible con OpenAI. Nace <strong>inactivo</strong>:
+            darlo de alta no lo mete en la cascada.
+        </p>
+
+        <form method="post" action="/panel/ia/proveedor" class="tarjeta mt-3 p-4">
+            <?= $ctx->csrf->campoOculto() ?>
+
+            <?php if ($disponibles !== []): ?>
+            <p class="text-sm">
+                Conocidos sin dar de alta:
+                <?php foreach ($disponibles as $clave => $d): ?>
+                    <button type="submit" name="clave" value="<?= $e((string) $clave) ?>"
+                            class="boton-secundario mt-1"><?= $e((string) $d['nombre']) ?></button>
+                <?php endforeach; ?>
+            </p>
+            <p class="mt-2 text-xs text-acero">
+                Pulsar uno lo da de alta con sus valores. Para otro cualquiera, use el
+                formulario de abajo.
+            </p>
+            <?php endif; ?>
+
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="rotulo">Clave</label>
+                    <input name="clave" class="campo mt-1 font-mono" placeholder="mi-proveedor">
+                </div>
+                <div>
+                    <label class="rotulo">Nombre visible</label>
+                    <input name="nombre" class="campo mt-1" placeholder="Mi proveedor">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="rotulo">URL base</label>
+                    <input name="base_url" class="campo mt-1 font-mono"
+                           placeholder="https://api.ejemplo.com/v1">
+                </div>
+                <div>
+                    <label class="rotulo">Formato de API</label>
+                    <select name="formato_api" class="campo mt-1">
+                        <option value="openai_compatible">Compatible con OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="ollama">Ollama</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="rotulo">País del servidor</label>
+                    <input name="pais_servidor" class="campo mt-1" placeholder="Estados Unidos">
+                    <p class="mt-1 text-xs text-acero">
+                        Dato de cumplimiento: si el contenido de los casos sale de Colombia,
+                        el aviso de habeas data debe declarar transferencia internacional.
+                    </p>
+                </div>
+            </div>
+
+            <button type="submit" class="boton mt-4">Dar de alta</button>
+        </form>
+    </section>
+    <?php endif; ?>
 
     <?php if ($puedeEscribir): ?>
     <section class="mt-10">

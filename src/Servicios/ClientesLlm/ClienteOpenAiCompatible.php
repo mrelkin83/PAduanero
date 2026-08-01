@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Servicios\ClientesLlm;
 
+use App\Servicios\CatalogoProveedores;
 use App\Servicios\RespuestaLlm;
 use App\Soporte\Http;
 
@@ -48,9 +49,16 @@ final class ClienteOpenAiCompatible implements ClienteLlm
             $cabeceras['Authorization'] = 'Bearer ' . $secreto;
         }
 
+        // El parámetro que acota la respuesta NO se llama igual en todos.
+        // OpenAI lo renombró a `max_completion_tokens` en sus modelos
+        // recientes y **rechaza `max_tokens` con un 400**; el resto de
+        // compatibles siguen esperando `max_tokens`. Mandar el equivocado no
+        // degrada nada: rompe todas las llamadas a ese proveedor.
+        $campoMax = CatalogoProveedores::campoMax((string) $modelo['proveedor_clave']);
+
         $cuerpo = [
             'model' => (string) $modelo['identificador'],
-            'max_tokens' => $maxTokens,
+            $campoMax => $maxTokens,
             'messages' => [
                 ['role' => 'system', 'content' => $systemPrompt],
                 ...array_map(

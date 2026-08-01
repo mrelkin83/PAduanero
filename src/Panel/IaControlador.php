@@ -9,6 +9,7 @@ use App\Core\Respuesta;
 use App\Repositorios\AuditoriaRepo;
 use App\Repositorios\CredencialRepo;
 use App\Servicios\CatalogoModelos;
+use App\Servicios\CatalogoProveedores;
 use App\Servicios\Credenciales;
 use App\Servicios\GateDorado;
 
@@ -117,16 +118,182 @@ final class IaControlador extends ControladorBase
             }
         }
 
+        // Modelos de referencia por proveedor: solo para que una ficha sin
+        // descubrir no aparezca vacía y sin explicación. NO se insertan.
+        $referencia = [];
+
+        foreach ($proveedores as $p) {
+            $tiene = array_filter(
+                $modelos,
+                static fn (array $m): bool => $m['proveedor_clave'] === $p['clave'],
+            );
+
+            if ($tiene === []) {
+                $referencia[(string) $p['clave']] = CatalogoProveedores::modelosDeReferencia(
+                    (string) $p['clave'],
+                );
+            }
+        }
+
         return $this->vista('panel/ia', [
             'ctx' => $ctx,
             'proveedores' => $proveedores,
             'modelos' => $modelos,
             'credenciales' => $credenciales,
+            'referencia' => $referencia,
+            'disponibles' => CatalogoProveedores::disponibles(array_column($proveedores, 'clave')),
             'gates' => $gates,
             'puedeEscribir' => $ctx->puede('ia.proveedores.escribir'),
             'puedePromover' => $ctx->puede('ia.modelos.promover'),
             'avisos' => $this->avisos($ctx),
         ]);
+    }
+
+    /**
+     * Da de alta un proveedor.
+     *
+     * Dos caminos: elegir uno del catálogo conocido —que rellena URL, formato
+     * y país— o escribirlo a mano. El segundo existe porque cualquier
+     * endpoint compatible con OpenAI sirve, y no tiene sentido que añadir uno
+     * exija tocar código.
+     *
+     * Nace **inactivo**, igual que un modelo descubierto. Encenderlo es un
+     * acto aparte: dar de alta un proveedor no debería poner nada en la
+     * cascada sin que alguien lo mire.
+     */
+    public function crearProveedor(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+
+        $clave = mb_strtolower(trim($ctx->campo('clave')));
+
+        if (preg_match('/^[a-z0-9_-]{2,30}$/', $clave) !== 1) {
+            return $this->redirigirCon(
+                '/panel/ia',
+                'error',
+                'La clave del proveedor debe ser de 2 a 30 caracteres: letras, números, guion o guion bajo.',
+            );
+        }
+
+        $conocido = CatalogoProveedores::CONOCIDOS[$clave] ?? null;
+
+        $nombre = $ctx->campo('nombre') !== ''
+            ? $ctx->campo('nombre')
+            : ($conocido['nombre'] ?? $clave);
+
+        $baseUrl = $ctx->campo('base_url') !== ''
+            ? $ctx->campo('base_url')
+            : ($conocido['base_url'] ?? '');
+
+        $formato = $ctx->campo('formato_api') !== ''
+            ? $ctx->campo('formato_api')
+            : ($conocido['formato_api'] ?? 'openai_compatible');
+
+        if (!in_array($formato, ['anthropic', 'openai_compatible', 'ollama'], true)) {
+            return $this->redirigirCon('/panel/ia', 'error', 'Formato de API desconocido.');
+        }
+
+        if (preg_match('#^https?://#i', $baseUrl) !== 1) {
+            return $this->redirigirCon(
+                '/panel/ia',
+                'error',
+                'La URL base debe empezar por http:// o https://.',
+            );
+        }
+
+        $pais = $ctx->campo('pais_servidor') !== ''
+            ? $ctx->campo('pais_servidor')
+            : ($conocido['pais_servidor'] ?? null);
+
+        try {
+            $this->bd->pdo()->prepare(
+                'INSERT INTO proveedores_ia (clave, nombre, base_url, formato_api, pais_servidor, activo)
+                 VALUES (?, ?, ?, ?, ?, 0)'
+            )->execute([$clave, $nombre, rtrim($baseUrl, '/'), $formato, $pais]);
+        } catch (\PDOException $e) {
+            if (($e->errorInfo[1] ?? 0) === 1062) {
+                return $this->redirigirCon('/panel/ia', 'error', "Ya existe un proveedor «{$clave}».");
+            }
+
+            throw $e;
+        }
+
+        $this->auditoria->registrar(
+            'proveedor_ia',
+            null,
+            'crear',
+            $ctx->actor(),
+            ['clave' => $clave, 'formato' => $formato, 'pais' => $pais],
+            $ctx->ip(),
+        );
+
+        return $this->redirigirCon(
+            '/panel/ia',
+            'ok',
+            "Proveedor «{$nombre}» dado de alta, inactivo. Guarde su credencial y actívelo.",
+        );
+    }
+
+    /**
+     * Enciende o apaga un proveedor.
+     *
+     * Apagarlo saca de la cascada todos sus modelos: `Llm` exige
+     * `p.activo = 1`. Es la forma de dejar de usar un proveedor sin borrar su
+     * histórico de consumo.
+     */
+    public function alternarProveedor(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+
+        $clave = $ctx->campo('clave');
+
+        $stmt = $this->bd->pdo()->prepare('SELECT id, nombre, activo FROM proveedores_ia WHERE clave = ?');
+        $stmt->execute([$clave]);
+        $proveedor = $stmt->fetch();
+
+        if ($proveedor === false) {
+            return $this->redirigirCon('/panel/ia', 'error', 'Ese proveedor no existe.');
+        }
+
+        $encender = (int) $proveedor['activo'] === 0;
+
+        // Apagar el proveedor del primario dejaría al motor sin modelo y
+        // escalando cada conversación a humano. Se dice antes, no después.
+        if (!$encender) {
+            $stmt = $this->bd->pdo()->prepare(
+                'SELECT identificador FROM modelos_ia WHERE proveedor_id = ? AND es_primario = 1'
+            );
+            $stmt->execute([$proveedor['id']]);
+            $primario = $stmt->fetchColumn();
+
+            if ($primario !== false) {
+                return $this->redirigirCon(
+                    '/panel/ia',
+                    'error',
+                    "No se puede apagar: «{$primario}» es el modelo primario. "
+                    . 'Ascienda otro antes.',
+                );
+            }
+        }
+
+        $this->bd->pdo()
+            ->prepare('UPDATE proveedores_ia SET activo = ? WHERE id = ?')
+            ->execute([$encender ? 1 : 0, $proveedor['id']]);
+
+        $this->auditoria->registrar(
+            'proveedor_ia',
+            (string) $proveedor['id'],
+            $encender ? 'activar' : 'desactivar',
+            $ctx->actor(),
+            ['clave' => $clave],
+            $ctx->ip(),
+        );
+
+        return $this->redirigirCon(
+            '/panel/ia',
+            'ok',
+            $proveedor['nombre'] . ($encender ? ' activado.' : ' desactivado.'),
+        );
     }
 
     /**

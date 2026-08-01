@@ -148,6 +148,8 @@ final class Panel
             'GET /prompts/diff' => $modulos['prompts']->diferencias($ctx),
 
             'GET /ia' => $modulos['ia']->inicio($ctx),
+            'POST /ia/proveedor' => $modulos['ia']->crearProveedor($ctx),
+            'POST /ia/proveedor/activo' => $modulos['ia']->alternarProveedor($ctx),
             'POST /ia/credencial' => $modulos['ia']->guardarCredencial($ctx),
             'POST /ia/sincronizar' => $modulos['ia']->sincronizar($ctx),
             'POST /ia/costo' => $modulos['ia']->guardarCosto($ctx),
