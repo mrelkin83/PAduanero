@@ -772,3 +772,32 @@ caben en un CHECK están en `ck_modelo_primario_dorado`; la vigencia frente al
 prompt cruza dos tablas y por eso no cabe.
 
 Un modelo de `embeddings` no pasa por el gate: no le dice nada a nadie.
+
+**La puerta que el gate obliga a dejar abierta, y por qué no es un agujero.**
+
+El gate crea una circularidad que solo se ve al ejecutarlo: un modelo no puede
+responder sin corrida dorada en verde, y la corrida necesita que responda para
+existir. Con el gate aplicado a rajatabla, **la primera corrida sería
+imposible** y el sistema no podría arrancar nunca.
+
+La salida es `Llm::chatParaConjuntoDorado()`, la única llamada del sistema que
+se salta el gate. Queda escrito aquí porque, visto suelto en el código, un
+método que ignora el `GateDorado` parece exactamente lo que el ADR-016 existe
+para impedir.
+
+Por qué la excepción es legítima y no una grieta:
+
+- **Al otro lado de esa llamada no hay un cliente.** Hay un archivo de
+  aserciones. El gate protege a quien recibe el mensaje, y aquí no recibe nadie.
+- **El resto de garantías siguen en pie.** El modelo tiene que estar activo, no
+  retirado y con costo verificado; el consumo se registra igual; el presupuesto
+  corta igual.
+- **La firma es incómoda a propósito.** Exige el `id` del modelo, que nadie
+  tiene a mano por casualidad. No es una barrera criptográfica: es fricción
+  suficiente para que no se use por descuido en lugar de `chat()`.
+- **Su único llamador legítimo es `bin/correr-dorado.php`.** Si aparece en otro
+  sitio, es un defecto.
+
+El mismo razonamiento vale para `GateDorado::puedeActivarPrompt()`, que cierra
+el agujero simétrico: sin él no se podía cambiar el modelo sin dorado, pero se
+conseguía el mismo efecto cambiando el prompt.

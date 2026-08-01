@@ -245,6 +245,32 @@ final class ConversacionEstadoRepo
         )->execute([max(1, $minutos), $chatwootConvId]);
     }
 
+    /**
+     * Id del último mensaje de Chatwoot que se procesó.
+     *
+     * Es la deduplicación de los reintentos del webhook. Chatwoot reintenta
+     * cuando nuestra respuesta tarda, y sin esto un reintento que llega
+     * después de cerrarse la ventana de ráfaga produce un turno entero de más:
+     * otra llamada al modelo, otro cobro y otra respuesta en el hilo.
+     */
+    public function ultimoMensajeChatwoot(int $chatwootConvId): ?int
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT ultimo_mensaje_chatwoot_id FROM conversacion_estado WHERE chatwoot_conv_id = ?'
+        );
+        $stmt->execute([$chatwootConvId]);
+        $id = $stmt->fetchColumn();
+
+        return ($id === false || $id === null) ? null : (int) $id;
+    }
+
+    public function marcarUltimoMensajeChatwoot(int $chatwootConvId, int $mensajeId): void
+    {
+        $this->bd->pdo()->prepare(
+            'UPDATE conversacion_estado SET ultimo_mensaje_chatwoot_id = ? WHERE chatwoot_conv_id = ?'
+        )->execute([$mensajeId, $chatwootConvId]);
+    }
+
     public function vincularCaso(int $chatwootConvId, string $casoId): void
     {
         $this->bd->pdo()

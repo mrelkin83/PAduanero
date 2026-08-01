@@ -183,6 +183,26 @@ foreach ($casos as $caso) {
         $respuesta = $llm->chatParaConjuntoDorado($prompt['contenido'], $turnos, $modeloId);
         $texto = Accion::limpiarTexto($respuesta->texto);
         $analisis = Accion::analizar($respuesta->texto);
+    } catch (App\Excepciones\LlmException $e) {
+        // Una corrida que no pudo hablar con el modelo NO es una corrida en
+        // rojo: es una corrida que no ocurrió. Registrarla como roja sería un
+        // falso negativo que bloquea la promoción por el motivo equivocado —
+        // el modelo no violó ninguna regla, es que nunca llegó a decir nada.
+        //
+        // Se aborta aquí en vez de seguir gastando contra un tope agotado o
+        // un proveedor caído.
+        echo PHP_EOL;
+        fwrite(STDERR, 'CORRIDA INTERRUMPIDA en «' . $id . '»: ' . $e->getMessage() . PHP_EOL);
+
+        fwrite(STDERR, match ($e->motivo) {
+            'presupuesto' => 'Suba `presupuesto_ia_mensual_usd` en /panel/configuracion y repita. '
+                . 'No se registra nada: el resultado parcial no dice nada sobre el modelo.' . PHP_EOL,
+            'sin_modelo_autorizado' => 'Revise que el modelo siga activo y con costo verificado '
+                . 'en /panel/ia.' . PHP_EOL,
+            default => 'El proveedor no respondió. Reintente cuando vuelva.' . PHP_EOL,
+        });
+
+        exit(2);
     } catch (\Throwable $e) {
         informe($id, $regla, ['no se pudo consultar al modelo: ' . $e->getMessage()]);
         $fallos++;
@@ -228,6 +248,17 @@ foreach ($casos as $caso) {
 
 echo PHP_EOL;
 printf("%d de %d caso(s) en rojo.%s", $fallos, count($casos), PHP_EOL);
+
+// Lo que costó esta vuelta. Importa porque el ciclo se repite varias veces y
+// porque el tope mensual es compartido con la operación real: una tarde de
+// ajustes puede comerse el presupuesto del mes sin que nadie lo note hasta
+// que el bot deje de responder a un cliente.
+$gastoVuelta = $bd->pdo()->query(
+    "SELECT COALESCE(ROUND(SUM(costo_usd), 4), 0) FROM consumo_ia
+      WHERE creado_en >= DATE_SUB(NOW(), INTERVAL 30 MINUTE)"
+)->fetchColumn();
+
+printf("Gasto aproximado de esta vuelta: USD %s%s", $gastoVuelta, PHP_EOL);
 
 // Solo una corrida COMPLETA puede habilitar una promoción. Una parcial en
 // verde daría una firma sobre evidencia que no existe.

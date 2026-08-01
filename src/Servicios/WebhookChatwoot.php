@@ -218,26 +218,28 @@ final class WebhookChatwoot
     }
 
     /**
-     * Guarda contra el reintento inmediato de Chatwoot.
+     * ¿Ya se procesó este mensaje?
      *
-     * **Es parcial y conviene saber hasta dónde llega.** Compara el texto
-     * contra lo que ya hay en el buffer de ráfaga, así que cubre el caso
-     * frecuente —Chatwoot reintenta a los pocos segundos porque nuestra
-     * respuesta tardó— y NO cubre el reintento que llega después de que la
-     * ventana de ráfaga se cerrara. Ese produciría un segundo turno: una
-     * segunda respuesta en el hilo y un segundo cobro de tokens.
+     * Dos guardas, y las dos hacen falta:
      *
-     * La deduplicación completa necesita recordar el `id` del último mensaje
-     * procesado, y eso es una columna nueva en `conversacion_estado`. Es un
-     * cambio de esquema, así que se propone en vez de aplicarse: ver
-     * `docs/PLAN_BUILD.md` §Etapa 4.
+     *  · Por **id** contra `ultimo_mensaje_chatwoot_id`. Cubre el reintento
+     *    tardío, el que llega cuando la ventana de ráfaga ya se cerró y que
+     *    produciría un turno entero de más: otra llamada al modelo, otro
+     *    cobro y otra respuesta en el hilo.
+     *  · Por **texto** contra el buffer. Cubre el reintento inmediato, que
+     *    llega mientras la ráfaga sigue abierta y todavía no se ha guardado
+     *    ningún id.
      *
-     * Mientras tanto el daño acotado es aceptable porque el motor está en
-     * modo sombra: un turno repetido son dos borradores para Pedro, no dos
-     * mensajes a un cliente. **Antes de la Etapa 6 hay que cerrarlo.**
+     * Con una sola quedaría medio agujero, y es el tipo de fallo que nadie
+     * lee como error: no se piensa «el webhook se reintentó», se piensa «el
+     * bot está raro».
      */
     private function yaVisto(int $conversacionId, int $mensajeId): bool
     {
+        if ($mensajeId > 0 && $this->conversaciones->ultimoMensajeChatwoot($conversacionId) === $mensajeId) {
+            return true;
+        }
+
         $estado = $this->conversaciones->porConversacion($conversacionId);
 
         return $estado !== null && in_array($this->ultimoTexto, $estado->buffer, true);
@@ -245,6 +247,8 @@ final class WebhookChatwoot
 
     private function marcarVisto(int $conversacionId, int $mensajeId): void
     {
-        // Sin columna donde anotarlo, la marca la deja el propio buffer.
+        if ($mensajeId > 0) {
+            $this->conversaciones->marcarUltimoMensajeChatwoot($conversacionId, $mensajeId);
+        }
     }
 }

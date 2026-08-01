@@ -319,6 +319,51 @@ final class WebhookChatwootTest extends CasoBaseBd
     }
 
     #[Test]
+    public function elReintentoTardioTampocoDuplicaElTurno(): void
+    {
+        // El que llega con la ventana de ráfaga ya cerrada. Sin la guarda por
+        // id sería un turno entero de más: otra llamada al modelo, otro cobro
+        // y otra respuesta en el hilo. Y nadie lo leería como error — se
+        // leería como que el bot está raro.
+        $contacto = $this->contactos->crear('573001112233', 'whatsapp');
+        $this->consentimientos->registrar($contacto->id, 'v1', 'Aviso', otorgado: true);
+
+        $webhook = $this->webhook();
+        $webhook->manejar($this->entrante('me llegó un requerimiento'));
+
+        // Se cierra la ventana y se despacha, que es lo que vacía el buffer.
+        $this->bd->pdo()->exec(
+            'UPDATE conversacion_estado SET buffer_mensajes = \'[]\', buffer_hasta = NULL'
+        );
+
+        self::assertSame(
+            'duplicado',
+            $webhook->manejar($this->entrante('me llegó un requerimiento'))['accion'],
+        );
+    }
+
+    #[Test]
+    public function unMensajeDistintoDespuesSiSeProcesa(): void
+    {
+        // La guarda no puede ser tan amplia que bloquee la conversación: dos
+        // mensajes distintos con la ventana cerrada son dos turnos legítimos.
+        $contacto = $this->contactos->crear('573001112233', 'whatsapp');
+        $this->consentimientos->registrar($contacto->id, 'v1', 'Aviso', otorgado: true);
+
+        $webhook = $this->webhook();
+        $webhook->manejar($this->entrante('primero'));
+
+        $this->bd->pdo()->exec(
+            'UPDATE conversacion_estado SET buffer_mensajes = \'[]\', buffer_hasta = NULL'
+        );
+
+        $segundo = $this->entrante('segundo');
+        $segundo['id'] = 1002;
+
+        self::assertNotSame('duplicado', $webhook->manejar($segundo)['accion']);
+    }
+
+    #[Test]
     public function unaSenalCriticaEscalaDesdeElWebhook(): void
     {
         $resultado = $this->webhook()->manejar($this->entrante('La POLFA está en mi bodega'));
