@@ -8,6 +8,7 @@ use App\Soporte\Vista;
  * @var \App\Panel\Contexto $ctx
  * @var list<array<string,mixed>> $proveedores
  * @var list<array<string,mixed>> $modelos
+ * @var array<string,array{clave:string,filas:list<array<string,mixed>>}> $credenciales
  * @var array<string,array{ok:bool,motivo:string}> $gates
  * @var bool $puedeEscribir
  * @var bool $puedePromover
@@ -22,6 +23,7 @@ $contenido = static function () use (
     $ctx,
     $proveedores,
     $modelos,
+    $credenciales,
     $gates,
     $puedeEscribir,
     $puedePromover,
@@ -140,6 +142,51 @@ $contenido = static function () use (
         </table>
         </div>
     </section>
+
+    <?php if ($puedeEscribir): ?>
+    <section class="mt-10">
+        <h2 class="rotulo">Credenciales de los proveedores</h2>
+        <p class="mt-2 text-sm text-acero">
+            Van aquí y no en Pagos: una llave de LLM no es una pasarela de cobro, y quien
+            la busque no va a mirar ahí. Se guardan cifradas con el mismo mecanismo
+            (AES-256-GCM) y <strong>el valor no vuelve a salir nunca</strong> por esta
+            pantalla — solo la máscara.
+        </p>
+
+        <?php foreach ($proveedores as $p):
+            $cred = $credenciales[(string) $p['clave']] ?? null;
+            if ($cred === null) {
+                continue;
+            }
+            $guardada = $cred['filas'][0] ?? null;
+            ?>
+        <form method="post" action="/panel/ia/credencial" class="tarjeta mt-4 p-4">
+            <?= $ctx->csrf->campoOculto() ?>
+            <input type="hidden" name="servicio" value="<?= $e((string) $p['clave']) ?>">
+
+            <div class="flex flex-wrap items-baseline gap-x-3">
+                <span class="font-medium"><?= $e((string) $p['nombre']) ?></span>
+                <span class="font-mono text-xs text-acero"><?= $e($cred['clave']) ?></span>
+                <?php if ($guardada !== null): ?>
+                    <span class="mascara"><?= $e((string) $guardada['mascara']) ?></span>
+                    <span class="text-xs text-acero">
+                        guardada el <?= $e((string) $guardada['actualizado_en']) ?>
+                    </span>
+                <?php else: ?>
+                    <span class="etiqueta etiqueta-error">sin guardar</span>
+                <?php endif; ?>
+            </div>
+
+            <div class="mt-3 flex flex-wrap items-end gap-2">
+                <input name="valor" type="password" autocomplete="off"
+                       class="campo font-mono" style="max-width:26rem"
+                       placeholder="<?= $guardada !== null ? 'Escriba una nueva para reemplazarla' : 'Pegue la llave aquí' ?>">
+                <button type="submit" class="boton-secundario">Guardar</button>
+            </div>
+        </form>
+        <?php endforeach; ?>
+    </section>
+    <?php endif; ?>
 
     <section class="mt-10">
         <h2 class="rotulo">Modelos</h2>

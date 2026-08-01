@@ -2,8 +2,13 @@
 
 Paquete de especificación completo. **Leer en este orden.**
 
+> **¿Primera vez que levantas esto?** → **[`docs/ARRANQUE_LOCAL.md`](docs/ARRANQUE_LOCAL.md)**.
+> De cero al panel: base de datos, llaves, migraciones, usuario, Laragon, y dónde
+> está cada cosa una vez dentro. Todos sus pasos están ejecutados y verificados.
+
 | # | Archivo | Qué contiene |
 |---|---|---|
+| 0 | `docs/ARRANQUE_LOCAL.md` | Levantar el proyecto en Windows y entrar al panel |
 | 1 | `CLAUDE.md` | Documento maestro: decisiones, arquitectura, ADRs, reglas inviolables |
 | 2 | `docs/CONTRATOS.md` | Firmas exactas de cada clase y servicio. **Normativo** |
 | 3 | `docs/PANEL_ADMIN.md` | Panel administrativo, roles, frontera con Chatwoot |

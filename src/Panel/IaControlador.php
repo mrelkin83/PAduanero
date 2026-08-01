@@ -7,7 +7,9 @@ namespace App\Panel;
 use App\Core\BD;
 use App\Core\Respuesta;
 use App\Repositorios\AuditoriaRepo;
+use App\Repositorios\CredencialRepo;
 use App\Servicios\CatalogoModelos;
+use App\Servicios\Credenciales;
 use App\Servicios\GateDorado;
 
 /**
@@ -37,10 +39,25 @@ use App\Servicios\GateDorado;
  */
 final class IaControlador extends ControladorBase
 {
+    /**
+     * Clave de credencial que pide cada formato de API.
+     *
+     * Ollama en la propia máquina no pide nada, y por eso no aparece: un campo
+     * de credencial para algo que no la usa invita a inventarse una.
+     *
+     * @var array<string,string>
+     */
+    private const CLAVE_POR_FORMATO = [
+        'anthropic' => 'api_key',
+        'openai_compatible' => 'api_key',
+    ];
+
     public function __construct(
         private readonly BD $bd,
         private readonly CatalogoModelos $catalogo,
         private readonly GateDorado $gate,
+        private readonly Credenciales $credenciales,
+        private readonly CredencialRepo $credencialRepo,
         private readonly AuditoriaRepo $auditoria,
     ) {
     }
@@ -84,15 +101,100 @@ final class IaControlador extends ControladorBase
             $gates[(string) $m['id']] = $this->gate->puedePromover($m);
         }
 
+        // Máscaras, nunca el valor. `Credenciales::obtener()` no se expone por
+        // HTTP jamás; esto va por `CredencialRepo`, cuyo SELECT ni siquiera
+        // incluye la columna cifrada.
+        $credenciales = [];
+
+        foreach ($proveedores as $p) {
+            $clave = self::CLAVE_POR_FORMATO[(string) $p['formato_api']] ?? null;
+
+            if ($clave !== null) {
+                $credenciales[(string) $p['clave']] = [
+                    'clave' => $clave,
+                    'filas' => $this->credencialRepo->resumen((string) $p['clave']),
+                ];
+            }
+        }
+
         return $this->vista('panel/ia', [
             'ctx' => $ctx,
             'proveedores' => $proveedores,
             'modelos' => $modelos,
+            'credenciales' => $credenciales,
             'gates' => $gates,
             'puedeEscribir' => $ctx->puede('ia.proveedores.escribir'),
             'puedePromover' => $ctx->puede('ia.modelos.promover'),
             'avisos' => $this->avisos($ctx),
         ]);
+    }
+
+    /**
+     * Guarda la credencial de un proveedor de IA.
+     *
+     * **Aquí y no en `/panel/pagos`.** Ese módulo es de pasarelas de cobro y
+     * solo conoce Wompi, Bold y MercadoPago; una key de LLM no es un pago, y
+     * quien la busque no va a mirar ahí. El servicio de credenciales es el
+     * mismo —mismo cifrado, misma auditoría, misma regla de que el valor no
+     * sale nunca por HTTP— pero la pantalla está donde corresponde.
+     *
+     * Es `ia.proveedores.escribir`: super_admin. El abogado no ve credenciales
+     * (ADR-007).
+     */
+    public function guardarCredencial(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+
+        $servicio = $ctx->campo('servicio');
+        $valor = $ctx->campo('valor');
+
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT formato_api FROM proveedores_ia WHERE clave = ?'
+        );
+        $stmt->execute([$servicio]);
+        $formato = $stmt->fetchColumn();
+
+        if ($formato === false) {
+            return $this->redirigirCon('/panel/ia', 'error', 'Ese proveedor no existe.');
+        }
+
+        $clave = self::CLAVE_POR_FORMATO[(string) $formato] ?? null;
+
+        if ($clave === null) {
+            return $this->redirigirCon(
+                '/panel/ia',
+                'error',
+                'Ese proveedor no usa credencial: Ollama local no autentica.',
+            );
+        }
+
+        if ($valor === '') {
+            return $this->redirigirCon('/panel/ia', 'error', 'La credencial va vacía.');
+        }
+
+        $resultado = $this->credenciales->guardar(
+            $servicio,
+            $clave,
+            $valor,
+            'produccion',
+            (string) $ctx->usuario?->id,
+        );
+
+        $this->auditoria->registrar(
+            'credencial',
+            null,
+            'guardar',
+            $ctx->actor(),
+            ['servicio' => $servicio, 'clave' => $clave],
+            $ctx->ip(),
+        );
+
+        return $this->redirigirCon(
+            '/panel/ia',
+            'ok',
+            'Credencial guardada (' . $resultado['mascara'] . '). '
+            . 'Pulse «Sincronizar ahora» para comprobar que el proveedor la acepta.',
+        );
     }
 
     /**

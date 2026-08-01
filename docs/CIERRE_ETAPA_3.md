@@ -47,6 +47,15 @@ no puede poner las pruebas en rojo.
 
 ## 1. Puesta en marcha
 
+> **Se puede hacer en local.** Esta lista está escrita para el VPS, pero la
+> verificación entera —salvo lo que dependa de credenciales de comercio
+> reales— funciona igual en Laragon. Para levantarlo de cero:
+> **[`docs/ARRANQUE_LOCAL.md`](ARRANQUE_LOCAL.md)**.
+>
+> Si lo haces en local, crea **dos** usuarios: uno `super_admin` y uno
+> `abogado`. Varias comprobaciones de abajo exigen ver el panel con los dos
+> roles, y la asimetría del ADR-007 solo se ve teniendo ambos.
+
 ```bash
 cd /var/www/pedro
 git pull --ff-only

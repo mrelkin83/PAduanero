@@ -148,6 +148,7 @@ final class Panel
             'GET /prompts/diff' => $modulos['prompts']->diferencias($ctx),
 
             'GET /ia' => $modulos['ia']->inicio($ctx),
+            'POST /ia/credencial' => $modulos['ia']->guardarCredencial($ctx),
             'POST /ia/sincronizar' => $modulos['ia']->sincronizar($ctx),
             'POST /ia/costo' => $modulos['ia']->guardarCosto($ctx),
             'POST /ia/activo' => $modulos['ia']->alternarActivo($ctx),
@@ -200,6 +201,8 @@ final class Panel
                 $this->c->obtener(BD::class),
                 $this->c->obtener(\App\Servicios\CatalogoModelos::class),
                 $this->c->obtener(\App\Servicios\GateDorado::class),
+                $this->c->obtener(Credenciales::class),
+                $this->c->obtener(\App\Repositorios\CredencialRepo::class),
                 $this->c->obtener(AuditoriaRepo::class),
             ),
             'usuarios' => new UsuariosControlador(
