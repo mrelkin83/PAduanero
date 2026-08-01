@@ -57,7 +57,6 @@ $contenido = static function () use ($e, $ctx, $versiones, $gates, $activo, $pue
 
         <?php foreach ($versiones as $v):
             $esActiva = (int) $v['activo'] === 1;
-            $gate = $gates[(string) $v['id']] ?? null;
             ?>
         <article class="tarjeta mt-4 p-4">
             <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -65,8 +64,6 @@ $contenido = static function () use ($e, $ctx, $versiones, $gates, $activo, $pue
 
                 <?php if ($esActiva): ?>
                     <span class="etiqueta etiqueta-ok">activa</span>
-                <?php elseif ($gate !== null && $gate['ok']): ?>
-                    <span class="etiqueta etiqueta-aviso">lista para activar</span>
                 <?php else: ?>
                     <span class="etiqueta">inactiva</span>
                 <?php endif; ?>
@@ -85,9 +82,6 @@ $contenido = static function () use ($e, $ctx, $versiones, $gates, $activo, $pue
                 </p>
             <?php endif; ?>
 
-            <?php if (!$esActiva && $gate !== null && !$gate['ok']): ?>
-                <p class="mt-2 text-xs text-sello"><?= $e($gate['motivo']) ?></p>
-            <?php endif; ?>
 
             <div class="mt-3 flex flex-wrap items-center gap-3 border-t border-acero/15 pt-3">
                 <?php if ($activo !== null && !$esActiva): ?>
@@ -99,15 +93,16 @@ $contenido = static function () use ($e, $ctx, $versiones, $gates, $activo, $pue
 
                 <?php
                 /* Activar es `ia.prompts.aprobar`: solo el abogado. El
-                   super_admin edita y prueba, no firma (ADR-007). */
+                   super_admin edita y prueba, no firma (ADR-007). Esa
+                   asimetría se mantiene; la que se retiró el 2026-08-01 es
+                   la del conjunto dorado, que además exigía haber probado
+                   esta versión contra el modelo que está hablando. */
                 ?>
                 <?php if ($puedeAprobar && !$esActiva): ?>
                 <form method="post" action="/panel/prompts/activar">
                     <?= $ctx->csrf->campoOculto() ?>
                     <input type="hidden" name="id" value="<?= $e((string) $v['id']) ?>">
-                    <button type="submit" class="boton" <?= ($gate !== null && $gate['ok']) ? '' : 'disabled' ?>>
-                        Activar esta versión
-                    </button>
+                    <button type="submit" class="boton">Activar esta versión</button>
                 </form>
                 <?php endif; ?>
             </div>

@@ -594,10 +594,11 @@ final class MotorTest extends CasoBaseBd
     public function siNoHayModeloAutorizadoSeEscalaEnVezDeCallar(): void
     {
         // Un fallo de infraestructura no puede dejar al contacto hablando
-        // solo, y tampoco puede resolverse respondiendo con un modelo sin
-        // firma (ADR-016).
+        // solo. Antes bastaba con dejar el dorado sin correr para vaciar la
+        // cascada; retirado el gate (PO, 2026-08-01), la forma de quedarse
+        // sin modelo es que no haya ninguno activo.
         $this->conConsentimiento();
-        $this->bd->pdo()->exec("UPDATE modelos_ia SET dorado_estado = 'sin_correr', es_primario = 0");
+        $this->bd->pdo()->exec('UPDATE modelos_ia SET activo = 0, es_primario = 0');
 
         $motor = $this->motor();
         $motor->procesar(42, self::TELEFONO, 'buenas');

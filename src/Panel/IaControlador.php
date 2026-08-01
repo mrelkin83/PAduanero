@@ -101,7 +101,7 @@ final class IaControlador extends ControladorBase
         $gates = [];
 
         foreach ($modelos as $m) {
-            $gates[(string) $m['id']] = $this->gate->puedePromover($m);
+            $gates[(string) $m['id']] = $this->gate->estado($m);
         }
 
         // Máscaras, nunca el valor. `Credenciales::obtener()` no se expone por
@@ -781,34 +781,50 @@ final class IaControlador extends ControladorBase
         );
     }
 
-    /** @param array<string,mixed> $modelo */
+    /**
+     * Elegir el modelo lo pone en uso.
+     *
+     * Decisión del PO del 2026-08-01. Antes aquí había dos puertas: el
+     * conjunto dorado en verde y la firma del abogado. La primera se retiró
+     * (migración 0010); la segunda dejó de ser exclusiva del abogado, así que
+     * quien configura el proveedor puede poner el modelo a hablar sin cambiar
+     * de sesión.
+     *
+     * El estado del conjunto dorado se sigue calculando y enseñando: dejó de
+     * impedir, no de informar.
+     *
+     * @param array<string,mixed> $modelo
+     */
     private function ascenderTrasConfigurar(
         Contexto $ctx,
         array $modelo,
         string $clave,
         string $identificador,
     ): Respuesta {
-        $gate = $this->gate->puedePromover($modelo);
-
-        if (!$gate['ok']) {
-            return $this->redirigirCon(
-                '/panel/ia',
-                'ok',
-                $identificador . ' quedó configurado y activo en ' . $clave . '. '
-                . 'Todavía no es el modelo con el que habla el bot: ' . $gate['motivo'],
-            );
-        }
-
         if (!$ctx->puede('ia.modelos.promover')) {
             return $this->redirigirCon(
                 '/panel/ia',
                 'ok',
-                $identificador . ' quedó configurado y activo. Falta que el abogado lo ascienda: '
-                . 'cambiar el modelo cambia lo que el bot dice, y esa firma no es del perfil técnico.',
+                $identificador . ' quedó configurado y activo en ' . $clave . ', '
+                . 'pero su usuario no puede ponerlo en uso.',
             );
         }
 
-        return $this->promoverModelo($ctx, $modelo);
+        $respuesta = $this->promoverModelo($ctx, $modelo);
+        $dorado = $this->gate->estado($modelo);
+
+        if ($dorado['ok']) {
+            return $respuesta;
+        }
+
+        // Se pone en uso igual, pero no en silencio: el aviso es la única
+        // señal de que este modelo va a hablar sin que nadie haya comprobado
+        // que respeta las reglas inviolables.
+        return $this->redirigirCon(
+            '/panel/ia',
+            'ok',
+            $identificador . ' quedó en uso vía ' . $clave . '. Aviso: ' . $dorado['motivo'],
+        );
     }
 
     /** @return array<string,mixed>|null */
@@ -950,17 +966,20 @@ final class IaControlador extends ControladorBase
     /**
      * Asciende un modelo a primario de su propósito.
      *
-     * Este es el acto que el descubrimiento automático deliberadamente no
-     * hace, y lo firma **el abogado**, no el super_admin: `ia.modelos.promover`
-     * es la tercera asimetría del ADR-007, junto a `ia.prompts.aprobar`,
-     * `kb.verificar` y `contenido.publicar`. Lo que se firma no es la calidad
-     * técnica del modelo —el abogado no la evalúa, igual que no redacta el
-     * prompt que aprueba— sino la responsabilidad profesional sobre lo que el
-     * bot diga a partir de aquí.
+     * Sigue siendo el acto que el descubrimiento automático deliberadamente
+     * no hace: un modelo aparece solo en el catálogo, pero empieza a hablar
+     * porque alguien lo decidió, y en `auditoria` queda quién.
      *
-     * Y para que esa firma sea informada y no un trámite, antes pasa el
-     * `GateDorado`: no se aprueba un nombre de modelo, se aprueba un modelo
-     * que ya demostró no violar las reglas inviolables.
+     * Lo que ya no exige (PO, 2026-08-01, «quita el gate, elegir el modelo
+     * debe ser suficiente»): corrida dorada en verde contra ese modelo. Y
+     * `ia.modelos.promover` dejó de ser exclusivo del abogado.
+     *
+     * Lo que sigue exigiendo, y no por burocracia:
+     *
+     *  · Costo verificado. Sin él, `presupuesto_ia_mensual_usd` no corta
+     *    nunca — un modelo a costo cero jamás agota un presupuesto.
+     *  · No retirado. El proveedor dejó de anunciarlo; ponerlo a hablar es
+     *    programar un fallo.
      */
     public function promover(Contexto $ctx): Respuesta
     {
@@ -986,12 +1005,6 @@ final class IaControlador extends ControladorBase
                 'error',
                 'El proveedor retiró ' . $modelo['identificador'] . '. No puede ser primario.',
             );
-        }
-
-        $gate = $this->gate->puedePromover($modelo);
-
-        if (!$gate['ok']) {
-            return $this->redirigirCon('/panel/ia', 'error', $gate['motivo']);
         }
 
         return $this->promoverModelo($ctx, $modelo);

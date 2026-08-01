@@ -42,13 +42,13 @@ final class PromptsControlador extends ControladorBase
         $ctx->permisos->exigir($ctx->usuario, 'ia.prompts.editar');
 
         $versiones = $this->prompts->versiones(GateDorado::CLAVE_PROMPT);
-        $gates = [];
 
-        foreach ($versiones as $version) {
-            if ((int) $version['activo'] === 0) {
-                $gates[(string) $version['id']] = $this->gate->puedeActivarPrompt((string) $version['id']);
-            }
-        }
+        // Aquí se calculaba, versión por versión, si el conjunto dorado
+        // permitía activarla. El PO retiró el gate el 2026-08-01: activar una
+        // versión ya no depende de haberla probado contra el modelo que está
+        // hablando. La vista sigue recibiendo el array para no cambiar su
+        // firma, vacío.
+        $gates = [];
 
         return $this->vista('panel/prompts', [
             'ctx' => $ctx,
@@ -127,12 +127,10 @@ final class PromptsControlador extends ControladorBase
             return $this->redirigirCon('/panel/prompts', 'error', 'Esa versión no existe.');
         }
 
-        $veredicto = $this->gate->puedeActivarPrompt($id);
-
-        if (!$veredicto['ok']) {
-            return $this->redirigirCon('/panel/prompts', 'error', $veredicto['motivo']);
-        }
-
+        // Sin gate: activar ya no exige haber corrido el conjunto dorado con
+        // esta versión contra el modelo primario. Lo que sí sigue pasando es
+        // que las corridas anteriores caducan —`dorado_prompt_id` deja de
+        // coincidir— y el panel de modelos lo dice.
         $anterior = $this->prompts->activo(GateDorado::CLAVE_PROMPT);
 
         $this->prompts->activar($id, GateDorado::CLAVE_PROMPT, (string) $ctx->usuario?->id);

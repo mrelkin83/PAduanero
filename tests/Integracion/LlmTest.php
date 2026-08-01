@@ -338,10 +338,15 @@ final class LlmTest extends CasoBaseBd
     // ── Invariante 3: la cascada no salta el gate ────────────────────────
 
     #[Test]
-    public function unSuplenteSinConjuntoDoradoNoResponde(): void
+    public function unSuplenteSinConjuntoDoradoSiResponde(): void
     {
-        // El caso que convierte la firma en decorativa si se hace mal: el
-        // primario cae y el suplente contesta sin haber pasado el gate.
+        // Hasta el 2026-08-01 esta prueba comprobaba lo contrario: que un
+        // suplente sin corrida dorada NO recibía la petición aunque cayera el
+        // primario. El PO retiró el gate, así que ahora el suplente responde.
+        //
+        // Se deja escrito el efecto para que quede claro qué se aceptó: si el
+        // primario cae, contesta a un cliente un modelo del que no hay
+        // ninguna evidencia de que respete las reglas inviolables.
         $this->autorizar('claude-opus-5', primario: true, ordenFallback: 0);
 
         $this->bd->pdo()->exec(
@@ -353,27 +358,21 @@ final class LlmTest extends CasoBaseBd
 
         $http = $this->http([
             new RespuestaHttp(503, '{"error":"overloaded"}', null, 800),
-            $this->respuestaOk('No debería llegar aquí.'),
+            $this->respuestaOk('Respondo yo.'),
         ]);
 
-        $this->expectException(LlmException::class);
+        $respuesta = $this->llm($http)->chat('Sistema', [['role' => 'user', 'content' => 'hola']]);
 
-        try {
-            $this->llm($http)->chat('Sistema', [['role' => 'user', 'content' => 'hola']]);
-        } finally {
-            self::assertSame(
-                ['claude-opus-5'],
-                $http->llamadas,
-                'el suplente sin firma no puede recibir la petición',
-            );
-        }
+        self::assertSame(['claude-opus-5', 'claude-sonnet-5'], $http->llamadas);
+        self::assertTrue($respuesta->huboFallback);
     }
 
     #[Test]
-    public function siElPromptCambioLaCascadaSeQuedaSinModelos(): void
+    public function cambiarElPromptYaNoVaciaLaCascada(): void
     {
-        // El verde de ayer no dice nada sobre lo que el bot diría hoy. La
-        // conducta correcta es escalar, no responder.
+        // Antes, activar un prompt nuevo caducaba el verde y dejaba la
+        // cascada sin modelos: el bot escalaba hasta que alguien volviera a
+        // correr el dorado. Retirado el gate, sigue respondiendo.
         $this->autorizar('claude-opus-5', primario: true, ordenFallback: 0);
 
         $this->bd->pdo()->exec('UPDATE prompts SET activo = 0');
@@ -381,6 +380,28 @@ final class LlmTest extends CasoBaseBd
         $this->bd->pdo()->prepare(
             'INSERT INTO prompts (id, clave, version, contenido, activo) VALUES (?, ?, 2, ?, 1)'
         )->execute([$otro, GateDorado::CLAVE_PROMPT, 'Prompt nuevo.']);
+
+        $http = $this->http([$this->respuestaOk()]);
+
+        $this->llm($http)->chat('Sistema', [['role' => 'user', 'content' => 'hola']]);
+
+        self::assertSame(['claude-opus-5'], $http->llamadas);
+    }
+
+    #[Test]
+    public function unModeloSinCostoVerificadoSigueFueraDeLaCascada(): void
+    {
+        // Lo que el PO NO retiró. Sin costo, `presupuesto_ia_mensual_usd` no
+        // corta nunca. Esta sigue siendo la única puerta de la cascada.
+        $this->autorizar('claude-opus-5', primario: true, ordenFallback: 0);
+
+        // Hay que bajarlo de primario antes: `ck_modelo_primario_apto` no
+        // deja quitarle el costo a un primario, que es exactamente la
+        // garantía que se está comprobando.
+        $this->bd->pdo()->exec(
+            "UPDATE modelos_ia SET es_primario = 0, costos_verificados = 0
+              WHERE identificador = 'claude-opus-5'"
+        );
 
         $http = $this->http([$this->respuestaOk()]);
 

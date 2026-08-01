@@ -336,11 +336,11 @@ final class PantallaProveedorIaTest extends CasoBaseBd
     }
 
     #[Test]
-    public function guardarNoAsciendeAPrimarioSinConjuntoDorado(): void
+    public function guardarPoneElModeloEnUso(): void
     {
-        // El atajo de esta pantalla no puede saltarse el ADR-016: elegir un
-        // modelo lo deja listo, pero quien habla con los clientes se decide
-        // con evidencia de que respeta las reglas inviolables.
+        // «Quita el gate, elegir el modelo debe ser suficiente» (PO,
+        // 2026-08-01). Guardar deja el modelo hablando, sin corrida dorada y
+        // sin cambiar de sesión al abogado.
         $r = $this->controlador()->configurar($this->ctx([
             'proveedor' => 'deepseek',
             'modelo' => 'deepseek-chat',
@@ -349,8 +349,33 @@ final class PantallaProveedorIaTest extends CasoBaseBd
             'costo_salida_usd_1m' => '1.10',
         ]));
 
-        self::assertSame(0, (int) $this->modelo('deepseek-chat')['es_primario']);
+        self::assertSame(1, (int) $this->modelo('deepseek-chat')['es_primario']);
+        // Pero no en silencio: se avisa de que va a hablar sin evidencia.
         self::assertStringContainsString('conjunto dorado', $this->destino($r));
+    }
+
+    #[Test]
+    public function elegirOtroModeloDegradaAlAnterior(): void
+    {
+        // `ux_modelo_primario` solo admite uno por propósito. Si el ascenso
+        // no bajara al anterior dentro de la misma transacción, guardar dos
+        // veces reventaría con un error de índice único.
+        $controlador = $this->controlador();
+
+        foreach (['deepseek-chat' => '0.27', 'deepseek-reasoner' => '0.55'] as $modelo => $costo) {
+            $controlador->configurar($this->ctx([
+                'proveedor' => 'deepseek',
+                'modelo' => $modelo,
+                'api_key' => 'sk-secreta-1234',
+                'costo_entrada_usd_1m' => $costo,
+                'costo_salida_usd_1m' => '2.19',
+            ]));
+        }
+
+        self::assertSame(0, (int) $this->modelo('deepseek-chat')['es_primario']);
+        self::assertSame(1, (int) $this->modelo('deepseek-reasoner')['es_primario']);
+        // El anterior queda de suplente, que es el papel natural.
+        self::assertSame(1, (int) $this->modelo('deepseek-chat')['activo']);
     }
 
     #[Test]

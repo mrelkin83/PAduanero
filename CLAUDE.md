@@ -740,64 +740,70 @@ Tres razones, en orden de peso:
    Cambiar el modelo por debajo las deja sin valor, y nadie se entera hasta
    que un cliente lee algo que no debía.
 
-**Quién asciende — resuelto por el PO (2026-07-31).** Se crea
-`ia.modelos.promover` y es **del abogado**, no del `super_admin`. Es la tercera
-asimetría del ADR-007, junto a `ia.prompts.aprobar`, `kb.verificar` y
-`contenido.publicar`:
+**Quién asciende — reabierto y resuelto por el PO (2026-08-01).**
+
+La decisión del 2026-07-31 fue: `ia.modelos.promover` es **del abogado**, y
+un modelo no puede ser primario sin conjunto dorado en verde contra él. El
+2026-08-01 el PO retiró ambas cosas, textualmente: **«quita el gate, elegir
+el modelo debe ser suficiente»**.
+
+Queda así:
 
 | Rol | Puede |
 |---|---|
-| `super_admin` | Descubrir, configurar, verificar costos, probar conexión, activar y desactivar. Todo el trabajo técnico. **No puede promover.** |
-| `abogado` | `ia.modelos.promover`. Firma que el bot va a hablar con otro modelo. |
+| `super_admin` | Descubrir, configurar, verificar costos, probar conexión, activar, desactivar **y poner en uso**. |
+| `abogado` | Lo mismo. No se le quitó nada. |
 
-La objeción previsible —Pedro no sabe evaluar un modelo— es correcta y no
-importa: tampoco redacta el prompt que aprueba. Lo que firma no es la calidad
-técnica, es que asume la responsabilidad profesional de lo que el bot diga a
-partir de ese momento.
+Las otras tres asimetrías del ADR-007 —`ia.prompts.aprobar`, `kb.verificar`,
+`contenido.publicar`— **siguen intactas**. La decisión fue sobre el modelo,
+no sobre el reparto de firmas.
 
-**El gate que hace la firma significativa.** Un modelo no puede ser primario de
-`conversacion` sin que el conjunto dorado haya corrido **en verde contra ese
-modelo**, y sin que la corrida siga vigente: se guarda en `modelos_ia` el
-resultado, la fecha y el `id` del prompt que estaba activo, y si el prompt
-cambia después, el verde caduca.
+**Qué se retiró exactamente.** La migración `0010_sin_gate_dorado.sql` quita
+el CHECK `ck_modelo_primario_dorado` y concede el permiso al `super_admin`.
+En código dejan de bloquear tres cosas:
 
-Así Pedro no aprueba «claude-opus-6»: aprueba un modelo que ya demostró no
-soltar un plazo, no citar una norma numerada y no prometer un resultado. Y la
-razón 3 de arriba se da la vuelta — el conjunto dorado deja de perder valor al
-cambiar de modelo, porque cambiar de modelo obliga a recorrerlo.
+- Promover un modelo sin corrida dorada en verde.
+- Que un suplente de la cascada responda sin corrida propia. Antes, si caía
+  el primario, el bot escalaba a humano; ahora responde el suplente.
+- Activar una versión de prompt no probada contra el modelo que está
+  hablando.
 
-La regla vive en `App\Servicios\GateDorado`, en un solo sitio, porque la usan
-el panel al promover y el corredor del dorado al terminar. Las dos mitades que
-caben en un CHECK están en `ck_modelo_primario_dorado`; la vigencia frente al
-prompt cruza dos tablas y por eso no cabe.
+**Qué NO se retiró.** Las columnas `dorado_*`, el corredor
+`bin/correr-dorado.php` y el estado en el panel siguen igual. Se retiró el
+bloqueo, no la evidencia: saber si un modelo pasó el conjunto dorado sigue
+siendo el único dato objetivo sobre si respeta las reglas inviolables, y el
+panel lo enseña como aviso junto al modelo en uso. `GateDorado::estado()`
+informa; ya no impide.
 
-Un modelo de `embeddings` no pasa por el gate: no le dice nada a nadie.
+Tampoco se tocó el CHECK `ck_modelo_primario_apto`: un modelo sin costo
+verificado sigue sin poder ser primario, porque sin costo el corte por
+`presupuesto_ia_mensual_usd` no corta nunca y un guardia que deja de guardar
+en silencio es peor que no tenerlo.
 
-**La puerta que el gate obliga a dejar abierta, y por qué no es un agujero.**
+**Qué se pierde, dicho aquí para que quede en el historial.** A partir de
+ahora un modelo puede hablar con un cliente sin que nadie haya comprobado que
+no suelta un plazo (regla 2), que no cita una norma numerada (regla 3) y que
+no promete un resultado (regla 4). Las reglas siguen escritas en el prompt y
+siguen probadas en el conjunto dorado; lo que ya no existe es la comprobación
+de que **ese** modelo las cumple antes de servir.
 
-El gate crea una circularidad que solo se ve al ejecutarlo: un modelo no puede
-responder sin corrida dorada en verde, y la corrida necesita que responda para
-existir. Con el gate aplicado a rajatabla, **la primera corrida sería
-imposible** y el sistema no podría arrancar nunca.
+Debajo quedan dos redes: el **modo sombra** de la Etapa 4 —la respuesta va a
+nota privada en Chatwoot y Pedro decide si se envía— y la corrida dorada, que
+se puede lanzar cuando se quiera. Mientras el modo sombra esté activo, ningún
+texto llega a un cliente sin que Pedro lo lea primero. **El día que se pase a
+envío automático (Etapa 6), esa red desaparece y esta decisión pasa a tener
+consecuencias directas.** Conviene releer este párrafo ese día.
 
-La salida es `Llm::chatParaConjuntoDorado()`, la única llamada del sistema que
-se salta el gate. Queda escrito aquí porque, visto suelto en el código, un
-método que ignora el `GateDorado` parece exactamente lo que el ADR-016 existe
-para impedir.
+**La circularidad que el gate creaba, y qué pasó con su puerta.** El gate
+hacía imposible la primera corrida: un modelo no podía responder sin dorado
+verde, y el dorado necesitaba que respondiera. La salida era
+`Llm::chatParaConjuntoDorado()`, que se lo saltaba.
 
-Por qué la excepción es legítima y no una grieta:
+Retirado el gate esa razón desaparece, pero **el método se queda**, por otra
+que sigue siendo válida: la corrida dorada y la prueba de conexión del panel
+tienen que hablar con un modelo **elegido**, no con el que la cascada
+prefiera. Si el primario fallara y contestara el suplente, se registraría un
+verde sobre un modelo que no era el que se estaba probando. Por eso sigue
+exigiendo el `id` y no acepta `proposito`.
 
-- **Al otro lado de esa llamada no hay un cliente.** Hay un archivo de
-  aserciones. El gate protege a quien recibe el mensaje, y aquí no recibe nadie.
-- **El resto de garantías siguen en pie.** El modelo tiene que estar activo, no
-  retirado y con costo verificado; el consumo se registra igual; el presupuesto
-  corta igual.
-- **La firma es incómoda a propósito.** Exige el `id` del modelo, que nadie
-  tiene a mano por casualidad. No es una barrera criptográfica: es fricción
-  suficiente para que no se use por descuido en lugar de `chat()`.
-- **Su único llamador legítimo es `bin/correr-dorado.php`.** Si aparece en otro
-  sitio, es un defecto.
-
-El mismo razonamiento vale para `GateDorado::puedeActivarPrompt()`, que cierra
-el agujero simétrico: sin él no se podía cambiar el modelo sin dorado, pero se
-conseguía el mismo efecto cambiando el prompt.
+Un modelo de `embeddings` nunca entró en esto: no le dice nada a nadie.

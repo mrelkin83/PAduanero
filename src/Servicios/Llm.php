@@ -164,23 +164,21 @@ final class Llm
     }
 
     /**
-     * Una sola llamada a un modelo **concreto**, saltándose el `GateDorado`.
+     * Una sola llamada a un modelo **concreto**, sin cascada.
      *
-     * Existe por una circularidad que el propio gate crea: un modelo no puede
-     * responder sin corrida dorada en verde, y la corrida dorada necesita que
-     * responda para existir. Sin esta puerta, la primera corrida sería
-     * imposible y el sistema no podría arrancar nunca.
+     * Nació para resolver la circularidad del `GateDorado` —un modelo no
+     * podía responder sin corrida en verde, y la corrida necesitaba que
+     * respondiera— y esa razón desapareció cuando el PO retiró el gate el
+     * 2026-08-01. **Se conserva porque sigue haciendo falta por otro motivo:**
+     * la corrida dorada y la prueba de conexión del panel tienen que hablar
+     * con un modelo **elegido**, no con el que la cascada prefiera. Si el
+     * primario fallara y respondiera el suplente, se registraría un verde
+     * sobre un modelo que no es el que se estaba probando.
      *
-     * **Su único llamador legítimo es `bin/correr-dorado.php`.** Saltarse el
-     * gate es aceptable ahí y solo ahí, porque al otro lado de esa llamada no
-     * hay un cliente: hay un archivo de aserciones. El resto de garantías
-     * siguen en pie — el modelo tiene que estar activo, no retirado y con
-     * costo verificado, y el consumo se registra igual.
+     * Por eso la firma sigue exigiendo el `id`, y por eso no acepta
+     * `proposito`: aquí no hay elección que delegar.
      *
-     * La firma es deliberadamente incómoda: exige el **id** del modelo, que
-     * nadie tiene a mano por casualidad. No es una barrera criptográfica, es
-     * fricción suficiente para que no se use por descuido en lugar de
-     * `chat()`.
+     * Llamadores legítimos: `bin/correr-dorado.php` e `IaControlador::probar()`.
      *
      * @param array<int,array{role:string,content:string}> $mensajes
      * @throws LlmException
@@ -268,26 +266,28 @@ final class Llm
         );
         $stmt->execute([$proposito]);
 
-        $autorizados = [];
+        $modelos = $stmt->fetchAll();
 
-        foreach ($stmt->fetchAll() as $modelo) {
-            $veredicto = $this->gate->puedeResponder($modelo);
+        // Aquí filtraba el `GateDorado`: un modelo sin corrida en verde no
+        // entraba en la cascada. El PO lo retiró el 2026-08-01. La cascada la
+        // define ahora solo lo que se ve en el WHERE de arriba: activo, no
+        // retirado, con costo verificado y con el proveedor encendido.
+        //
+        // Se sigue avisando de qué modelos van a responder sin evidencia,
+        // porque el dato existe y callarlo sería peor que no tenerlo. Es un
+        // registro, no un filtro: ninguno de estos queda fuera.
+        foreach ($modelos as $modelo) {
+            $veredicto = $this->gate->estado($modelo);
 
-            if ($veredicto['ok']) {
-                $autorizados[] = $modelo;
-                continue;
+            if (!$veredicto['ok']) {
+                $this->log->warn('llm.modelo_sin_dorado', [
+                    'modelo' => $modelo['identificador'],
+                    'motivo' => $veredicto['motivo'],
+                ]);
             }
-
-            // Un suplente que no pasa el gate no se usa en silencio: se dice.
-            // Si el primario cae y esto no queda registrado, alguien va a
-            // preguntarse por qué el bot escaló en vez de responder.
-            $this->log->warn('llm.suplente_sin_firma', [
-                'modelo' => $modelo['identificador'],
-                'motivo' => $veredicto['motivo'],
-            ]);
         }
 
-        return $autorizados;
+        return $modelos;
     }
 
     /**

@@ -7,23 +7,32 @@ namespace App\Servicios;
 use App\Core\BD;
 
 /**
- * Puerta entre «este modelo existe» y «este modelo le habla a los clientes».
+ * Estado del conjunto dorado de cada modelo.
  *
- * Una sola clase con la regla, usada por dos sitios: el panel, cuando el
- * abogado pulsa «Hacer primario», y el corredor del conjunto dorado, cuando
- * termina. Si la regla viviera duplicada en ambos, uno de los dos se quedaría
- * atrás y el que se quedara atrás sería el que deja pasar.
+ * **Ya no es una puerta.** Lo fue hasta el 2026-08-01, cuando el Product
+ * Owner decidió retirarla: «quita el gate, elegir el modelo debe ser
+ * suficiente». Se conserva el nombre de la clase porque el concepto —el
+ * conjunto dorado— sigue existiendo y es como se le llama en el resto de la
+ * documentación; lo que se retiró es el bloqueo, no la evidencia.
  *
- * La regla completa tiene tres partes; solo dos caben en un CHECK:
+ * Lo que hace hoy:
  *
- *  1. Hubo corrida y salió verde        → `ck_modelo_primario_dorado`
- *  2. Es de propósito `conversacion`    → idem
- *  3. **La corrida sigue vigente**: el prompt activo es el mismo con el que
- *     se corrió. Esto cruza `modelos_ia` con `prompts` y por eso vive aquí.
+ *  · `registrarCorrida()` deja constancia de cada corrida. Sin cambios.
+ *  · `estado()` describe la situación de un modelo para que el panel la
+ *    enseñe. **Informa, no impide.**
  *
- * La tercera es la que impide el fraude honesto: correr el dorado en verde,
- * cambiar el prompt al día siguiente y promover con un verde que ya no dice
- * nada sobre lo que el bot diría.
+ * Lo que hacía y ya no hace: negar el ascenso de un modelo sin corrida en
+ * verde, negarle la respuesta a un suplente de la cascada, y negar la
+ * activación de un prompt no probado contra el modelo que está hablando.
+ *
+ * Consecuencia, escrita aquí porque a quien lea esta clase dentro de un año
+ * le va a faltar: un modelo puede empezar a hablar con clientes sin que
+ * nadie haya comprobado que no suelta un plazo, que no cita una norma
+ * numerada y que no promete un resultado. Las reglas siguen escritas en el
+ * prompt y siguen probadas en el conjunto dorado — lo que ya no existe es la
+ * comprobación de que ese modelo concreto las cumple antes de servir.
+ * Debajo quedan el modo sombra de la Etapa 4 y la corrida, que se puede
+ * lanzar cuando se quiera.
  */
 final class GateDorado
 {
@@ -35,34 +44,19 @@ final class GateDorado
     }
 
     /**
-     * ¿Puede este modelo hablar con un cliente?
+     * Cómo está este modelo respecto del conjunto dorado.
      *
-     * Mismo criterio que `puedePromover()`, y adrede: si un suplente de la
-     * cascada pudiera responder con requisitos más laxos que los que se le
-     * exigen a un primario, la firma del abogado sería decorativa — bastaría
-     * con que el primario fallara para que hablara un modelo sin firmar, que
-     * es justo el día en que menos conviene.
-     *
-     * Existen los dos nombres porque los dos sitios preguntan lo mismo desde
-     * intenciones distintas, y leer `puedePromover()` dentro de la cascada
-     * despistaría a quien la revise.
+     * Es puramente descriptivo: nadie decide nada con esto salvo qué texto
+     * pintar en la ficha. `ok` significa «hay evidencia vigente», no
+     * «tiene permiso».
      *
      * @param  array<string,mixed> $modelo fila de `modelos_ia`
      * @return array{ok:bool,motivo:string}
      */
-    public function puedeResponder(array $modelo): array
+    public function estado(array $modelo): array
     {
-        return $this->puedePromover($modelo);
-    }
-
-    /**
-     * @param  array<string,mixed> $modelo fila de `modelos_ia`
-     * @return array{ok:bool,motivo:string}
-     */
-    public function puedePromover(array $modelo): array
-    {
-        // Un modelo de embeddings no le dice nada a nadie. Exigirle el
-        // conjunto dorado sería teatro.
+        // Un modelo de embeddings no le dice nada a nadie: el conjunto
+        // dorado no tiene nada que decir sobre él.
         if ((string) $modelo['proposito'] !== 'conversacion') {
             return ['ok' => true, 'motivo' => ''];
         }
@@ -72,9 +66,8 @@ final class GateDorado
         if ($estado === 'sin_correr') {
             return [
                 'ok' => false,
-                'motivo' => 'El conjunto dorado no se ha corrido contra este modelo. '
-                    . 'Sin eso, aprobarlo sería aprobar un nombre: no hay evidencia de '
-                    . 'que respete las reglas inviolables.',
+                'motivo' => 'El conjunto dorado no se ha corrido contra este modelo: '
+                    . 'no hay evidencia de que respete las reglas inviolables.',
             ];
         }
 
@@ -85,7 +78,7 @@ final class GateDorado
                 'ok' => false,
                 'motivo' => 'El conjunto dorado falló contra este modelo'
                     . ($fallos > 0 ? " ({$fallos} caso(s) en rojo)" : '')
-                    . '. Revise el detalle antes de volver a intentarlo.',
+                    . '. Revise el detalle.',
             ];
         }
 
@@ -94,8 +87,8 @@ final class GateDorado
         if ($activo === null) {
             return [
                 'ok' => false,
-                'motivo' => 'No hay prompt de conversación activo. La corrida dorada no '
-                    . 'puede quedar atada a nada.',
+                'motivo' => 'No hay prompt de conversación activo, así que la corrida '
+                    . 'dorada no está atada a nada.',
             ];
         }
 
@@ -106,62 +99,12 @@ final class GateDorado
         if ($corridoCon !== $activo) {
             return [
                 'ok' => false,
-                'motivo' => 'El prompt activo cambió después de la última corrida dorada. '
-                    . 'El verde anterior no dice nada sobre lo que el bot diría hoy: '
-                    . 'vuelva a correr el conjunto dorado contra este modelo.',
+                'motivo' => 'El prompt activo cambió después de la última corrida dorada: '
+                    . 'ese verde no dice nada sobre lo que el bot diría hoy.',
             ];
         }
 
-        return ['ok' => true, 'motivo' => ''];
-    }
-
-    /**
-     * ¿Se puede activar esta versión de prompt?
-     *
-     * Simétrico al de los modelos, y por la misma razón: la corrida dorada
-     * valida **la pareja prompt + modelo**, no cada uno por su lado. Activar
-     * un prompt que nunca se probó contra el modelo que está hablando deja al
-     * bot funcionando con una combinación que nadie verificó — y sin ningún
-     * síntoma, porque el bot sigue respondiendo.
-     *
-     * Es lo que cierra el hueco que quedaba: `puedePromover()` impide cambiar
-     * el modelo sin dorado, pero sin esto se podía conseguir lo mismo por el
-     * otro lado, cambiando el prompt.
-     *
-     * @return array{ok:bool,motivo:string}
-     */
-    public function puedeActivarPrompt(string $promptId): array
-    {
-        $primario = $this->bd->pdo()->query(
-            "SELECT id, identificador FROM modelos_ia
-              WHERE proposito = 'conversacion' AND es_primario = 1 LIMIT 1"
-        )->fetch();
-
-        if ($primario === false) {
-            // Todavía no hay primario: es el caso normal la primera vez, y
-            // entonces el orden correcto es activar el prompt y después
-            // correr el dorado para poder promover el modelo.
-            return ['ok' => true, 'motivo' => ''];
-        }
-
-        $stmt = $this->bd->pdo()->prepare(
-            "SELECT dorado_estado, dorado_prompt_id FROM modelos_ia WHERE id = ?"
-        );
-        $stmt->execute([$primario['id']]);
-        $modelo = $stmt->fetch();
-
-        if (($modelo['dorado_estado'] ?? '') === 'verde'
-            && (string) ($modelo['dorado_prompt_id'] ?? '') === $promptId) {
-            return ['ok' => true, 'motivo' => ''];
-        }
-
-        return [
-            'ok' => false,
-            'motivo' => 'Esta versión no se ha probado contra ' . $primario['identificador']
-                . ', que es el modelo que está hablando. Corra el conjunto dorado '
-                . '(`php bin/correr-dorado.php --prompt=' . $promptId . '`) y actívela '
-                . 'cuando salga en verde.',
-        ];
+        return ['ok' => true, 'motivo' => 'Conjunto dorado en verde con el prompt activo.'];
     }
 
     /**
@@ -214,15 +157,13 @@ final class GateDorado
     /**
      * Versión del prompt de conversación que gobierna hoy.
      *
-     * De aquí sale la invalidación implícita de las corridas: activar una
-     * versión nueva no borra ningún resultado —queda el histórico de que ese
-     * modelo pasó alguna vez— pero hace que `dorado_prompt_id` deje de
-     * coincidir y `puedePromover()` empiece a decir que no.
+     * De aquí sale la caducidad de las corridas: activar una versión nueva no
+     * borra ningún resultado —queda el histórico de que ese modelo pasó
+     * alguna vez— pero hace que `dorado_prompt_id` deje de coincidir y que
+     * `estado()` pase a decir que ese verde ya no dice nada sobre lo que el
+     * bot diría hoy.
      *
-     * Nótese lo que eso NO hace: activar un prompt nuevo no degrada al
-     * primario actual, que sigue respondiendo. Solo impide promover a otro
-     * con un verde caducado. Degradar al primario en caliente por un cambio
-     * de prompt dejaría al motor sin modelo en mitad de una conversación.
+     * Desde que se retiró el gate eso es un aviso, no un impedimento.
      */
     public function promptActivoId(): ?string
     {

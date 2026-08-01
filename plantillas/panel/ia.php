@@ -5,6 +5,21 @@ declare(strict_types=1);
 use App\Soporte\Vista;
 
 /**
+ * Proveedores y modelos de IA.
+ *
+ * La pantalla se reordenó el 2026-08-01 porque era ilegible: pintaba una
+ * tarjeta por cada modelo, y con un proveedor como OpenRouter —que anuncia
+ * más de trescientos— la página pesaba más de un megabyte y lo único que
+ * alguien viene a hacer aquí, elegir con qué modelo habla el bot, quedaba
+ * enterrado.
+ *
+ * Ahora hay tres bloques y un cajón:
+ *
+ *   1. Elegir proveedor y modelo. Es a lo que se viene.
+ *   2. Qué está en uso ahora.
+ *   3. Proveedores, en tabla compacta.
+ *   · El catálogo completo, plegado, en tabla y con buscador.
+ *
  * @var \App\Panel\Contexto $ctx
  * @var list<array<string,mixed>> $proveedores
  * @var list<array<string,mixed>> $modelos
@@ -32,62 +47,69 @@ $contenido = static function () use (
     $conteoModelos,
     $elegibles,
     $enUso,
-    $credenciales,
     $referencia,
-    $disponibles,
     $gates,
     $puedeEscribir,
     $puedePromover,
 ): void {
-    $nuevos = array_filter(
-        $modelos,
-        static fn (array $m): bool => $m['origen'] === 'descubierto'
-            && (int) $m['costos_verificados'] === 0
-            && $m['retirado_en'] === null,
-    );
-
+    // Lo que pide decisión hoy, separado del inventario. Un modelo primario
+    // retirado por su proveedor es lo único que puede romper el bot sin dar
+    // ningún síntoma: la cascada lo cubre y nadie se entera.
     $primariosRetirados = array_filter(
         $modelos,
         static fn (array $m): bool => (int) $m['es_primario'] === 1 && $m['retirado_en'] !== null,
     );
+
+    // «Configurado» es lo que alguien tocó: activo, primario o con costo
+    // verificado. El resto es catálogo, y va al cajón.
+    $configurados = array_filter(
+        $modelos,
+        static fn (array $m): bool => (int) $m['activo'] === 1
+            || (int) $m['es_primario'] === 1
+            || (int) $m['costos_verificados'] === 1,
+    );
+
+    $catalogo = array_filter(
+        $modelos,
+        static fn (array $m): bool => !in_array($m, $configurados, true),
+    );
     ?>
 
-    <?php /* ── Proveedor de IA ────────────────────────────────────────────
-            Elegir proveedor, ver sus modelos EN VIVO desde su propia API,
-            elegir uno y guardar la llave. Todo en una pantalla, que es como
-            se configura esto en cualquier sitio y no había razón para que
-            aquí fuera distinto. */ ?>
+    <?php if ($primariosRetirados !== []): ?>
+    <section class="aviso aviso-error">
+        <p class="font-semibold">Un modelo primario fue retirado por su proveedor.</p>
+        <p class="mt-1 text-sm">
+            La cascada lo está cubriendo, así que el bot sigue respondiendo, pero está
+            sirviendo desde el suplente sin que nadie lo haya decidido. Elija sustituto.
+        </p>
+        <ul class="mt-2 font-mono text-sm">
+            <?php foreach ($primariosRetirados as $m): ?>
+                <li><?= $e((string) $m['identificador']) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    </section>
+    <?php endif; ?>
+
+    <?php /* ── 1. A lo que se viene ──────────────────────────────────── */ ?>
     <?php if ($puedeEscribir): ?>
-    <section class="tarjeta p-5">
+    <section class="tarjeta p-4">
         <h2 class="text-lg font-semibold">🤖 Proveedor de IA</h2>
         <p class="mt-1 text-sm text-acero">
             El proveedor y modelo elegidos se usan en todas las generaciones. La API key
             se guarda cifrada en la base de datos y nunca vuelve al navegador.
         </p>
 
-        <?php if ($enUso !== null): ?>
-        <p class="mt-3 text-sm">
-            En uso ahora:
-            <span class="font-mono font-medium"><?= $e((string) $enUso['identificador']) ?></span>
-            <span class="text-acero">vía <?= $e((string) $enUso['proveedor_nombre']) ?></span>
-        </p>
-        <?php else: ?>
-        <p class="aviso aviso-error mt-3 text-sm">
-            Ningún modelo está en uso todavía. El motor no puede responder.
-        </p>
-        <?php endif; ?>
-
         <form method="post" action="/panel/ia/configurar" class="mt-4 space-y-4">
             <?= $ctx->csrf->campoOculto() ?>
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="grid gap-4 sm:grid-cols-2">
                 <div>
-                    <label class="etiqueta" for="campo-proveedor">Proveedor</label>
+                    <label class="rotulo" for="campo-proveedor">Proveedor</label>
                     <select id="campo-proveedor" name="proveedor" class="campo">
                         <?php foreach ($elegibles as $k => $d): ?>
                         <option value="<?= $e((string) $k) ?>"
                             <?= $enUso !== null && $enUso['proveedor_clave'] === $k ? 'selected' : '' ?>>
-                            <?= $e((string) $d['nombre']) ?><?= $d['dadoDeAlta'] ? '' : ' — sin dar de alta' ?>
+                            <?= $e((string) $d['nombre']) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -95,7 +117,7 @@ $contenido = static function () use (
                 </div>
 
                 <div>
-                    <label class="etiqueta" for="campo-modelo">Modelo</label>
+                    <label class="rotulo" for="campo-modelo">Modelo</label>
                     <select id="campo-modelo" name="modelo" class="campo">
                         <option value="">Cargando modelos…</option>
                     </select>
@@ -106,13 +128,15 @@ $contenido = static function () use (
             </div>
 
             <div id="grupo-url" class="hidden">
-                <label class="etiqueta" for="campo-url">URL base del endpoint (compatible con OpenAI)</label>
+                <label class="rotulo" for="campo-url">
+                    URL base del endpoint (compatible con OpenAI)
+                </label>
                 <input type="text" id="campo-url" name="base_url" class="campo"
                        placeholder="https://mi-servidor/v1">
             </div>
 
             <div>
-                <label class="etiqueta" for="campo-clave">API key del proveedor</label>
+                <label class="rotulo" for="campo-clave">API key del proveedor</label>
                 <input type="password" id="campo-clave" name="api_key" class="campo" autocomplete="off">
                 <p id="clave-estado" class="mt-1 text-xs text-acero"></p>
             </div>
@@ -123,17 +147,17 @@ $contenido = static function () use (
                     modelo a costo cero nunca agota un presupuesto, y un
                     guardia que deja de guardar en silencio es peor que no
                     tenerlo. Quien lo teclea queda en `auditoria`. */ ?>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="grid gap-4 sm:grid-cols-2">
                 <div>
-                    <label class="etiqueta" for="campo-costo-entrada">
-                        Costo de entrada · USD por millón de tokens
+                    <label class="rotulo" for="campo-costo-entrada">
+                        Costo de entrada · USD / millón de tokens
                     </label>
                     <input type="text" id="campo-costo-entrada" name="costo_entrada_usd_1m"
                            class="campo" inputmode="decimal" placeholder="5">
                 </div>
                 <div>
-                    <label class="etiqueta" for="campo-costo-salida">
-                        Costo de salida · USD por millón de tokens
+                    <label class="rotulo" for="campo-costo-salida">
+                        Costo de salida · USD / millón de tokens
                     </label>
                     <input type="text" id="campo-costo-salida" name="costo_salida_usd_1m"
                            class="campo" inputmode="decimal" placeholder="25">
@@ -160,47 +184,53 @@ $contenido = static function () use (
     </section>
     <?php endif; ?>
 
+    <?php /* ── 2. Qué está en uso ────────────────────────────────────── */ ?>
     <section class="mt-8">
-        <p class="text-sm text-acero">
-            El catálogo se sincroniza solo con lo que cada proveedor anuncia: si sale un
-            modelo nuevo, aparece aquí al día siguiente sin tocar código.
-            <strong>Lo que no es automático es empezar a usarlo.</strong> Un modelo nuevo
-            entra inactivo y sin costo. Ascenderlo a primario lo firma el abogado —igual
-            que aprobar un prompt, y por la misma razón: cambia lo que el bot dice— y
-            solo después de que el conjunto dorado haya corrido en verde contra ese
-            modelo con el prompt que está activo hoy.
+        <h2 class="rotulo">En uso</h2>
+
+        <?php if ($enUso === null): ?>
+            <p class="aviso aviso-error mt-3 text-sm">
+                Ningún modelo está en uso. El motor no puede responder y escalará
+                cada conversación a humano.
+            </p>
+        <?php else: ?>
+            <?php $dorado = $gates[(string) $enUso['id']] ?? ['ok' => false, 'motivo' => '']; ?>
+            <p class="mt-3">
+                <span class="font-mono font-medium"><?= $e((string) $enUso['identificador']) ?></span>
+                <span class="text-sm text-acero">
+                    vía <?= $e((string) $enUso['proveedor_nombre']) ?>
+                    · <?= $e((string) ($enUso['costo_entrada_usd_1m'] ?? '?')) ?> /
+                    <?= $e((string) ($enUso['costo_salida_usd_1m'] ?? '?')) ?> USD por millón
+                </span>
+            </p>
+            <?php /* El conjunto dorado dejó de bloquear el 2026-08-01, pero
+                    su estado sigue siendo el único dato objetivo sobre si
+                    este modelo respeta las reglas inviolables. Callarlo
+                    sería peor que no tenerlo. */ ?>
+            <p class="mt-1 text-xs <?= $dorado['ok'] ? 'text-acero' : 'text-sello' ?>">
+                <?= $e((string) $dorado['motivo']) ?>
+            </p>
+        <?php endif; ?>
+
+        <?php
+        $suplentes = array_filter(
+            $configurados,
+            static fn (array $m): bool => (int) $m['activo'] === 1
+                && (int) $m['es_primario'] === 0
+                && $m['proposito'] === 'conversacion',
+        );
+        ?>
+        <?php if ($suplentes !== []): ?>
+        <p class="mt-2 text-xs text-acero">
+            Suplentes, por orden: <?= $e(implode(' · ', array_map(
+                static fn (array $m): string => (string) $m['identificador'],
+                $suplentes,
+            ))) ?>
         </p>
+        <?php endif; ?>
     </section>
 
-    <?php if ($primariosRetirados !== []): ?>
-    <section class="aviso aviso-error mt-6">
-        <p class="font-semibold">Un modelo primario fue retirado por su proveedor.</p>
-        <p class="mt-1 text-sm">
-            La cascada de fallback lo está cubriendo, así que el bot sigue respondiendo,
-            pero está sirviendo desde el suplente sin que nadie lo haya decidido.
-            Elija sustituto.
-        </p>
-        <ul class="mt-2 font-mono text-sm">
-            <?php foreach ($primariosRetirados as $m): ?>
-                <li><?= $e((string) $m['identificador']) ?> · <?= $e((string) $m['proposito']) ?></li>
-            <?php endforeach; ?>
-        </ul>
-    </section>
-    <?php endif; ?>
-
-    <?php if ($nuevos !== []): ?>
-    <section class="aviso aviso-ok mt-6">
-        <p class="font-semibold">
-            <?= count($nuevos) ?> modelo(s) nuevo(s) sin revisar.
-        </p>
-        <p class="mt-1 text-sm">
-            Ningún proveedor publica sus precios en el endpoint de modelos, así que el
-            costo hay que registrarlo a mano. Sin él, el corte por presupuesto mensual
-            no corta: un modelo a coste cero nunca agota un presupuesto.
-        </p>
-    </section>
-    <?php endif; ?>
-
+    <?php /* ── 3. Proveedores ────────────────────────────────────────── */ ?>
     <section class="mt-8">
         <div class="flex flex-wrap items-baseline justify-between gap-3">
             <h2 class="rotulo">Proveedores</h2>
@@ -208,24 +238,16 @@ $contenido = static function () use (
             <?php if ($puedeEscribir): ?>
             <form method="post" action="/panel/ia/sincronizar">
                 <?= $ctx->csrf->campoOculto() ?>
-                <button type="submit" class="boton-secundario">Sincronizar ahora</button>
+                <button type="submit" class="boton-secundario">Sincronizar todos</button>
             </form>
             <?php endif; ?>
         </div>
-
-        <?php if ($proveedores === []): ?>
-            <p class="mt-3 text-sm text-acero">
-                No hay proveedores registrados. Sin al menos uno activo y con credencial,
-                el motor no puede llamar a ningún modelo.
-            </p>
-        <?php endif; ?>
 
         <div class="mt-3 overflow-x-auto">
         <table class="tabla">
             <thead>
                 <tr>
                     <th>Proveedor</th>
-                    <th>Formato</th>
                     <th>País del servidor</th>
                     <th>Modelos</th>
                     <th>Última sincronización</th>
@@ -239,20 +261,16 @@ $contenido = static function () use (
                         <span class="font-medium"><?= $e((string) $p['nombre']) ?></span>
                         <span class="ml-1 font-mono text-xs text-acero"><?= $e((string) $p['clave']) ?></span>
                     </td>
-                    <td class="font-mono text-xs"><?= $e((string) $p['formato_api']) ?></td>
                     <td class="text-sm">
-                        <?php /* Dato de cumplimiento: dónde se procesa el contenido de
-                                los casos. Ver CLAUDE.md §9. */ ?>
+                        <?php /* Dato de cumplimiento: dónde se procesa el contenido
+                                de los casos. Ver CLAUDE.md §9. */ ?>
                         <?= $e((string) ($p['pais_servidor'] ?? '—')) ?>
                     </td>
                     <td class="text-sm">
                         <?php $cuantos = $conteoModelos[(string) $p['clave']] ?? 0; ?>
-                        <?php if ($cuantos === 0): ?>
-                            <span class="text-acero">—</span>
-                        <?php else: ?>
-                            <span class="font-medium"><?= $cuantos ?></span>
-                            <span class="text-xs text-acero">en catálogo</span>
-                        <?php endif; ?>
+                        <?= $cuantos === 0
+                            ? '<span class="text-acero">—</span>'
+                            : '<span class="font-medium">' . $cuantos . '</span>' ?>
                     </td>
                     <td class="text-sm">
                         <?php if ($p['ultima_sincro'] === null): ?>
@@ -260,9 +278,8 @@ $contenido = static function () use (
                         <?php elseif ((int) $p['ultima_ok'] === 1): ?>
                             <?= $e((string) $p['ultima_sincro']) ?>
                         <?php else: ?>
-                            <span class="text-sello">
-                                <?= $e((string) $p['ultima_sincro']) ?> —
-                                <?= $e((string) $p['ultimo_error']) ?>
+                            <span class="text-sello" title="<?= $e((string) $p['ultimo_error']) ?>">
+                                falló · <?= $e((string) $p['ultima_sincro']) ?>
                             </span>
                         <?php endif; ?>
                     </td>
@@ -292,17 +309,15 @@ $contenido = static function () use (
 
                 <?php
                 /* Modelos de referencia: solo cuando el proveedor todavía no ha
-                   descubierto ninguno. Sirve para que la ficha no aparezca
-                   vacía y sin explicación. NO son filas de `modelos_ia`: un
-                   modelo entra al catálogo cuando el proveedor lo anuncia
-                   (ADR-016), no porque figure en una lista escrita a mano. */
+                   descubierto ninguno. NO son filas de `modelos_ia`: un modelo
+                   entra al catálogo cuando el proveedor lo anuncia (ADR-016),
+                   no porque figure en una lista escrita a mano. */
                 $refs = $referencia[(string) $p['clave']] ?? [];
                 ?>
                 <?php if ($refs !== []): ?>
                 <tr>
-                    <td colspan="6" class="text-xs text-acero">
-                        Sin descubrir todavía. Pulse «Cargar modelos» para traer los que
-                        anuncia hoy. Suele ofrecer:
+                    <td colspan="5" class="text-xs text-acero">
+                        Sin descubrir. Pulse «Cargar modelos». Suele ofrecer:
                         <span class="font-mono"><?= $e(implode(' · ', $refs)) ?></span>
                         — lista de referencia, no del catálogo.
                     </td>
@@ -314,49 +329,148 @@ $contenido = static function () use (
         </div>
     </section>
 
-    <?php if ($puedeEscribir): ?>
-    <section class="mt-10">
-        <h2 class="rotulo">Añadir proveedor</h2>
-        <p class="mt-2 text-sm text-acero">
-            Elija uno conocido —rellena URL, formato y país— o escriba los datos de
-            cualquier endpoint compatible con OpenAI. Nace <strong>inactivo</strong>:
-            darlo de alta no lo mete en la cascada.
-        </p>
+    <?php /* ── Modelos configurados ──────────────────────────────────── */ ?>
+    <?php if ($configurados !== []): ?>
+    <section class="mt-8">
+        <h2 class="rotulo">Modelos configurados</h2>
+        <div class="mt-3 overflow-x-auto">
+        <table class="tabla">
+            <thead>
+                <tr>
+                    <th>Modelo</th>
+                    <th>Proveedor</th>
+                    <th>USD / millón</th>
+                    <th>Estado</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($configurados as $m):
+                $primario = (int) $m['es_primario'] === 1;
+                $retirado = $m['retirado_en'] !== null;
+                ?>
+                <tr class="<?= $retirado ? 'opacity-60' : '' ?>">
+                    <td class="font-mono text-sm"><?= $e((string) $m['identificador']) ?></td>
+                    <td class="text-sm"><?= $e((string) $m['proveedor_nombre']) ?></td>
+                    <td class="font-mono text-sm">
+                        <?= $e((string) ($m['costo_entrada_usd_1m'] ?? '—')) ?> /
+                        <?= $e((string) ($m['costo_salida_usd_1m'] ?? '—')) ?>
+                    </td>
+                    <td class="text-sm">
+                        <?php if ($retirado): ?>
+                            <span class="etiqueta etiqueta-error">retirado</span>
+                        <?php elseif ($primario): ?>
+                            <span class="etiqueta etiqueta-ok">en uso</span>
+                        <?php elseif ((int) $m['activo'] === 1): ?>
+                            <span class="etiqueta">suplente</span>
+                        <?php else: ?>
+                            <span class="etiqueta">inactivo</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($puedeEscribir && !$primario && !$retirado): ?>
+                        <div class="flex flex-wrap gap-2">
+                            <form method="post" action="/panel/ia/activo">
+                                <?= $ctx->csrf->campoOculto() ?>
+                                <input type="hidden" name="id" value="<?= $e((string) $m['id']) ?>">
+                                <button type="submit" class="boton-secundario">
+                                    <?= (int) $m['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
+                                </button>
+                            </form>
+                            <?php if ($puedePromover && (int) $m['costos_verificados'] === 1): ?>
+                            <form method="post" action="/panel/ia/promover">
+                                <?= $ctx->csrf->campoOculto() ?>
+                                <input type="hidden" name="id" value="<?= $e((string) $m['id']) ?>">
+                                <button type="submit" class="boton-secundario">Poner en uso</button>
+                            </form>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        </div>
+    </section>
+    <?php endif; ?>
 
-        <form method="post" action="/panel/ia/proveedor" class="tarjeta mt-3 p-4">
-            <?= $ctx->csrf->campoOculto() ?>
+    <?php /* ── El cajón: el catálogo entero ──────────────────────────── */ ?>
+    <?php if ($catalogo !== []): ?>
+    <section class="mt-8">
+        <details>
+            <summary class="cursor-pointer text-sm font-medium">
+                Catálogo descubierto — <?= count($catalogo) ?> modelo(s) que ningún
+                proveedor ha configurado todavía
+            </summary>
 
-            <?php if ($disponibles !== []): ?>
-            <p class="text-sm">
-                Conocidos sin dar de alta:
-                <?php foreach ($disponibles as $clave => $d): ?>
-                    <button type="submit" name="clave" value="<?= $e((string) $clave) ?>"
-                            class="boton-secundario mt-1"><?= $e((string) $d['nombre']) ?></button>
+            <p class="mt-2 text-sm text-acero">
+                Lo que cada proveedor anuncia hoy. Entran solos e inactivos: para usar uno,
+                elíjalo arriba. Un catálogo compatible con OpenAI devuelve además todo lo
+                que el proveedor tenga publicado —transcripción, imágenes, moderación,
+                instantáneas viejas—, así que la lista es larga y mayormente irrelevante.
+            </p>
+
+            <input type="search" id="filtro-catalogo" class="campo mt-3"
+                   placeholder="Filtrar por identificador o proveedor…" autocomplete="off">
+
+            <div class="mt-3 overflow-x-auto" style="max-height:24rem;overflow-y:auto">
+            <table class="tabla">
+                <thead>
+                    <tr><th>Modelo</th><th>Proveedor</th><th>Contexto</th></tr>
+                </thead>
+                <tbody id="cuerpo-catalogo">
+                <?php foreach ($catalogo as $m): ?>
+                    <tr data-busca="<?= $e(mb_strtolower(
+                        $m['identificador'] . ' ' . $m['proveedor_clave']
+                    )) ?>" class="<?= $m['retirado_en'] !== null ? 'opacity-50' : '' ?>">
+                        <td class="font-mono text-xs"><?= $e((string) $m['identificador']) ?></td>
+                        <td class="text-xs"><?= $e((string) $m['proveedor_clave']) ?></td>
+                        <td class="text-xs text-acero">
+                            <?= $m['ventana_contexto'] !== null
+                                ? number_format((int) $m['ventana_contexto'], 0, ',', '.')
+                                : '—' ?>
+                        </td>
+                    </tr>
                 <?php endforeach; ?>
-            </p>
-            <p class="mt-2 text-xs text-acero">
-                Pulsar uno lo da de alta con sus valores. Para otro cualquiera, use el
-                formulario de abajo.
-            </p>
-            <?php endif; ?>
+                </tbody>
+            </table>
+            </div>
+        </details>
+    </section>
+    <?php endif; ?>
 
-            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+    <?php /* ── Dar de alta un proveedor a mano ───────────────────────── */ ?>
+    <?php if ($puedeEscribir): ?>
+    <section class="mt-8">
+        <details>
+            <summary class="cursor-pointer text-sm font-medium">
+                Añadir un proveedor que no está en la lista
+            </summary>
+
+            <p class="mt-2 text-sm text-acero">
+                Cualquier endpoint compatible con OpenAI. Nace inactivo: darlo de alta
+                no lo mete en la cascada.
+            </p>
+
+            <form method="post" action="/panel/ia/proveedor" class="mt-3 grid gap-3 sm:grid-cols-2">
+                <?= $ctx->csrf->campoOculto() ?>
                 <div>
                     <label class="rotulo">Clave</label>
-                    <input name="clave" class="campo mt-1 font-mono" placeholder="mi-proveedor">
+                    <input name="clave" class="campo font-mono" placeholder="mi-proveedor">
                 </div>
                 <div>
                     <label class="rotulo">Nombre visible</label>
-                    <input name="nombre" class="campo mt-1" placeholder="Mi proveedor">
+                    <input name="nombre" class="campo" placeholder="Mi proveedor">
                 </div>
                 <div class="sm:col-span-2">
                     <label class="rotulo">URL base</label>
-                    <input name="base_url" class="campo mt-1 font-mono"
+                    <input name="base_url" class="campo font-mono"
                            placeholder="https://api.ejemplo.com/v1">
                 </div>
                 <div>
                     <label class="rotulo">Formato de API</label>
-                    <select name="formato_api" class="campo mt-1">
+                    <select name="formato_api" class="campo">
                         <option value="openai_compatible">Compatible con OpenAI</option>
                         <option value="anthropic">Anthropic</option>
                         <option value="ollama">Ollama</option>
@@ -364,209 +478,19 @@ $contenido = static function () use (
                 </div>
                 <div>
                     <label class="rotulo">País del servidor</label>
-                    <input name="pais_servidor" class="campo mt-1" placeholder="Estados Unidos">
+                    <input name="pais_servidor" class="campo" placeholder="Estados Unidos">
                     <p class="mt-1 text-xs text-acero">
-                        Dato de cumplimiento: si el contenido de los casos sale de Colombia,
-                        el aviso de habeas data debe declarar transferencia internacional.
+                        Si el contenido de los casos sale de Colombia, el aviso de habeas
+                        data debe declarar transferencia internacional.
                     </p>
                 </div>
-            </div>
-
-            <button type="submit" class="boton mt-4">Dar de alta</button>
-        </form>
+                <div class="sm:col-span-2">
+                    <button type="submit" class="boton">Dar de alta</button>
+                </div>
+            </form>
+        </details>
     </section>
     <?php endif; ?>
-
-    <?php if ($puedeEscribir): ?>
-    <section class="mt-10">
-        <h2 class="rotulo">Credenciales de los proveedores</h2>
-        <p class="mt-2 text-sm text-acero">
-            Van aquí y no en Pagos: una llave de LLM no es una pasarela de cobro, y quien
-            la busque no va a mirar ahí. Se guardan cifradas con el mismo mecanismo
-            (AES-256-GCM) y <strong>el valor no vuelve a salir nunca</strong> por esta
-            pantalla — solo la máscara.
-        </p>
-
-        <?php foreach ($proveedores as $p):
-            $cred = $credenciales[(string) $p['clave']] ?? null;
-            if ($cred === null) {
-                continue;
-            }
-            $guardada = $cred['filas'][0] ?? null;
-            ?>
-        <form method="post" action="/panel/ia/credencial" class="tarjeta mt-4 p-4">
-            <?= $ctx->csrf->campoOculto() ?>
-            <input type="hidden" name="servicio" value="<?= $e((string) $p['clave']) ?>">
-
-            <div class="flex flex-wrap items-baseline gap-x-3">
-                <span class="font-medium"><?= $e((string) $p['nombre']) ?></span>
-                <span class="font-mono text-xs text-acero"><?= $e($cred['clave']) ?></span>
-                <?php if ($guardada !== null): ?>
-                    <span class="mascara"><?= $e((string) $guardada['mascara']) ?></span>
-                    <span class="text-xs text-acero">
-                        guardada el <?= $e((string) $guardada['actualizado_en']) ?>
-                    </span>
-                <?php else: ?>
-                    <span class="etiqueta etiqueta-error">sin guardar</span>
-                <?php endif; ?>
-            </div>
-
-            <div class="mt-3 flex flex-wrap items-end gap-2">
-                <input name="valor" type="password" autocomplete="off"
-                       class="campo font-mono" style="max-width:26rem"
-                       placeholder="<?= $guardada !== null ? 'Escriba una nueva para reemplazarla' : 'Pegue la llave aquí' ?>">
-                <button type="submit" class="boton-secundario">Guardar</button>
-            </div>
-        </form>
-        <?php endforeach; ?>
-    </section>
-    <?php endif; ?>
-
-    <section class="mt-10">
-        <h2 class="rotulo">Modelos</h2>
-
-        <?php if ($modelos === []): ?>
-            <p class="mt-3 text-sm text-acero">
-                Todavía no hay modelos. Corra la sincronización.
-            </p>
-        <?php endif; ?>
-
-        <?php foreach ($modelos as $m):
-            $retirado = $m['retirado_en'] !== null;
-            $verificado = (int) $m['costos_verificados'] === 1;
-            $primario = (int) $m['es_primario'] === 1;
-            ?>
-        <article class="tarjeta mt-4 p-4 <?= $retirado ? 'opacity-60' : '' ?>">
-
-            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="font-mono font-medium"><?= $e((string) $m['identificador']) ?></span>
-                <span class="text-sm text-acero"><?= $e((string) $m['nombre_visible']) ?></span>
-
-                <?php if ($primario): ?>
-                    <span class="etiqueta etiqueta-ok">primario</span>
-                <?php endif; ?>
-                <?php if ($retirado): ?>
-                    <span class="etiqueta etiqueta-error">retirado por el proveedor</span>
-                <?php elseif (!$verificado): ?>
-                    <span class="etiqueta etiqueta-aviso">nuevo · sin costo verificado</span>
-                <?php elseif ((int) $m['activo'] === 0): ?>
-                    <span class="etiqueta">inactivo</span>
-                <?php endif; ?>
-            </div>
-
-            <dl class="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                    <dt class="text-xs text-acero">Proveedor</dt>
-                    <dd><?= $e((string) $m['proveedor_clave']) ?></dd>
-                </div>
-                <div>
-                    <dt class="text-xs text-acero">Propósito</dt>
-                    <dd><?= $e((string) $m['proposito']) ?></dd>
-                </div>
-                <div>
-                    <dt class="text-xs text-acero">Ventana de contexto</dt>
-                    <dd class="font-mono">
-                        <?= $m['ventana_contexto'] === null
-                            ? '—'
-                            : $e(number_format((int) $m['ventana_contexto'], 0, ',', '.')) ?>
-                    </dd>
-                </div>
-                <div>
-                    <dt class="text-xs text-acero">Costo USD / 1M (ent · sal)</dt>
-                    <dd class="font-mono">
-                        <?= $verificado
-                            ? $e((string) $m['costo_entrada_usd_1m']) . ' · '
-                              . $e((string) $m['costo_salida_usd_1m'])
-                            : '<span class="text-sello">sin registrar</span>' ?>
-                    </dd>
-                </div>
-            </dl>
-
-            <?php if ($m['costos_verificados_en'] !== null): ?>
-                <p class="mt-1 text-xs text-acero">
-                    Costo verificado el <?= $e((string) $m['costos_verificados_en']) ?>.
-                </p>
-            <?php endif; ?>
-
-            <?php if ((string) $m['proposito'] === 'conversacion'): ?>
-                <p class="mt-1 text-xs text-acero">
-                    Conjunto dorado:
-                    <?php if ((string) $m['dorado_estado'] === 'verde'): ?>
-                        <span class="text-verde">verde</span>
-                        el <?= $e((string) $m['dorado_en']) ?>
-                        · <?= (int) $m['dorado_casos'] ?> casos
-                    <?php elseif ((string) $m['dorado_estado'] === 'rojo'): ?>
-                        <span class="text-sello">rojo</span>
-                        el <?= $e((string) $m['dorado_en']) ?>
-                        · <?= (int) $m['dorado_fallos'] ?> de <?= (int) $m['dorado_casos'] ?> en rojo
-                    <?php else: ?>
-                        <span class="text-sello">sin correr</span>
-                    <?php endif; ?>
-                </p>
-            <?php endif; ?>
-
-            <?php if (($puedeEscribir || $puedePromover) && !$retirado): ?>
-            <div class="mt-3 flex flex-wrap items-end gap-3 border-t border-acero/15 pt-3">
-
-                <?php if ($puedeEscribir): ?>
-                <form method="post" action="/panel/ia/costo" class="flex flex-wrap items-end gap-2">
-                    <?= $ctx->csrf->campoOculto() ?>
-                    <input type="hidden" name="id" value="<?= $e((string) $m['id']) ?>">
-                    <label class="text-xs text-acero">
-                        Entrada
-                        <input name="costo_entrada_usd_1m" class="campo mt-1 w-24 font-mono"
-                               inputmode="decimal"
-                               value="<?= $e((string) ($m['costo_entrada_usd_1m'] ?? '')) ?>">
-                    </label>
-                    <label class="text-xs text-acero">
-                        Salida
-                        <input name="costo_salida_usd_1m" class="campo mt-1 w-24 font-mono"
-                               inputmode="decimal"
-                               value="<?= $e((string) ($m['costo_salida_usd_1m'] ?? '')) ?>">
-                    </label>
-                    <button type="submit" class="boton-secundario">Guardar costo</button>
-                </form>
-                <?php endif; ?>
-
-                <?php if ($puedeEscribir && !$primario): ?>
-                <form method="post" action="/panel/ia/activo">
-                    <?= $ctx->csrf->campoOculto() ?>
-                    <input type="hidden" name="id" value="<?= $e((string) $m['id']) ?>">
-                    <button type="submit" class="boton-secundario">
-                        <?= (int) $m['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
-                    </button>
-                </form>
-                <?php endif; ?>
-
-                <?php
-                /* Ascender es del abogado (ia.modelos.promover), no del
-                   super_admin: es la firma sobre lo que el bot dirá, no una
-                   tarea técnica. Ver ADR-007 y ADR-016. */
-                ?>
-                <?php if ($puedePromover && !$primario):
-                    $gate = $gates[(string) $m['id']] ?? ['ok' => false, 'motivo' => ''];
-                    $listo = $verificado && $gate['ok'];
-                    ?>
-                <form method="post" action="/panel/ia/promover">
-                    <?= $ctx->csrf->campoOculto() ?>
-                    <input type="hidden" name="id" value="<?= $e((string) $m['id']) ?>">
-                    <button type="submit" class="boton" <?= $listo ? '' : 'disabled' ?>>
-                        Hacer primario
-                    </button>
-                </form>
-                <?php if (!$listo): ?>
-                    <p class="text-xs text-sello">
-                        <?= $e($verificado
-                            ? (string) $gate['motivo']
-                            : 'Falta registrar y verificar el costo.') ?>
-                    </p>
-                <?php endif; ?>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
-        </article>
-        <?php endforeach; ?>
-    </section>
 
     <?php
 };
@@ -574,12 +498,10 @@ $contenido = static function () use (
 /**
  * Script de la pantalla.
  *
- * Solo hace una cosa que no se puede hacer sin él: pedir los modelos del
- * proveedor elegido mientras alguien está eligiendo. El resto —guardar,
- * probar— son formularios normales que funcionan igual con JS apagado.
- *
- * Los datos van embebidos como JSON y no repartidos en atributos `data-`
- * porque son mapas, no valores sueltos.
+ * Dos cosas que no se pueden hacer sin él: pedir los modelos del proveedor
+ * elegido mientras alguien está eligiendo, y filtrar un catálogo de
+ * trescientas filas sin recargar. Todo lo demás son formularios normales que
+ * funcionan igual con JS apagado.
  */
 $scripts = static function () use ($elegibles, $costosConocidos, $enUso): void {
     $aJson = static fn (mixed $v): string => (string) json_encode(
@@ -603,8 +525,7 @@ const selProveedor = $('campo-proveedor');
 const selModelo = $('campo-modelo');
 const otroModelo = $('campo-modelo-otro');
 
-// La pantalla solo existe para quien puede escribir; sin el select no hay
-// nada que animar.
+// La pantalla solo existe entera para quien puede escribir.
 if (selProveedor) {
     selProveedor.addEventListener('change', alCambiarProveedor);
     selModelo.addEventListener('change', alCambiarModelo);
@@ -615,9 +536,9 @@ function alCambiarProveedor() {
     const clave = selProveedor.value;
     const info = PROVEEDORES[clave] || {};
 
-    // La URL base solo se pide cuando no la sabemos: un proveedor conocido
-    // ya la trae, y ofrecer el campo invita a escribir una que no es.
-    $('grupo-url').classList.toggle('hidden', Boolean(info.dadoDeAlta) || esConocido(clave));
+    // La URL base solo se pide cuando no la sabemos: un proveedor conocido ya
+    // la trae, y ofrecer el campo invita a escribir una que no es.
+    $('grupo-url').classList.toggle('hidden', Boolean(info.formato_api));
 
     $('pais-proveedor').textContent = info.pais_servidor
         ? 'Procesa en: ' + info.pais_servidor
@@ -627,8 +548,8 @@ function alCambiarProveedor() {
     campoClave.value = '';
 
     // Nunca la llave: solo su máscara, y el aviso de que dejarlo vacío la
-    // conserva. Si no se dijera, cambiar de modelo obligaría a volver a
-    // pegarla, y quien no la tenga a mano la borraría sin querer.
+    // conserva. Sin decirlo, cambiar de modelo obligaría a volver a pegarla y
+    // quien no la tenga a mano la borraría sin querer.
     if (info.clave_guardada) {
         campoClave.placeholder = 'Guardada: ' + info.clave_guardada + ' — escriba solo para reemplazarla';
         $('clave-estado').textContent = 'Hay una llave guardada y cifrada. Deje el campo vacío para conservarla.';
@@ -638,11 +559,6 @@ function alCambiarProveedor() {
     }
 
     cargarModelos(clave);
-}
-
-function esConocido(clave) {
-    const info = PROVEEDORES[clave];
-    return Boolean(info && info.formato_api && !info.personalizado);
 }
 
 async function cargarModelos(clave) {
@@ -685,8 +601,8 @@ async function cargarModelos(clave) {
 function alCambiarModelo() {
     const otro = selModelo.value === '__otro__';
     otroModelo.classList.toggle('hidden', !otro);
-    // El `name` se mueve para que solo uno de los dos campos viaje: si los
-    // dos se llamaran `modelo`, ganaría el último y sería el equivocado.
+    // El `name` se mueve para que solo uno de los dos campos viaje: si los dos
+    // se llamaran `modelo`, ganaría el último y sería el equivocado.
     selModelo.name = otro ? '' : 'modelo';
     otroModelo.name = otro ? 'modelo' : '';
 
@@ -705,7 +621,7 @@ function alCambiarModelo() {
         salida.value = String(parseFloat(conocido.salida));
         $('costo-nota').textContent = conocido.verificado
             ? 'Costo ya verificado. Guardar lo vuelve a confirmar a su nombre.'
-            : 'Costo precargado sin verificar: compruébelo en la página de precios del proveedor antes de guardar.';
+            : 'Costo precargado sin verificar: compruébelo en la página de precios del proveedor.';
         return;
     }
 
@@ -713,6 +629,19 @@ function alCambiarModelo() {
     salida.value = '';
     $('costo-nota').textContent = 'Ningún proveedor publica precios en su endpoint de modelos. '
         + 'Sin costo, el corte por presupuesto mensual no corta y el modelo queda inactivo.';
+}
+
+// Filtro del catálogo. Sin esto, trescientas filas son un muro.
+const filtro = $('filtro-catalogo');
+
+if (filtro) {
+    filtro.addEventListener('input', () => {
+        const q = filtro.value.trim().toLowerCase();
+
+        for (const fila of $('cuerpo-catalogo').rows) {
+            fila.hidden = q !== '' && !fila.dataset.busca.includes(q);
+        }
+    });
 }
     <?php
 };
