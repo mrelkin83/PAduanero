@@ -36,7 +36,10 @@ require $raiz . '/vendor/autoload.php';
 try {
     $contenedor = (new Aplicacion($raiz))->contenedor;
 
-    $resumen = $contenedor->obtener(CatalogoModelos::class)->sincronizarTodo();
+    // Solo los activos: el cron corre a diario y no tiene sentido gastar una
+    // petición contra un proveedor que nadie usa. El panel, en cambio, los
+    // consulta todos — ahí el que pulsa está esperando el resultado.
+    $resumen = $contenedor->obtener(CatalogoModelos::class)->sincronizarTodo(soloActivos: true);
 
     if ($resumen === []) {
         fwrite(STDERR, 'No hay proveedores de IA activos. Nada que sincronizar.' . PHP_EOL);

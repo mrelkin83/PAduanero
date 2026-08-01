@@ -626,3 +626,42 @@ compilada en el servidor.
     Es la misma disciplina que `Credenciales::obtener()`, que no se expone por
     HTTP jamás. La diferencia entre ambos casos es solo el destino de la fuga:
     allí el navegador, aquí el proveedor del LLM (regla 13).
+19. Añadir una variable a una plantilla del panel sin ponerla en la lista
+    `use` de su clausura `$contenido`. Dentro vale «indefinido», y el `?? 0`
+    o el `?? []` de la línea que la usa la convierte en un valor **creíble y
+    falso**, sin error, sin aviso y sin página en blanco.
+
+    Ocurrió: `panel/ia.php` pintaba «—» en la columna «Modelos» para un
+    proveedor que tenía 336 en la base. Nadie investiga un cero razonable.
+
+    Lo cubre `PlantillasCapturanSusVariablesTest`, que compara las variables
+    que el cuerpo de cada clausura **lee** contra las que **captura**. El
+    aislamiento de la clausura vale la pena —impide que una plantilla lea
+    datos que el controlador no le pasó— pero la lista tiene doce nombres,
+    hay que tocarla cada vez que llega un dato nuevo, y olvidarla no rompe
+    nada visible. El patrón invita al defecto; por eso lleva cinturón.
+
+20. Abortar un descubrimiento de modelos porque no hay credencial guardada.
+    **Decide el proveedor, no nosotros.** OpenRouter lista su catálogo sin
+    autenticar y Ollama tampoco pide nada: negarse a preguntar dejaba «No hay
+    credencial» en pantalla para un endpoint que habría contestado con 336
+    modelos.
+
+    Y cuando la llave sí hace falta, el 401 del proveedor distingue «no
+    mandaste llave» de «la llave no vale», que es justo lo que uno necesita
+    saber en ese momento. El nuestro no distinguía.
+
+    La regla general: **un guardia propio que se adelanta al servicio remoto
+    solo puede dar peor diagnóstico que él.** Adelantarse se justifica para
+    no gastar dinero o no filtrar datos; para no gastar una petición GET a un
+    catálogo público, no.
+
+21. Consultar solo los proveedores activos al sincronizar desde el panel. Un
+    proveedor nace inactivo a propósito (ADR-016), así que lo primero que uno
+    hace tras darlo de alta —ver qué modelos ofrece— no funcionaba nunca, y
+    sin explicación. Descubrir es una lectura: no enciende nada y los modelos
+    siguen entrando inactivos y sin costo.
+
+    El cron sí salta los apagados (`sincronizarTodo(soloActivos: true)`):
+    corre a diario y ahí la petición contra un proveedor que nadie usa sí
+    sobra. Quien pulsa en el panel está esperando el resultado; el cron no.

@@ -135,10 +135,21 @@ final class IaControlador extends ControladorBase
             }
         }
 
+        // Cuántos modelos tiene cada proveedor en el catálogo. Sin esto, la
+        // fila de un proveedor recién sincronizado se ve igual que la de uno
+        // que nunca trajo nada.
+        $conteoModelos = [];
+
+        foreach ($modelos as $m) {
+            $k = (string) $m['proveedor_clave'];
+            $conteoModelos[$k] = ($conteoModelos[$k] ?? 0) + 1;
+        }
+
         return $this->vista('panel/ia', [
             'ctx' => $ctx,
             'proveedores' => $proveedores,
             'modelos' => $modelos,
+            'conteoModelos' => $conteoModelos,
             'credenciales' => $credenciales,
             'referencia' => $referencia,
             'disponibles' => CatalogoProveedores::disponibles(array_column($proveedores, 'clave')),
@@ -377,7 +388,7 @@ final class IaControlador extends ControladorBase
         $resumen = $this->catalogo->sincronizarTodo();
 
         if ($resumen === []) {
-            return $this->redirigirCon('/panel/ia', 'error', 'No hay proveedores activos.');
+            return $this->redirigirCon('/panel/ia', 'error', 'No hay proveedores registrados.');
         }
 
         $nuevos = array_sum(array_column($resumen, 'nuevos'));
@@ -411,6 +422,75 @@ final class IaControlador extends ControladorBase
                 ? 'Catálogo al día. Ningún modelo nuevo.'
                 : $nuevos . ' modelo(s) nuevo(s). Registre su costo antes de activarlos.',
         );
+    }
+
+    /**
+     * Carga los modelos de UN proveedor, ahora mismo.
+     *
+     * Es el botón que faltaba. «Sincronizar ahora» consulta a todos y su
+     * mensaje habla de totales, así que el resultado del proveedor que acabas
+     * de dar de alta se pierde entre los demás. Aquí el mensaje es de ese
+     * proveedor: cuántos modelos trajo, o exactamente por qué no trajo ninguno.
+     *
+     * Funciona con el proveedor apagado a propósito. Descubrir es una lectura;
+     * exigir encenderlo antes obligaba a activar un proveedor cuya credencial
+     * todavía no se sabe si sirve.
+     */
+    public function sincronizarProveedor(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+
+        $clave = $ctx->campo('clave');
+        $resultado = $this->catalogo->sincronizarPorClave($clave);
+
+        if ($resultado === null) {
+            return $this->redirigirCon('/panel/ia', 'error', 'Ese proveedor no existe.');
+        }
+
+        $this->auditoria->registrar(
+            'catalogo_modelos',
+            null,
+            'sincronizar',
+            $ctx->actor(),
+            ['proveedor' => $clave, 'ok' => $resultado['ok'], 'nuevos' => $resultado['nuevos']],
+            $ctx->ip(),
+        );
+
+        if (!$resultado['ok']) {
+            return $this->redirigirCon(
+                '/panel/ia',
+                'error',
+                $clave . ' — ' . $resultado['error'],
+            );
+        }
+
+        $total = $resultado['nuevos'] + $resultado['vistos'];
+
+        // El caso «0 y 0» es real y desconcertante: el proveedor contestó, pero
+        // su lista vino vacía. Sin decirlo, parece que el botón no hizo nada.
+        if ($total === 0) {
+            return $this->redirigirCon(
+                '/panel/ia',
+                'error',
+                $clave . ' respondió, pero no anunció ningún modelo. '
+                . 'Suele ser una credencial sin acceso al catálogo.',
+            );
+        }
+
+        $texto = $clave . ': ' . $total . ' modelo(s) en su catálogo';
+
+        if ($resultado['nuevos'] > 0) {
+            $texto .= ', ' . $resultado['nuevos'] . ' nuevo(s). '
+                . 'Registre su costo para poder activarlos.';
+        } else {
+            $texto .= '. Ninguno nuevo desde la última vez.';
+        }
+
+        if ($resultado['retirados'] > 0) {
+            $texto .= ' ' . $resultado['retirados'] . ' dejó de anunciarlo(s) y quedan retirados.';
+        }
+
+        return $this->redirigirCon('/panel/ia', 'ok', $texto);
     }
 
     /**

@@ -152,6 +152,7 @@ final class Panel
             'POST /ia/proveedor/activo' => $modulos['ia']->alternarProveedor($ctx),
             'POST /ia/credencial' => $modulos['ia']->guardarCredencial($ctx),
             'POST /ia/sincronizar' => $modulos['ia']->sincronizar($ctx),
+            'POST /ia/proveedor/sincronizar' => $modulos['ia']->sincronizarProveedor($ctx),
             'POST /ia/costo' => $modulos['ia']->guardarCosto($ctx),
             'POST /ia/activo' => $modulos['ia']->alternarActivo($ctx),
             'POST /ia/promover' => $modulos['ia']->promover($ctx),

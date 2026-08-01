@@ -314,8 +314,16 @@ final class CatalogoModelosTest extends CasoBaseBd
         $this->catalogo([new ModeloDescubierto('claude-opus-6', 'Claude Opus 6')])->sincronizarTodo();
         $this->catalogo(new DescubrimientoFallido('credencial rechazada'))->sincronizarTodo();
 
+        // Solo las de `anthropic`: la corrida consulta a todos los proveedores
+        // registrados —incluidos los apagados, que es lo que hace útil el
+        // botón «Cargar modelos»— y los demás no tienen descubridor de prueba.
         $filas = $this->bd->pdo()
-            ->query('SELECT ok, nuevos, error FROM sincronizaciones_modelos ORDER BY id')
+            ->query(
+                'SELECT s.ok, s.nuevos, s.error
+                   FROM sincronizaciones_modelos s
+                   JOIN proveedores_ia p ON p.id = s.proveedor_id
+                  WHERE p.clave = \'anthropic\' ORDER BY s.id'
+            )
             ->fetchAll();
 
         self::assertCount(2, $filas);
@@ -341,6 +349,137 @@ final class CatalogoModelosTest extends CasoBaseBd
         self::assertTrue($porClave['anthropic']['ok']);
         self::assertFalse($porClave['openai']['ok']);
         self::assertStringContainsString('descubridor', (string) $porClave['openai']['error']);
+    }
+
+    // ── Los dos callejones sin salida del alta de un proveedor ───────────
+    //
+    // Los dos daban el mismo síntoma: das de alta un proveedor, pulsas para
+    // traer sus modelos y no aparece ninguno. Uno en silencio, el otro con un
+    // error que culpaba a la credencial equivocadamente.
+
+    #[Test]
+    public function seConsultanTambienLosProveedoresApagados(): void
+    {
+        // Un proveedor nace inactivo a propósito. Si la sincronización
+        // saltaba los inactivos, lo primero que uno hace tras darlo de alta
+        // —ver qué ofrece— no funcionaba nunca, y sin explicación.
+        //
+        // Descubrir es una lectura: no enciende nada y los modelos siguen
+        // entrando inactivos y sin costo.
+        $this->bd->pdo()->exec("UPDATE proveedores_ia SET activo = 0 WHERE clave = 'anthropic'");
+
+        $resumen = $this->catalogo([new ModeloDescubierto('claude-opus-6', 'Claude Opus 6')])
+            ->sincronizarTodo();
+
+        self::assertContains('anthropic', array_column($resumen, 'proveedor'));
+        self::assertNotNull($this->modelo('claude-opus-6'));
+    }
+
+    #[Test]
+    public function elCronSiSaltaLosApagadosParaNoGastarPeticiones(): void
+    {
+        // La otra mitad: a diario, y contra proveedores que nadie usa, la
+        // petición sí sobra. Quien pulsa en el panel está esperando; el cron
+        // no.
+        $this->bd->pdo()->exec("UPDATE proveedores_ia SET activo = 0 WHERE clave = 'anthropic'");
+
+        $resumen = $this->catalogo([new ModeloDescubierto('claude-opus-6', 'Claude Opus 6')])
+            ->sincronizarTodo(soloActivos: true);
+
+        self::assertNotContains('anthropic', array_column($resumen, 'proveedor'));
+    }
+
+    #[Test]
+    public function sinCredencialGuardadaSePreguntaIgualYDecideElProveedor(): void
+    {
+        // Antes se abortaba antes de salir a la red con «No hay credencial».
+        // Eso rompía los catálogos públicos —OpenRouter lista sin autenticar,
+        // Ollama tampoco pide nada— y forzaba a conseguir una llave antes de
+        // poder mirar qué modelos ofrece un proveedor.
+        //
+        // Cuando la llave sí hace falta, el 401 del proveedor distingue «no
+        // mandaste llave» de «la llave no vale». El nuestro no distinguía.
+        $catalogo = new CatalogoModelos(
+            $this->bd,
+            $this->credencialesQueNoTienenNada(),
+            Logger::desdeEntorno(),
+            [$this->descubridorQueExigeSecretoNulo()],
+        );
+
+        $resumen = $catalogo->sincronizarTodo();
+        $anthropic = array_values(array_filter(
+            $resumen,
+            static fn (array $f): bool => $f['proveedor'] === 'anthropic',
+        ))[0];
+
+        self::assertTrue($anthropic['ok'], (string) $anthropic['error']);
+        self::assertNotNull($this->modelo('modelo-de-catalogo-publico'));
+    }
+
+    #[Test]
+    public function sincronizarUnProveedorQueNoExisteDevuelveNuloEnVezDeReventar(): void
+    {
+        $catalogo = $this->catalogo([new ModeloDescubierto('claude-opus-6', 'Claude Opus 6')]);
+
+        self::assertNull($catalogo->sincronizarPorClave('proveedor-inventado'));
+        self::assertIsArray($catalogo->sincronizarPorClave('anthropic'));
+    }
+
+    private function credencialesQueNoTienenNada(): Credenciales
+    {
+        return new class implements Credenciales {
+            public function obtener(string $servicio, string $clave, string $entorno = 'produccion'): string
+            {
+                throw new \App\Excepciones\CredencialNoEncontradaException(
+                    "No hay credencial activa para {$servicio}.{$clave}."
+                );
+            }
+
+            public function guardar(
+                string $servicio,
+                string $clave,
+                string $valor,
+                string $entorno,
+                string $usuarioId,
+            ): array {
+                return ['mascara' => '****'];
+            }
+
+            public function probar(string $servicio, string $entorno): array
+            {
+                return ['ok' => true, 'mensaje' => ''];
+            }
+
+            public function rotarClaveMaestra(string $nuevaClave): void
+            {
+            }
+        };
+    }
+
+    private function descubridorQueExigeSecretoNulo(): Descubridor
+    {
+        return new class implements Descubridor {
+            public function formato(): string
+            {
+                return 'anthropic';
+            }
+
+            public function claveCredencial(): ?string
+            {
+                return 'api_key';
+            }
+
+            public function listar(string $baseUrl, ?string $secreto): array
+            {
+                // Lo que se comprueba de verdad: que se llega hasta aquí, y
+                // que se llega con `null` en vez de con una excepción.
+                if ($secreto !== null) {
+                    throw new \RuntimeException('debía llegar sin secreto');
+                }
+
+                return [new ModeloDescubierto('modelo-de-catalogo-publico', 'Público')];
+            }
+        };
     }
 
     // ── Semillas ─────────────────────────────────────────────────────────

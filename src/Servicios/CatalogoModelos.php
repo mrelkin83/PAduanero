@@ -66,12 +66,27 @@ final class CatalogoModelos
      *
      * @return list<array{proveedor:string,ok:bool,nuevos:int,vistos:int,retirados:int,error:?string}>
      */
-    public function sincronizarTodo(): array
+    public function sincronizarTodo(bool $soloActivos = false): array
     {
-        $proveedores = $this->bd->pdo()->query(
-            'SELECT id, clave, nombre, base_url, formato_api
-               FROM proveedores_ia WHERE activo = 1 ORDER BY clave'
-        )->fetchAll();
+        // Por defecto se consultan TODOS los proveedores, activos o no.
+        //
+        // Descubrir es una lectura: no enciende nada, no mete nada en la
+        // cascada, y los modelos siguen entrando inactivos y sin costo. Pero
+        // saltarse los inactivos convertía el alta de un proveedor en un
+        // callejón sin salida: dabas de alta DeepSeek, guardabas su llave,
+        // pulsabas sincronizar y no pasaba nada — sin error y sin explicación,
+        // porque el proveedor nacía apagado.
+        //
+        // `$soloActivos` existe para el cron: ahí sí interesa no gastar
+        // peticiones diarias contra proveedores que nadie usa.
+        $sql = 'SELECT id, clave, nombre, base_url, formato_api, activo
+                  FROM proveedores_ia';
+
+        if ($soloActivos) {
+            $sql .= ' WHERE activo = 1';
+        }
+
+        $proveedores = $this->bd->pdo()->query($sql . ' ORDER BY activo DESC, clave')->fetchAll();
 
         $resumen = [];
 
@@ -80,6 +95,27 @@ final class CatalogoModelos
         }
 
         return $resumen;
+    }
+
+    /**
+     * Un proveedor concreto, por su clave.
+     *
+     * Lo usa el botón «Cargar modelos» de cada fila del panel. Existe porque
+     * el caso normal es querer los modelos de UNO —el que se acaba de dar de
+     * alta— y no pagar la espera de consultarlos todos.
+     *
+     * @return array{proveedor:string,ok:bool,nuevos:int,vistos:int,retirados:int,error:?string}|null
+     */
+    public function sincronizarPorClave(string $clave): ?array
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT id, clave, nombre, base_url, formato_api, activo
+               FROM proveedores_ia WHERE clave = ?'
+        );
+        $stmt->execute([$clave]);
+        $proveedor = $stmt->fetch();
+
+        return $proveedor === false ? null : $this->sincronizar($proveedor);
     }
 
     /**
@@ -307,6 +343,23 @@ final class CatalogoModelos
         }
     }
 
+    /**
+     * La credencial del proveedor, si la hay.
+     *
+     * Sin credencial se intenta igual, con `null`, y **decide el proveedor**.
+     * Antes se abortaba aquí, y eso rompía dos casos reales:
+     *
+     *  · Catálogos públicos. OpenRouter lista sus modelos sin autenticar y
+     *    Ollama tampoco pide nada. Negarse a preguntar dejaba «No hay
+     *    credencial» en pantalla para un endpoint que habría contestado.
+     *  · El orden natural de trabajo. Das de alta un proveedor y lo primero
+     *    que quieres es ver qué ofrece, antes de ir a por una llave. Exigirla
+     *    para mirar invierte ese orden sin ganar nada.
+     *
+     * Y cuando sí hace falta, el 401 del proveedor es mejor diagnóstico que
+     * el nuestro: distingue «no mandaste llave» de «la llave no vale», que es
+     * justo lo que uno necesita saber en ese momento.
+     */
     private function secreto(Descubridor $descubridor, string $claveProveedor): ?string
     {
         $clave = $descubridor->claveCredencial();
@@ -315,7 +368,11 @@ final class CatalogoModelos
             return null;
         }
 
-        return $this->credenciales->obtener($claveProveedor, $clave);
+        try {
+            return $this->credenciales->obtener($claveProveedor, $clave);
+        } catch (CredencialNoEncontradaException) {
+            return null;
+        }
     }
 
     /** @param array{nuevos:int,vistos:int,retirados:int} $conteo */

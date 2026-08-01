@@ -8,6 +8,7 @@ use App\Soporte\Vista;
  * @var \App\Panel\Contexto $ctx
  * @var list<array<string,mixed>> $proveedores
  * @var list<array<string,mixed>> $modelos
+ * @var array<string,int> $conteoModelos
  * @var array<string,array{clave:string,filas:list<array<string,mixed>>}> $credenciales
  * @var array<string,list<string>> $referencia
  * @var array<string,array<string,mixed>> $disponibles
@@ -25,6 +26,7 @@ $contenido = static function () use (
     $ctx,
     $proveedores,
     $modelos,
+    $conteoModelos,
     $credenciales,
     $referencia,
     $disponibles,
@@ -112,6 +114,7 @@ $contenido = static function () use (
                     <th>Proveedor</th>
                     <th>Formato</th>
                     <th>País del servidor</th>
+                    <th>Modelos</th>
                     <th>Última sincronización</th>
                     <th></th>
                 </tr>
@@ -130,6 +133,15 @@ $contenido = static function () use (
                         <?= $e((string) ($p['pais_servidor'] ?? '—')) ?>
                     </td>
                     <td class="text-sm">
+                        <?php $cuantos = $conteoModelos[(string) $p['clave']] ?? 0; ?>
+                        <?php if ($cuantos === 0): ?>
+                            <span class="text-acero">—</span>
+                        <?php else: ?>
+                            <span class="font-medium"><?= $cuantos ?></span>
+                            <span class="text-xs text-acero">en catálogo</span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="text-sm">
                         <?php if ($p['ultima_sincro'] === null): ?>
                             <span class="text-acero">nunca</span>
                         <?php elseif ((int) $p['ultima_ok'] === 1): ?>
@@ -143,13 +155,24 @@ $contenido = static function () use (
                     </td>
                     <td>
                         <?php if ($puedeEscribir): ?>
-                        <form method="post" action="/panel/ia/proveedor/activo">
-                            <?= $ctx->csrf->campoOculto() ?>
-                            <input type="hidden" name="clave" value="<?= $e((string) $p['clave']) ?>">
-                            <button type="submit" class="boton-secundario">
-                                <?= (int) $p['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
-                            </button>
-                        </form>
+                        <div class="flex flex-wrap gap-2">
+                            <?php /* Funciona con el proveedor apagado: descubrir es
+                                    una lectura. Exigir activarlo antes obligaba a
+                                    encender un proveedor cuya credencial todavía no
+                                    se sabe si sirve. */ ?>
+                            <form method="post" action="/panel/ia/proveedor/sincronizar">
+                                <?= $ctx->csrf->campoOculto() ?>
+                                <input type="hidden" name="clave" value="<?= $e((string) $p['clave']) ?>">
+                                <button type="submit" class="boton-secundario">Cargar modelos</button>
+                            </form>
+                            <form method="post" action="/panel/ia/proveedor/activo">
+                                <?= $ctx->csrf->campoOculto() ?>
+                                <input type="hidden" name="clave" value="<?= $e((string) $p['clave']) ?>">
+                                <button type="submit" class="boton-secundario">
+                                    <?= (int) $p['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
+                                </button>
+                            </form>
+                        </div>
                         <?php endif; ?>
                     </td>
                 </tr>
@@ -164,8 +187,9 @@ $contenido = static function () use (
                 ?>
                 <?php if ($refs !== []): ?>
                 <tr>
-                    <td colspan="5" class="text-xs text-acero">
-                        Sin descubrir todavía. Suele ofrecer:
+                    <td colspan="6" class="text-xs text-acero">
+                        Sin descubrir todavía. Pulse «Cargar modelos» para traer los que
+                        anuncia hoy. Suele ofrecer:
                         <span class="font-mono"><?= $e(implode(' · ', $refs)) ?></span>
                         — lista de referencia, no del catálogo.
                     </td>
