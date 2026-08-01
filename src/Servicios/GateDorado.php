@@ -35,6 +35,27 @@ final class GateDorado
     }
 
     /**
+     * ¿Puede este modelo hablar con un cliente?
+     *
+     * Mismo criterio que `puedePromover()`, y adrede: si un suplente de la
+     * cascada pudiera responder con requisitos más laxos que los que se le
+     * exigen a un primario, la firma del abogado sería decorativa — bastaría
+     * con que el primario fallara para que hablara un modelo sin firmar, que
+     * es justo el día en que menos conviene.
+     *
+     * Existen los dos nombres porque los dos sitios preguntan lo mismo desde
+     * intenciones distintas, y leer `puedePromover()` dentro de la cascada
+     * despistaría a quien la revise.
+     *
+     * @param  array<string,mixed> $modelo fila de `modelos_ia`
+     * @return array{ok:bool,motivo:string}
+     */
+    public function puedeResponder(array $modelo): array
+    {
+        return $this->puedePromover($modelo);
+    }
+
+    /**
      * @param  array<string,mixed> $modelo fila de `modelos_ia`
      * @return array{ok:bool,motivo:string}
      */

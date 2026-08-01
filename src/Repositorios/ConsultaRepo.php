@@ -244,8 +244,16 @@ final class ConsultaRepo
         try {
             $pdo->prepare("UPDATE consultas SET estado = 'cancelada' WHERE id = ?")->execute([$id]);
 
+            // La ventana restante, no una nueva. Reagendar no puede regalar
+            // 45 minutos más para pagar.
+            //
+            // Va por `Fechas` y no por `strtotime(...) - time()`: la columna
+            // está en UTC y el reloj de PHP en Bogotá, así que la resta cruda
+            // sale negativa, el `max(1, …)` la convierte en un minuto y la
+            // reserva reagendada caduca casi al instante. Es el mismo defecto
+            // que `puedeResponderIa()` (CONTRATOS.md §Errores 17).
             $minutos = $actual->reservaExpira !== null
-                ? max(1, (int) round((strtotime($actual->reservaExpira) - time()) / 60))
+                ? max(1, Fechas::minutosHastaUtc($actual->reservaExpira))
                 : 45;
 
             $nuevaId = $this->insertarReserva(
@@ -330,7 +338,7 @@ final class ConsultaRepo
         $duracion = (int) $modalidad['duracion_min'];
         $pdo = $this->bd->pdo();
 
-        $diaSemana = (int) date('w', (int) strtotime($fecha));
+        $diaSemana = Fechas::diaSemana($fecha);
 
         $franjas = $pdo->prepare(
             'SELECT hora_inicio, hora_fin FROM horarios

@@ -11,8 +11,24 @@ declare(strict_types=1);
  */
 
 use App\Soporte\Entorno;
+use App\Soporte\Fechas;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
+
+/*
+ * La zona horaria se fija AQUÍ, no en `Aplicacion`.
+ *
+ * `Aplicacion::__construct()` la fija también, y eso está bien en producción,
+ * pero en pruebas significa que la zona depende de si alguna clase anterior
+ * construyó la aplicación. Con esa dependencia, una prueba que compara tiempos
+ * pasa aislada y falla en suite —o al revés— según el orden de ejecución.
+ *
+ * Eso ya pasó una vez, con `puedeResponderIa()`. El defecto era real, pero el
+ * modo de falla es el problema: un fallo que depende del orden se declara
+ * «flaky», alguien con prisa lo marca para saltarlo, y el defecto vuelve
+ * invisible. Fijarla en el arranque quita esa posibilidad de la mesa.
+ */
+date_default_timezone_set(Fechas::ZONA);
 
 // El .env.pruebas es opcional: en CI las variables llegan por el entorno.
 $rutaPruebas = dirname(__DIR__) . '/.env.pruebas';

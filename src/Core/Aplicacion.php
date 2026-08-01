@@ -163,6 +163,32 @@ final class Aplicacion
                 => new \App\Repositorios\ConsultaRepo($c->obtener(BD::class)),
         );
 
+        $this->contenedor->registrar(
+            \App\Servicios\Llm::class,
+            static fn (Contenedor $c): \App\Servicios\Llm => new \App\Servicios\Llm(
+                $c->obtener(BD::class),
+                $c->obtener(Credenciales::class),
+                $c->obtener(Config::class),
+                $c->obtener(\App\Servicios\GateDorado::class),
+                $c->obtener(Logger::class),
+                [
+                    new \App\Servicios\ClientesLlm\ClienteAnthropic(
+                        $c->obtener(\App\Soporte\Http::class),
+                    ),
+                    new \App\Servicios\ClientesLlm\ClienteOpenAiCompatible(
+                        $c->obtener(\App\Soporte\Http::class),
+                    ),
+                    // Ollama expone el formato de OpenAI bajo `/v1`. Se
+                    // reutiliza el mismo cliente en vez de duplicarlo.
+                    new \App\Servicios\ClientesLlm\ClienteOpenAiCompatible(
+                        $c->obtener(\App\Soporte\Http::class),
+                        'ollama',
+                        '/v1',
+                    ),
+                ],
+            ),
+        );
+
         // La regla «¿puede este modelo hablar con clientes?» en un solo sitio.
         // La usan el panel al promover y el corredor del conjunto dorado al
         // terminar; duplicada, uno de los dos se quedaría atrás.

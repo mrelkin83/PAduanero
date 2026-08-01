@@ -234,6 +234,34 @@ final class ConsultaRepoTest extends CasoBaseBd
     }
 
     #[Test]
+    public function reagendarConservaLaVentanaDePagoQueQuedaba(): void
+    {
+        // Dos defectos posibles y los dos silenciosos:
+        //
+        //  · Regalar 45 minutos nuevos convierte reagendar en una forma de no
+        //    pagar nunca.
+        //  · Restar `strtotime(columna) - time()` da negativo —la columna está
+        //    en UTC y el reloj de PHP en Bogotá— y el `max(1, …)` lo convierte
+        //    en un minuto: la reserva reagendada caduca casi al instante y el
+        //    cliente pierde el cupo sin entender por qué.
+        //
+        // Ninguno de los dos se ve como error: se ven como una realidad
+        // plausible.
+        $reserva = $this->reservar('14:00:00');
+
+        $this->bd->pdo()
+            ->prepare('UPDATE consultas SET reserva_expira = DATE_ADD(NOW(), INTERVAL 20 MINUTE) WHERE id = ?')
+            ->execute([$reserva->id]);
+
+        $nueva = $this->consultas->reagendar($reserva->id, '2026-08-05', '17:00:00');
+
+        $restan = \App\Soporte\Fechas::minutosHastaUtc((string) $nueva->reservaExpira);
+
+        self::assertGreaterThanOrEqual(18, $restan, 'la ventana no puede colapsar a un minuto');
+        self::assertLessThanOrEqual(22, $restan, 'ni reiniciarse a 45');
+    }
+
+    #[Test]
     public function reagendarUnaConsultaPagadaLaMantienePagada(): void
     {
         $reserva = $this->reservar('14:00:00');

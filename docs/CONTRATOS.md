@@ -74,6 +74,37 @@ cae en cascada por `orden_fallback` ante 5xx o timeout, escribe **siempre** una 
 en `consumo_ia` (también en el fallo), y corta si se superó
 `presupuesto_ia_mensual_usd`. Transporte: cURL nativo, sin SDK.
 
+**Las tres invariantes, y por qué cada una fallaría en silencio:**
+
+1. **`consumo_ia` se escribe siempre.** Un timeout sin fila hace que el gasto y
+   la tasa de error mientan: el panel enseña un sistema barato y sano que está
+   quemando reintentos contra un proveedor caído.
+2. **El presupuesto se verifica ANTES de llamar.** Después es un informe del
+   daño, no un tope. Y un modelo sin costo **no entra en la cascada**: a coste
+   cero el presupuesto no se agota jamás (mismo patrón que el error 15).
+3. **La cascada no cae en un modelo sin firma.** Ni de otro propósito, ni sin
+   costo verificado, ni sin `GateDorado` en verde y vigente. Si el primario
+   muere y el suplente no está autorizado, se **escala a humano**; responder
+   con un modelo sin firma convertiría el mecanismo del ADR-016 en decorativo
+   justo el día que importa. Por eso `GateDorado` expone `puedeResponder()`
+   además de `puedePromover()`: es el mismo criterio, y tiene que serlo — si el
+   suplente pudiera responder con requisitos más laxos que el primario,
+   bastaría con tumbar el primario para saltarse la firma.
+
+**Lo que NO se envía a Anthropic, y no es un olvido:** `temperature` —los
+modelos actuales de la familia Opus/Sonnet 5 la rechazan con 400— y `thinking`,
+que se deja en el valor por defecto del modelo. La columna
+`modelos_ia.temperatura_default` sigue sirviendo para los proveedores
+compatibles con OpenAI, que sí la aceptan.
+
+**Consecuencia a vigilar:** `max_tokens` acota el pensamiento **más** la
+respuesta. Un tope corto puede agotarse pensando y devolver texto vacío, así
+que una respuesta sin bloques de texto se trata como fallo reintentable, no
+como turno válido: es preferible bajar al suplente que enviarle al contacto un
+mensaje en blanco. Lo mismo con `stop_reason: refusal`, que llega como **200**
+con `content` vacío — leer `content[0]` sin comprobarlo revienta con una
+respuesta exitosa.
+
 ---
 
 ## `App\Servicios\CatalogoModelos`
@@ -480,3 +511,27 @@ compilada en el servidor.
     característico: la prueba pasa aislada y falla en la suite completa,
     según qué otra clase haya construido `Aplicacion` —y con ella fijado la
     zona— antes.
+
+    **Regla positiva: toda comparación de tiempo pasa por `App\Soporte\Fechas`.
+    Nunca `strtotime()` suelto.** `time()` sí es legítimo cuando ambos lados
+    son marcas Unix generadas por PHP —cookies, TTL de caché, el contador del
+    TOTP— porque ahí no hay zona que interpretar; el veneno es mezclar una
+    columna de la base con el reloj de PHP. Y cuando la comparación puede
+    hacerse **en SQL** (`WHERE reserva_expira <= NOW()`), esa es la forma
+    preferida: los dos lados salen del mismo reloj y no hay nada que
+    convertir.
+
+    El modo de falla importa más que las cinco horas: un fallo que depende del
+    orden de ejecución se declara «flaky», alguien con prisa lo marca para
+    saltarlo y el defecto vuelve invisible. Por eso la zona se fija en
+    `tests/arranque.php` y no solo en `Aplicacion`.
+18. Meter un campo cifrado dentro de un DTO. **Los DTOs viajan al prompt del
+    LLM, a los registros y a las vistas.** Un campo cifrado no entra en un
+    DTO: se lee por su propio camino, con auditoría. `Contacto` expone
+    `tieneNit` —que es lo que casi siempre se necesita saber— y el valor sale
+    por `ContactoRepo::nit($id, $actor)`, que descifra bajo petición explícita
+    y deja fila en `auditoria`.
+
+    Es la misma disciplina que `Credenciales::obtener()`, que no se expone por
+    HTTP jamás. La diferencia entre ambos casos es solo el destino de la fuga:
+    allí el navegador, aquí el proveedor del LLM (regla 13).

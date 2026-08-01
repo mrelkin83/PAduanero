@@ -61,6 +61,40 @@ final class Fechas
         return self::ahora()->format('Y-m-d');
     }
 
+    /**
+     * Día de la semana de una fecha `Y-m-d`, con 0 = domingo.
+     *
+     * Coincide con `horarios.dia_semana`. Existe para que nadie tenga que
+     * escribir `date('w', strtotime($fecha))`, que funciona por casualidad:
+     * acierta solo mientras las dos llamadas usen la misma zona por defecto,
+     * y deja de acertar el día que alguien la cambie en un `php.ini`.
+     */
+    public static function diaSemana(string $fecha): int
+    {
+        $d = DateTimeImmutable::createFromFormat('!Y-m-d', $fecha, self::zona());
+
+        if ($d === false) {
+            throw new \InvalidArgumentException("Fecha inválida: {$fecha}");
+        }
+
+        return (int) $d->format('w');
+    }
+
+    /**
+     * Minutos que faltan desde ahora hasta un `DATETIME` leído de la base.
+     *
+     * La base guarda UTC. Restar `strtotime($columna) - time()` lee la cadena
+     * en la zona por defecto de PHP y se desvía cinco horas — hacia el lado
+     * peligroso, porque el resultado sale negativo y cualquier `max(1, …)` lo
+     * convierte en «queda un minuto».
+     */
+    public static function minutosHastaUtc(string $datetimeUtc): int
+    {
+        $restan = self::deUtc($datetimeUtc)->getTimestamp() - self::ahora()->getTimestamp();
+
+        return (int) round($restan / 60);
+    }
+
     /** 'martes 4 de agosto' */
     public static function fechaNatural(string $fecha): string
     {
