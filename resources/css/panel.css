@@ -114,6 +114,23 @@
   .aviso-error { border-color: var(--color-sello); background-color: #B4341F0F; }
   .aviso-atencion { border-color: var(--color-ambar); background-color: #B87A120F; }
 
+  /* Estado de una fila, dicho en una palabra. Se usan en el catálogo de
+     modelos, donde la diferencia entre «inactivo» y «retirado por el
+     proveedor» decide si alguien tiene que hacer algo hoy. */
+  .etiqueta {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 2px;
+    border: 1px solid color-mix(in srgb, var(--color-acero) 35%, transparent);
+    color: var(--color-acero);
+  }
+  .etiqueta-ok     { border-color: var(--color-verde); color: var(--color-verde); }
+  .etiqueta-error  { border-color: var(--color-sello); color: var(--color-sello); }
+  .etiqueta-aviso  { border-color: var(--color-ambar); color: var(--color-ambar); }
+
   .tabla { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
   .tabla th {
     text-align: left;

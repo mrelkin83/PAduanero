@@ -72,6 +72,28 @@ Listado de transacciones con estado y conciliación.
   internacional.
 - **Modelos:** por propósito (conversación, embeddings, clasificación). Uno primario
   y una cascada de fallback ordenada. Costos por millón de tokens para proyección.
+
+  El catálogo **se descubre solo** (ADR-016): un cron consulta a diario el endpoint
+  de modelos de cada proveedor, así que un modelo nuevo aparece aquí al día
+  siguiente sin tocar código. Lo que **no** es automático es adoptarlo. Lo nuevo
+  entra inactivo, sin costo verificado y sin ser primario, con una etiqueta
+  «nuevo · sin revisar». Tres puertas antes de que pueda ser primario:
+
+  1. **Costo registrado y verificado.** Se teclea porque ningún proveedor lo
+     publica en su endpoint. Sin él, el corte por `presupuesto_ia_mensual_usd`
+     no corta: un modelo a coste cero nunca agota un presupuesto. Lo impone un
+     CHECK en base, no solo la pantalla.
+  2. **Activo.**
+  3. **No retirado por el proveedor.**
+
+  Ascender un modelo queda firmado en la bitácora con quién, cuándo y cuál era
+  el anterior — igual que aprobar un prompt, y por la misma razón: cambia lo que
+  el bot dice.
+
+  Si el proveedor retira el modelo primario, el panel lo avisa en rojo al entrar.
+  No es una caída —la cascada de fallback lo cubre— y precisamente por eso hay
+  que decirlo: el bot está respondiendo desde el suplente sin que nadie lo haya
+  decidido.
 - **Prompts:** editor con versionado. Un prompt nuevo nace inactivo; requiere
   **aprobación del abogado** para activarse. Botón de rollback a cualquier versión.
   Diff entre versiones.

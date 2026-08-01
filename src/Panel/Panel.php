@@ -142,6 +142,12 @@ final class Panel
             'POST /pagos/credenciales' => $modulos['pagos']->guardarCredencial($ctx),
             'POST /pagos/probar' => $modulos['pagos']->probar($ctx),
 
+            'GET /ia' => $modulos['ia']->inicio($ctx),
+            'POST /ia/sincronizar' => $modulos['ia']->sincronizar($ctx),
+            'POST /ia/costo' => $modulos['ia']->guardarCosto($ctx),
+            'POST /ia/activo' => $modulos['ia']->alternarActivo($ctx),
+            'POST /ia/promover' => $modulos['ia']->promover($ctx),
+
             'GET /usuarios' => $modulos['usuarios']->listar($ctx),
             'POST /usuarios' => $modulos['usuarios']->crear($ctx),
 
@@ -179,6 +185,11 @@ final class Panel
                 $this->c->obtener(\App\Repositorios\CredencialRepo::class),
                 $this->c->obtener(Config::class),
                 rtrim(Entorno::obtener('APP_URL', '') ?? '', '/'),
+            ),
+            'ia' => new IaControlador(
+                $this->c->obtener(BD::class),
+                $this->c->obtener(\App\Servicios\CatalogoModelos::class),
+                $this->c->obtener(AuditoriaRepo::class),
             ),
             'usuarios' => new UsuariosControlador(
                 $this->c->obtener(UsuarioRepo::class),

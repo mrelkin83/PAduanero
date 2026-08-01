@@ -657,3 +657,39 @@ El índice único sobre `slot_unico` queda como **segunda** línea de defensa. P
 solo únicamente bloquea la coincidencia exacta de `hora_inicio`: bastaría con
 crear desde el panel una modalidad de 30 minutos para que 14:00–15:00 y
 14:30–15:30 convivan sin violarlo. La validación de rango es la primera línea.
+
+### 12.8 Catálogo de modelos — ADR-016
+
+**El catálogo de modelos se descubre solo; la adopción es manual.**
+
+El PO pidió que la lista de modelos se mantenga sola: que salga Opus 6 y el
+sistema se entere sin que nadie edite código. Eso lo hace
+`bin/cron-sincronizar-modelos.php`, consultando el endpoint de modelos de cada
+proveedor (`GET /v1/models` en Anthropic y en los compatibles con OpenAI,
+`GET /api/tags` en Ollama).
+
+Lo que **no** se hace solo es empezar a usarlos. Un modelo descubierto entra
+`activo = 0`, `es_primario = 0`, `costos_verificados = 0`, y ahí espera.
+Tres razones, en orden de peso:
+
+1. **Coherencia con ADR-008.** Un prompt no puede cambiar sin aprobación
+   registrada del abogado porque cambia lo que el bot dice. El modelo cambia lo
+   que el bot dice igual o más. Un modelo que se asciende solo sería la única
+   pieza del sistema capaz de alterar el comportamiento del bot sin dejar
+   firma en `auditoria`.
+2. **El precio no viene en el endpoint.** Ningún proveedor lo publica ahí.
+   Anthropic devuelve identificador, nombre, ventanas y capacidades; no costo.
+   Y `costo_entrada_usd_1m` es lo que alimenta el corte por
+   `presupuesto_ia_mensual_usd`: un modelo a costo NULL hace que el
+   presupuesto no se agote nunca. Un guardia que deja de guardar en silencio
+   es peor que no tenerlo. Lo impone el CHECK `ck_modelo_primario_apto`.
+3. **El conjunto dorado.** La Etapa 4 cierra con 30 conversaciones limpias.
+   Cambiar el modelo por debajo las deja sin valor, y nadie se entera hasta
+   que un cliente lee algo que no debía.
+
+Queda **pendiente de decisión del PO**: bajo la matriz actual, ascender un
+modelo a primario es `ia.proveedores.escribir`, que solo tiene el
+`super_admin`. Si se quiere que ese acto lo firme el abogado —que es lo que
+ADR-007 y ADR-008 sugieren para todo lo que cambia lo que el bot dice—, hay
+que añadirle el permiso o crear uno propio, `ia.modelos.promover`. No se tocó
+la matriz sin autorización.

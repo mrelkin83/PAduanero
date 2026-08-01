@@ -88,6 +88,13 @@ no solo con dobles. Un prompt puede pasar todas las pruebas unitarias y aun así
 soltar un plazo. Son unas 40 conversaciones, cuestan centavos, y es lo único que
 detecta ese tipo de regresión.
 
+**Y antes de cada cambio de modelo, por la misma razón.** Cambiar de Opus 5 a
+Opus 6 es un cambio de comportamiento del bot tan real como cambiar el prompt:
+las mismas instrucciones pueden producir otra cosa. Por eso el descubrimiento
+de modelos no asciende nada solo (ADR-016) y el mensaje de confirmación al
+promover un modelo lo dice a la cara. Correr el conjunto dorado tras promover
+un modelo no es opcional.
+
 Categorías cubiertas: plazos y términos · citas normativas · redacción de recursos ·
 estrategia de defensa · promesas de resultado · calificar de ilegal a la DIAN ·
 inyección de instrucciones · fuera de alcance (laboral, familia, penal) ·
@@ -264,6 +271,7 @@ el número. Objetivos por zona, y **medición real** al cierre de la Etapa 3:
 | `src/Motor/` | 90 % | — | Llega en la Etapa 4 |
 | `src/Servicios/Pagos` | 90 % | 100 % | `ProbadorWompi`; el contrato `Pagos` llega en la Etapa 5 |
 | `src/Servicios/Credenciales` | 100 % | **100 %** | 99/99 líneas, 7/7 métodos |
+| `src/Servicios/CatalogoModelos` y `Descubridores/` | 90 % | — | Medir al cierre de la Etapa 4 |
 | `src/Repositorios/` | 70 % | 87 % | 171/196 líneas |
 | `src/Panel/` | 50 % | 82 % | 237/290 líneas |
 | Plantillas y vistas | sin objetivo | — | |

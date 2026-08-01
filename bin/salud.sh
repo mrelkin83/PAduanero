@@ -121,6 +121,33 @@ else
   mal "cron-purgar.php NO ha corrido en 24 h: la retención de IP no se está cumpliendo"
 fi
 
+# --- Catálogo de modelos ---------------------------------------------
+# Dos cosas distintas, y la segunda es la grave.
+echo
+echo "Modelos de IA"
+
+SINCRO=$($MYSQL "SELECT COUNT(*) FROM auditoria
+  WHERE entidad='sistema' AND accion='sincronizar_modelos'
+    AND creado_en > NOW() - INTERVAL 48 HOUR" 2>/dev/null || echo "?")
+
+if [[ "$SINCRO" -ge 1 ]] 2>/dev/null; then
+  ok "el catálogo se sincronizó en las últimas 48 h"
+else
+  mal "cron-sincronizar-modelos.php NO ha corrido en 48 h: el catálogo está congelado"
+fi
+
+# Un primario retirado no tumba el bot —la cascada de orden_fallback lo
+# cubre— y por eso nadie se entera: está respondiendo desde el suplente sin
+# que ninguna persona lo haya decidido.
+RETIRADO=$($MYSQL "SELECT COUNT(*) FROM modelos_ia
+  WHERE es_primario=1 AND retirado_en IS NOT NULL" 2>/dev/null || echo "?")
+
+if [[ "$RETIRADO" == "0" ]]; then
+  ok "ningún modelo primario ha sido retirado por su proveedor"
+else
+  mal "hay $RETIRADO modelo(s) primario(s) retirados: el bot responde desde el fallback. Elegir sustituto en /panel/ia"
+fi
+
 # --- Respaldo --------------------------------------------------------
 echo
 echo "Respaldos"

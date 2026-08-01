@@ -45,18 +45,38 @@ touch /var/www/pedro/storage/config.sentinel
 | Redis de Chatwoot | Docker | 6379 | (interno de ese compose) |
 | Evolution API | Docker | 8080 | `docker compose -f /opt/evolution/docker-compose.yml restart` |
 
-Los tres crones:
+Los crones:
 
 ```cron
 */5  * * * *  php /var/www/pedro/bin/cron-expirar-reservas.php
 */10 * * * *  /var/www/pedro/bin/salud.sh
 15   3 * * *  /var/www/pedro/bin/respaldo.sh
 30   4 * * *  php /var/www/pedro/bin/cron-purgar.php
+15   5 * * *  php /var/www/pedro/bin/cron-sincronizar-modelos.php
 ```
 
 `cron-purgar.php` no es mantenimiento opcional: `intentos_acceso` guarda
 direcciones IP, que son dato personal bajo la Ley 1581 de 2012. Retención de
 30 días, igual que los logs.
+
+`cron-sincronizar-modelos.php` mantiene al día el catálogo de `modelos_ia`
+contra lo que cada proveedor anuncia. **No cambia nada de lo que el motor usa**:
+lo nuevo entra inactivo, sin costo y sin ser primario, y aparece en
+`/panel/ia` esperando revisión. Sale con 0 aunque un proveedor falle —una API
+caída no es motivo para marcar el cron como roto— y con 1 solo si ninguno
+respondió, que suele apuntar al VPS y no al proveedor.
+
+Cosas que este cron dirá y hay que atender:
+
+| En el log | Qué pasó | Qué hacer |
+|---|---|---|
+| `catalogo_modelos.nuevos` | Salió un modelo nuevo | Verificar su costo en la web del proveedor y decidir en `/panel/ia` |
+| `catalogo_modelos.fallo` | 401/403: credencial caducada o rotada | Reponerla en `/panel/pagos` → credenciales |
+| `catalogo_modelos.primario_retirado` | **El proveedor retiró el modelo en uso** | La cascada de `orden_fallback` cubre el servicio; elegir sustituto hoy |
+
+El último es el único de nivel `error` del servicio, y lo es porque el bot
+sigue respondiendo desde el suplente sin que nadie lo haya decidido: no hay
+caída visible que obligue a mirar.
 
 ---
 

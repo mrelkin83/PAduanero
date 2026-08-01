@@ -105,6 +105,30 @@ final class Aplicacion
             ),
         );
 
+        // Catálogo de modelos: descubrimiento automático, adopción manual.
+        // Los descubridores se enumeran aquí y no se autodetectan: la lista
+        // de proveedores a los que este sistema le pide su catálogo es una
+        // decisión, y tiene que poder leerse de un vistazo.
+        $this->contenedor->registrar(
+            \App\Servicios\CatalogoModelos::class,
+            static fn (Contenedor $c): \App\Servicios\CatalogoModelos => new \App\Servicios\CatalogoModelos(
+                $c->obtener(BD::class),
+                $c->obtener(Credenciales::class),
+                $c->obtener(Logger::class),
+                [
+                    new \App\Servicios\Descubridores\DescubridorAnthropic(
+                        $c->obtener(\App\Soporte\Http::class),
+                    ),
+                    new \App\Servicios\Descubridores\DescubridorOpenAiCompatible(
+                        $c->obtener(\App\Soporte\Http::class),
+                    ),
+                    new \App\Servicios\Descubridores\DescubridorOllama(
+                        $c->obtener(\App\Soporte\Http::class),
+                    ),
+                ],
+            ),
+        );
+
         // ── Panel (Etapa 3) ──────────────────────────────────────────────
         $this->contenedor->registrar(
             \App\Repositorios\UsuarioRepo::class,

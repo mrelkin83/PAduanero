@@ -76,6 +76,51 @@ en `consumo_ia` (también en el fallo), y corta si se superó
 
 ---
 
+## `App\Servicios\CatalogoModelos`
+
+```php
+final class CatalogoModelos
+{
+    /** @return list<array{proveedor:string,ok:bool,nuevos:int,vistos:int,retirados:int,error:?string}> */
+    public function sincronizarTodo(): array;
+
+    /** @param array<string,mixed> $proveedor fila de `proveedores_ia` */
+    public function sincronizar(array $proveedor): array;
+}
+```
+
+Mantiene `modelos_ia` al día con lo que cada proveedor anuncia. Un descubridor
+por `formato_api` (`App\Servicios\Descubridores\Descubridor`): Anthropic
+`GET /v1/models`, compatibles con OpenAI `GET /models`, Ollama `GET /api/tags`.
+
+**Descubrimiento automático, adopción manual.** Lo que la sincronización puede
+hacer y lo que no:
+
+| Puede | No puede |
+|---|---|
+| Dar de alta un modelo nuevo | Activarlo |
+| Refrescar nombre, ventanas y capacidades | Escribir o cambiar costos |
+| Marcar `retirado_en` y revertirlo | Ascender o degradar un primario |
+
+Las tres razones, en orden: **ADR-008** —un modelo que se asciende solo cambia
+lo que el bot dice sin firma en `auditoria`, y es la única pieza del sistema
+capaz de hacerlo—; **el precio no viene en el endpoint** —ningún proveedor lo
+publica ahí, y un modelo a costo NULL hace que el corte por
+`presupuesto_ia_mensual_usd` no corte nunca—; y **el conjunto dorado**, que
+queda sin valor si el modelo cambia por debajo.
+
+Contrato de fallo del descubridor: **excepción, nunca lista vacía**. Un 401 y
+un catálogo genuinamente vacío son situaciones opuestas, y confundirlas haría
+que una credencial caducada apareciera como «retiraron todos los modelos».
+
+`retirado_en` no entra en `ck_modelo_primario_apto` a propósito: si entrara, el
+cron no podría anotar el retiro del modelo en uso —el UPDATE violaría la
+restricción y la corrida fallaría entera justo en el caso que más importa
+registrar. Ascender un modelo retirado lo impide `IaControlador`, que es donde
+corresponde: es una decisión de la persona, no un estado imposible de los datos.
+
+---
+
 ## `App\Servicios\Chatwoot`
 
 ```php

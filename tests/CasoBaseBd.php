@@ -72,18 +72,64 @@ abstract class CasoBaseBd extends TestCase
         // `modalidades_asesoria`, y `limpiar()` la vacía justo antes.
         'modalidades_asesoria',
         'horarios',
+        // El catálogo de IA es semilla desde 0007. Las pruebas del
+        // descubrimiento dan de alta y retiran modelos, así que hay que
+        // devolverlo a su sitio. `proveedores_ia` va ANTES que `modelos_ia`:
+        // el DELETE del padre arrastra a los hijos por la foránea, y
+        // restaurar al revés dejaría los modelos sin proveedor.
+        'proveedores_ia',
+        'modelos_ia',
     ];
 
     /** @var array<string,list<array<string,mixed>>> */
     private static array $semillas = [];
 
+    /** @var array<string,list<string>> columnas reales por tabla */
+    private static array $columnas = [];
+
     private function capturarSemillas(): void
     {
         foreach (self::TABLAS_SEMILLA as $tabla) {
+            // Columnas reales, sin las generadas. `SELECT *` las traería y
+            // el INSERT de vuelta moriría con MySQL 3105: no se puede
+            // escribir en una columna GENERATED. El proyecto las usa para
+            // emular índices únicos parciales —`primario_key`, `slot_unico`,
+            // `activo_key`—, así que esto no es un caso raro sino el patrón
+            // de la casa.
+            $columnas = $this->columnasReales($tabla);
+            self::$columnas[$tabla] = $columnas;
+
+            $lista = implode(', ', array_map(static fn (string $c): string => "`{$c}`", $columnas));
+
             self::$semillas[$tabla] = $this->bd->pdo()
-                ->query("SELECT * FROM `{$tabla}`")
+                ->query("SELECT {$lista} FROM `{$tabla}`")
                 ->fetchAll();
         }
+    }
+
+    /**
+     * @return list<string>
+     *
+     * El filtro va sobre `GENERATION_EXPRESSION` y NO sobre `EXTRA`. `EXTRA`
+     * dice `STORED GENERATED` para una columna generada, pero también
+     * `DEFAULT_GENERATED` para cualquier columna con `DEFAULT (UUID())` o
+     * `DEFAULT CURRENT_TIMESTAMP` — que en este esquema son casi todas las
+     * claves primarias. Filtrar por la subcadena «GENERATED» se lleva por
+     * delante los `id`, las semillas se restauran con UUID nuevos y revientan
+     * las foráneas. `GENERATION_EXPRESSION` está vacía salvo en columnas
+     * realmente generadas.
+     */
+    private function columnasReales(string $tabla): array
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            "SELECT COLUMN_NAME FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+                AND (GENERATION_EXPRESSION IS NULL OR GENERATION_EXPRESSION = '')
+              ORDER BY ORDINAL_POSITION"
+        );
+        $stmt->execute([$tabla]);
+
+        return $stmt->fetchAll(\PDO::FETCH_COLUMN);
     }
 
     private function restaurarSemillas(): void
@@ -97,7 +143,7 @@ abstract class CasoBaseBd extends TestCase
                 continue;
             }
 
-            $columnas = array_keys($filas[0]);
+            $columnas = self::$columnas[$tabla] ?? array_keys($filas[0]);
             $lista = implode(', ', array_map(static fn (string $c): string => "`{$c}`", $columnas));
             $huecos = implode(', ', array_fill(0, count($columnas), '?'));
 
@@ -140,7 +186,7 @@ abstract class CasoBaseBd extends TestCase
             'conversacion_estado', 'contactos', 'eventos_outbox', 'auditoria',
             'credenciales', 'sesiones', 'usuarios', 'intentos_acceso',
             'configuraciones_historial', 'secuencias', 'eventos_landing',
-            'kb_chunks', 'kb_documentos', 'consumo_ia',
+            'kb_chunks', 'kb_documentos', 'consumo_ia', 'sincronizaciones_modelos',
         ] as $tabla) {
             $pdo->exec('TRUNCATE TABLE `' . $tabla . '`');
         }
