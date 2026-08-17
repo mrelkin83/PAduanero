@@ -7,27 +7,54 @@ use App\Soporte\Vista;
 /**
  * Cierre.
  *
+ * Vuelve a tinta y con foto a sangre, como el hero: la página abre y cierra
+ * con la misma superficie, y entre las dos el recorrido pasa por papel. Es
+ * lo que le da forma de documento —cubierta, cuerpo, contracubierta— en vez
+ * de lista de secciones.
+ *
+ * El texto va a la izquierda y no centrado. Centrado se lee como cartel; a
+ * la izquierda, alineado con todo lo anterior, se lee como la última línea
+ * de lo que se venía diciendo.
+ *
  * @var \App\Modelos\Bloque $bloque
  * @var string $waBase
  * @var callable $e
  */
-?>
-<section class="border-t border-acero/15 bg-papel-puro py-16 md:py-24">
-    <div class="mx-auto max-w-3xl px-5 text-center md:px-8">
 
-        <h2 class="titular-seccion text-[1.75rem] md:text-4xl">
+$imagen = $bloque->texto('imagen');
+?>
+<section class="sobre-tinta relative isolate overflow-hidden bg-tinta py-20 text-papel md:py-28">
+
+    <?php if ($imagen !== ''): ?>
+    <div class="hero-foto">
+        <?= Vista::imagen(
+            basename($imagen),
+            $bloque->texto('alt', 'Pedro, especialista en derecho aduanero y comercio exterior'),
+            886,
+            1176,
+            '',
+            sizes: '(min-width: 768px) 56vw, 100vw',
+        ) ?>
+    </div>
+    <?php endif; ?>
+
+    <div class="relative z-10 mx-auto max-w-6xl px-5 md:px-8">
+
+        <p class="rotulo">El tiempo</p>
+
+        <h2 class="titular-seccion mt-5 max-w-xl text-[2rem] md:text-[2.75rem]">
             <?= $e($bloque->titulo) ?>
         </h2>
 
-        <hr class="filete mx-auto mt-6">
+        <hr class="filete mt-7">
 
         <?php if ($bloque->subtitulo !== null): ?>
-        <p class="mx-auto mt-6 max-w-xl text-[1.0625rem] text-acero">
+        <p class="entrada mt-7 max-w-lg">
             <?= $e($bloque->subtitulo) ?>
         </p>
         <?php endif; ?>
 
-        <div class="mt-9 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-5">
+        <div class="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-6">
             <?= Vista::botonWhatsapp($waBase, $bloque->texto('cta_texto', 'Escribir por WhatsApp')) ?>
 
             <?php
@@ -40,7 +67,7 @@ use App\Soporte\Vista;
             $secundario = $bloque->texto('cta_secundario', 'O diagnostique su caso primero');
             ?>
             <?php if ($secundario !== ''): ?>
-            <a href="/perfil" class="boton-fantasma self-center sm:self-auto">
+            <a href="/perfil" class="boton-fantasma self-start sm:self-auto">
                 <?= $e($secundario) ?>
                 <span aria-hidden="true">→</span>
             </a>

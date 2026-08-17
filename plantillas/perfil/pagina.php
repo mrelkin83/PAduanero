@@ -78,12 +78,31 @@ $precio = $asesoria['precio'] !== null
          pinta con los seis pasos visibles, que es exactamente lo que debe
          ver quien no tiene JavaScript. Ponerlo desde el script diferido
          haría que todos vieran ese destello primero. */ ?>
-<script>document.documentElement.dataset.js='1'</script>
+<?php /* El mismo `data-js` y, detrás, la misma red del revelado que la
+         landing: esta página carga `landing.js` además de `perfil.js`, y es
+         ese archivo —no `perfil.js`, que no toca `.revelar`— el que sube la
+         opacidad del rótulo, del titular y de la entrada. Si no llega, lo
+         que desaparece aquí es el `<h1>`, que además es la LCP. */ ?>
+<script>
+document.documentElement.dataset.js = '1';
+window.__paRedRevelado = setTimeout(function () {
+    var ocultos = document.querySelectorAll('.revelar:not([data-visible])');
+    for (var i = 0; i < ocultos.length; i++) { ocultos[i].setAttribute('data-visible', ''); }
+}, 2500);
+</script>
 
 <script type="application/ld+json"><?= Vista::json($meta['jsonLd']) ?></script>
 </head>
 
-<body class="perfil-cuerpo text-papel">
+<?php /* `sobre-tinta` es lo que activa la variante oscura de todo el sistema
+         —rótulo en ámbar, filete en ámbar, filetes del índice aclarados, el
+         `boton-fantasma` en papel y, sobre todo, el anillo de foco en ámbar
+         en vez de rojo de sello—. Sin esta clase la página se pinta con los
+         colores pensados para papel sobre un fondo casi negro: el enlace
+         «Inicio» quedaba tinta sobre tinta, invisible, siendo la única
+         salida de la página. No se nota al revisar el CSS porque cada regla
+         por separado es correcta; lo que falla es que ninguna aplica. */ ?>
+<body class="perfil-cuerpo sobre-tinta text-papel">
 <a href="#contenido" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-3 focus:bg-ambar focus:px-4 focus:py-2 focus:text-tinta">
     Saltar al contenido
 </a>

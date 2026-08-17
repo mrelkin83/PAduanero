@@ -18,9 +18,25 @@
      · ámbar sobre tinta           (las lámparas de sodio del puerto,
                                     que ya están en la foto del hero)
 
-   Cero fuentes web: el criterio de cierre pide LCP < 2 s y «sin fuentes
-   bloqueantes». La personalidad tipográfica sale del tratamiento —escala,
-   peso, tracking y el contraste sans/mono— no de descargar una familia.
+   Tres fuentes, servidas locales desde `/fonts`. La Etapa 1 dijo «cero
+   fuentes web» y esa regla se levanta aquí, así que conviene dejar por
+   escrito con qué se paga y qué se compra:
+
+     · Instrument Serif  titulares. Es la voz de la página. Una serif de
+                         display en un despacho de litigio dice oficio y
+                         documento; la misma frase en sans de peso 800 dice
+                         «startup». Solo tiene un peso (400): poner 700 la
+                         engorda sintéticamente y se ve sucia.
+     · Geist             texto corrido.
+     · Geist Mono        rótulos, cifras y el índice de situaciones — todo
+                         lo que en este mundo va codificado.
+
+   El precio son 74 KB de woff2 y el riesgo de que el titular —que es la
+   LCP— parpadee. Se paga así: `font-display: swap` en las tres para que
+   ninguna bloquee el render, y `preload` SOLO de la serif, que es la única
+   que participa en la LCP. Las otras dos entran con el reflow del cuerpo,
+   donde no se nota. El presupuesto de 300 KB lo sigue midiendo
+   `bin/auditar-landing.mjs` en cada cierre de etapa.
    ===================================================================== */
 
 @theme {
@@ -36,15 +52,31 @@
   --color-acero: #64748B;
 
   /* Verde de WhatsApp, oscurecido. Se conserva el color porque la gente lo
-     reconoce y sabe qué aplicación va a abrir —eso pesa más que la coherencia
-     cromática en el único botón que hay que pulsar—, pero el tono de marca
-     (#25D366) y su versión oscura (#128C4A) dan 2.4:1 y 4.3:1 con texto
-     blanco, ambos por debajo del 4.5:1 que exige la WCAG AA. Este da 5.2:1. */
+     reconoce y sabe qué aplicación va a abrir, y eso pesa más que la
+     coherencia cromática en el único botón que hay que pulsar.
+
+     AVISO — este par NO cumple la WCAG AA, y hasta hoy este comentario decía
+     que sí. Medido con la fórmula de luminancia relativa de la WCAG 2.1:
+
+         blanco sobre #059669 (base) .... 3.77:1   ← exige 4.5:1
+         blanco sobre #047857 (hover) ... 5.48:1   ✓
+
+     La cifra de «5.2:1» que figuraba aquí era falsa; `bin/auditar-landing.mjs`
+     lo marca en cada corrida y por eso la Accesibilidad se queda en 96.
+
+     No se corrige por cuenta propia porque el tono de un botón de marca es
+     decisión del PO (CLAUDE.md §11) y no de quien pasa la auditoría. El
+     arreglo, si se aprueba, es de una línea: subir el actual `hover` a base
+     —ya cumple— y bajar el hover a #065F46, que da 7.68:1. */
   --color-whatsapp: #059669;
   --color-whatsapp-hover: #047857;
 
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  /* Las de sistema quedan detrás como reserva y no por cortesía: son las que
+     se ven durante el `swap` y si tienen métricas muy distintas el texto
+     salta al llegar la web. Geist es cercana a system-ui en ancho, así que
+     el salto es un matiz y no un reflow. */
+  --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
 
   --text-eyebrow: 0.6875rem;
@@ -59,6 +91,30 @@
   font-weight: 400;
   font-display: swap;
   src: url("/fonts/instrument-serif.woff2") format("woff2");
+}
+
+/* Los tres archivos son estáticos, no variables: se comprobó leyendo su
+   directorio de tablas —ninguno trae `fvar`—. Por eso el `font-weight` es
+   400 exacto y no un rango: declarar `400 700` sobre un archivo de un solo
+   peso no da negritas, da negrita SINTÉTICA, que es la misma letra engordada
+   por el motor y se ve sucia en pantallas de baja densidad.
+   Consecuencia asumida: donde el diseño pide semibold sobre Geist —botones y
+   rótulos, nada por encima de 1 rem— el navegador la sintetiza. A ese tamaño
+   no se distingue; en un titular sí, y por eso los titulares son serif. */
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/geist.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/geist-mono.woff2") format("woff2");
 }
 
 @layer base {
@@ -93,6 +149,16 @@
   .sobre-tinta :focus-visible {
     outline-color: var(--color-ambar);
   }
+
+  /* La barra superior es pegajosa, así que un salto a `#situaciones` dejaría
+     el titular de la sección justo debajo de ella y tapado. Esto no es
+     cosmética: sin el margen, el enlace del menú parece llevar al sitio
+     equivocado. */
+  :target,
+  section[id],
+  main[id] {
+    scroll-margin-top: 5rem;
+  }
 }
 
 @layer components {
@@ -120,26 +186,51 @@
   .sobre-tinta .rotulo { color: var(--color-ambar); }
 
   /* --- Titulares -----------------------------------------------------
-     Tracking negativo y line-height apretado: a tamaño grande el texto
-     por defecto se ve suelto y blando, y esto es un despacho de litigio. */
+     Instrument Serif, peso 400 y nunca más: es un solo archivo estático y
+     pedirle 700 lo engorda sintéticamente.
+
+     El tracking cambia de signo respecto a la versión en sans. Una sans de
+     peso 800 se compone con tracking negativo fuerte (-0.035em) porque a
+     tamaño grande sus contraformas se abren y el titular se ve suelto. Una
+     serif de display ya viene ajustada para tamaño grande: apretarla igual
+     le pega las serifas entre sí y ensucia justo lo que la hace legible. De
+     ahí -0.01em, casi nada, y un interlineado más corto (1.02) que sí se
+     puede permitir porque la letra tiene menos altura de x. */
+  .titular,
+  .titular-seccion,
+  .titular-menor {
+    font-family: var(--font-serif);
+    font-weight: 400;
+  }
+
+  /* Cada una trae tamaño por defecto, y eso no es comodidad: es que sin él
+     un titular al que se le olvide la utilidad de tamaño no se ve «un poco
+     más pequeño», se derrumba a 1 rem y queda indistinguible de un párrafo.
+     Pasó — el titular del bloque de diagnóstico salió a tamaño de texto
+     corrido y nada falló, simplemente la sección perdió su encabezado.
+
+     El `clamp` evita además el salto entre el móvil y el escritorio en los
+     dos anchos intermedios donde no hay punto de corte. Las plantillas
+     siguen pasando su tamaño explícito y ganan, porque las utilidades de
+     Tailwind van en una capa posterior a `components`. */
   .titular {
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    line-height: 1.05;
+    font-size: clamp(2.375rem, 4.5vw, 4rem);
+    letter-spacing: -0.01em;
+    line-height: 1.02;
     text-wrap: balance;
   }
 
   .titular-seccion {
-    font-weight: 700;
-    letter-spacing: -0.025em;
-    line-height: 1.15;
+    font-size: clamp(2rem, 3vw, 2.75rem);
+    letter-spacing: -0.005em;
+    line-height: 1.08;
     text-wrap: balance;
   }
 
   .titular-menor {
-    font-weight: 600;
-    letter-spacing: -0.015em;
-    line-height: 1.2;
+    font-size: 1.375rem;
+    letter-spacing: 0;
+    line-height: 1.15;
   }
 
   /* --- La regla de sello ---------------------------------------------
@@ -304,6 +395,234 @@
     transform: none;
   }
 
+  /* Sin JavaScript no hay quien ponga `data-visible`, y `.revelar` arranca en
+     opacidad 0: la sección entera quedaría en blanco. Misma guarda que usa
+     `.paso` más abajo y por la misma razón — §13.5 dice que la conversión no
+     depende de un script, y en la landing lo que lleva `.revelar` es
+     justamente el bloque del diagnóstico completo.
+
+     Esto cubre «JavaScript desactivado». El otro caso —JavaScript activo
+     pero `landing.js` que no llega— no lo puede cubrir el CSS, porque el
+     atributo ya está puesto; de eso se encarga la red con temporizador que
+     arman las dos plantillas en su `<head>` y que `landing.js` desarma al
+     cargar. */
+  html:not([data-js]) .revelar {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* =====================================================================
+     Cabecera del sitio
+     ---------------------------------------------------------------------
+     Barra pegajosa de cristal oscuro, la misma receta que la de `/perfil`
+     (`.barra-perfil`, más abajo): las dos páginas comparten la cabecera y
+     por tanto comparten la declaración, no una copia.
+
+     Es opaca-translúcida SIEMPRE, no transparente-que-se-vuelve-cristal al
+     bajar. Ese efecto es más bonito sobre el hero oscuro y necesita
+     JavaScript para saber cuánto se ha bajado — y sin JavaScript la barra
+     quedaría con enlaces color papel flotando sobre las secciones claras,
+     ilegibles. La regla de esta landing es que nada dependa de un script
+     (§13.5), así que gana el cristal permanente.
+     ==================================================================== */
+  .barra-sitio,
+  .barra-perfil {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: color-mix(in srgb, var(--color-tinta) 78%, transparent);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid color-mix(in srgb, #FFFFFF 8%, transparent);
+  }
+
+  /* La firma. El punto va en ámbar y aparte del texto porque es lo único
+     que hace de logotipo en toda la página: no hay marca gráfica. */
+  .marca {
+    font-family: var(--font-serif);
+    font-size: 1.375rem;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    color: var(--color-papel);
+  }
+  .marca::after {
+    content: ".";
+    color: var(--color-ambar);
+  }
+
+  /* Enlace del menú: el filete crece de izquierda a derecha, no aparece de
+     golpe. Con la curva de muelle la distancia se lee como un gesto. */
+  .menu-enlace {
+    position: relative;
+    font-size: 0.875rem;
+    color: color-mix(in srgb, var(--color-papel) 72%, transparent);
+    transition: color 400ms var(--ease-fina);
+  }
+  .menu-enlace::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -0.375rem;
+    height: 1px;
+    background-color: var(--color-ambar);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 400ms var(--ease-fina);
+  }
+  .menu-enlace:hover { color: var(--color-papel); }
+  .menu-enlace:hover::after { transform: scaleX(1); }
+
+  /* El botón de WhatsApp de la barra. Mismo botón, menos aire: a tamaño
+     completo compite con el titular del hero, y en la cabecera su trabajo
+     es estar disponible, no llamar. */
+  .boton-wa.compacto {
+    padding: 0.4375rem 0.4375rem 0.4375rem 1.0625rem;
+    font-size: 0.875rem;
+    gap: 0.5rem;
+  }
+  .boton-wa.compacto .disco {
+    width: 1.625rem;
+    height: 1.625rem;
+    margin-left: 0;
+  }
+  .boton-wa.compacto .disco svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  /* =====================================================================
+     Hero — la foto a sangre
+     ---------------------------------------------------------------------
+     La foto no va en una columna al lado del texto: ocupa la mitad derecha
+     y sale por el borde, y el degradado la disuelve en la tinta del fondo.
+     Va sobre la imagen y no detrás porque una franja intermedia dejaría
+     costura visible justo donde el cielo de la foto y el fondo coinciden.
+
+     En móvil no hay mitad derecha: la foto pasa a ser fondo del bloque
+     entero con un velo muy cerrado, porque el texto tiene que ganar el
+     contraste de la WCAG contra la parte más clara del cielo.
+     ==================================================================== */
+  .hero-foto {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .hero-foto picture,
+  .hero-foto img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 18%;
+    display: block;
+    user-select: none;
+  }
+  .hero-foto::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-tinta) 72%, transparent),
+      color-mix(in srgb, var(--color-tinta) 93%, transparent)
+    );
+  }
+
+  @media (min-width: 768px) {
+    .hero-foto {
+      left: auto;
+      width: 56%;
+    }
+    .hero-foto::after {
+      background: linear-gradient(
+        to right,
+        var(--color-tinta) 0%,
+        color-mix(in srgb, var(--color-tinta) 78%, transparent) 38%,
+        transparent 72%
+      );
+    }
+  }
+
+  /* --- Franja de cifras ------------------------------------------------
+     Cierra el hero por abajo. Las cifras van en mono porque son datos, no
+     adjetivos: «15+ años ante la DIAN» es verificable y por eso puede ir
+     grande; «el mejor abogado» no cabría en esta página ni en la Ley 1123. */
+  .cifra {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    line-height: 1.1;
+    color: var(--color-ambar);
+    letter-spacing: -0.02em;
+  }
+  .cifra-nota {
+    font-family: var(--font-mono);
+    font-size: var(--text-eyebrow);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--color-tinta-suave) 88%, transparent);
+  }
+
+  /* =====================================================================
+     Proceso — la lista editorial
+     ---------------------------------------------------------------------
+     Cuatro filas, no una rejilla de dos por dos. El contenido es una
+     secuencia y una rejilla la rompe: en 2×2 el ojo puede leer 01→02
+     bajando o cruzando, y aquí el orden es la información. Una columna
+     única solo se recorre en un sentido.
+     ==================================================================== */
+  .paso-fila {
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    gap: 1.25rem;
+    align-items: baseline;
+    padding: 1.5rem 0;
+    border-top: 1px solid color-mix(in srgb, #8392A8 22%, transparent);
+  }
+  .paso-cifra {
+    font-family: var(--font-serif);
+    font-size: 2rem;
+    line-height: 1;
+    color: var(--color-ambar);
+  }
+
+  @media (min-width: 768px) {
+    .paso-fila {
+      grid-template-columns: 4.5rem 1fr;
+      gap: 1.75rem;
+      padding: 1.875rem 0;
+    }
+    .paso-cifra { font-size: 2.5rem; }
+  }
+
+  /* --- Credencial numerada --------------------------------------------
+     El número va en mono y diminuto, y el título en serif: el orden no es
+     jerarquía —ninguna especialización vale más que otra—, es solo un
+     índice que permite referirse a ellas. */
+  .credencial-num {
+    font-family: var(--font-mono);
+    font-size: var(--text-eyebrow);
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    color: var(--color-sello);
+  }
+
+  /* El filete de sello al costado del retrato: la misma marca que abre cada
+     sección, girada. Cose la foto al sistema en vez de dejarla flotando. */
+  .marco-retrato {
+    position: relative;
+    padding-left: 1rem;
+  }
+  .marco-retrato::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: color-mix(in srgb, var(--color-sello) 55%, transparent);
+  }
+
   /* =====================================================================
      Perfil — tarjetas de vidrio (glass) sobre tinta
      ---------------------------------------------------------------------
@@ -322,17 +641,9 @@
     min-height: 100vh;
   }
 
-  /* Barra superior fija con desenfoque: el mismo cristal de las tarjetas,
-     estirado a lo ancho. */
-  .barra-perfil {
-    position: sticky;
-    top: 0;
-    z-index: 40;
-    background: color-mix(in srgb, var(--color-tinta) 78%, transparent);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border-bottom: 1px solid color-mix(in srgb, #FFFFFF 8%, transparent);
-  }
+  /* La barra superior de `/perfil` se declara junto a la de la landing, en
+     «Cabecera del sitio»: es la misma pieza y una copia aquí se desincroniza
+     en cuanto alguien ajuste el desenfoque en un solo sitio. */
 
   /* Tarjeta de vidrio con bisel doble: borde exterior de luz en la cara
      superior y sombra profunda abajo, como un cristal iluminado desde

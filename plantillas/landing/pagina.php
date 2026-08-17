@@ -53,20 +53,87 @@ $waBase = 'https://wa.me/' . rawurlencode($whatsapp['numero'])
 <link rel="preload" as="image" fetchpriority="high"
       href="/img/pedro-hero-400.avif"
       imagesrcset="/img/pedro-hero-400.avif 400w, /img/pedro-hero-640.avif 640w, /img/pedro-hero-890.avif 890w"
-      imagesizes="(min-width: 768px) 26rem, 100vw"
+      imagesizes="(min-width: 768px) 56vw, 100vw"
       type="image/avif">
+
+<?php /* La serif de los titulares se precarga y las otras dos no. El titular
+         del hero ES la LCP: sin `preload` el navegador no descubre la fuente
+         hasta parsear el CSS, pinta con la de reserva y la cambia después —el
+         salto se ve y además cuenta como desplazamiento de diseño. Geist y
+         Geist Mono entran con el cuerpo, donde el intercambio no se nota.
+
+         `crossorigin` es obligatorio aunque la fuente sea del mismo origen:
+         las peticiones de fuentes viajan en modo CORS, y sin el atributo el
+         navegador descarga el archivo dos veces —una para la precarga y otra
+         para usarlo—, que es peor que no precargar. */ ?>
+<link rel="preload" as="font" type="font/woff2" href="/fonts/instrument-serif.woff2" crossorigin>
 
 <?php /* CSS incrustado: son unos pocos KB y evita un viaje de ida y vuelta
          bloqueante justo en el camino crítico del render. */ ?>
 <style><?= $css ?></style>
 
 <script type="application/ld+json"><?= Vista::json($meta['jsonLd']) ?></script>
+
+<?php /* La red del revelado. `public/js/landing.js` la desarma nada más
+         cargar —hace `clearTimeout(window.__paRedRevelado)`—, así que en el
+         camino normal esto no llega a dispararse nunca.
+
+         Existe para el camino anormal: `.revelar` arranca en opacidad 0 y
+         quien la sube es el IntersectionObserver de ese archivo. Si el
+         archivo no llega —un 404 tras un despliegue a medias, la red que se
+         corta, una extensión que lo bloquea— el bloque del diagnóstico
+         completo se queda invisible, y la página no da ningún error: se ve
+         una franja oscura vacía. Con JavaScript desactivado del todo el
+         caso lo cubre el CSS (`html:not([data-js]) .revelar`); esta red es
+         para el otro, que el CSS no puede distinguir.
+
+         Va en el `<head>` y no al final del `<body>` a propósito: si se
+         emitiera después, un fallo de red que corte el HTML a la mitad se
+         llevaría por delante justo la red que debía cubrirlo. */ ?>
+<script>
+document.documentElement.dataset.js = '1';
+window.__paRedRevelado = setTimeout(function () {
+    var ocultos = document.querySelectorAll('.revelar:not([data-visible])');
+    for (var i = 0; i < ocultos.length; i++) { ocultos[i].setAttribute('data-visible', ''); }
+}, 2500);
+</script>
 </head>
 
 <body>
 <a href="#contenido" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-3 focus:bg-tinta focus:px-4 focus:py-2 focus:text-papel">
     Saltar al contenido
 </a>
+
+<?php
+/* Cabecera.
+ *
+ * Los tres enlaces son anclas a secciones de esta misma página, no rutas: la
+ * landing es un documento único y un menú que llevara a otras páginas
+ * repartiría en cuatro sitios la atención que tiene que terminar en un solo
+ * botón. La única salida real es `/perfil`, y por eso es la que va nombrada
+ * como diagnóstico.
+ *
+ * En móvil los enlaces desaparecen y quedan la firma y el botón. No hay
+ * hamburguesa a propósito: abrir un panel exige JavaScript, y §13.5 dice que
+ * la conversión no depende de un script. Con la página completa a un scroll
+ * de distancia, un menú plegable resolvería un problema que no existe.
+ */
+?>
+<header class="barra-sitio sobre-tinta text-papel">
+    <div class="mx-auto flex max-w-6xl items-center gap-6 px-5 py-3 md:px-8">
+        <a href="#contenido" class="marca" aria-label="Pedro, abogado aduanero y tributario">Pedro</a>
+
+        <nav aria-label="Secciones" class="ml-auto hidden items-center gap-8 md:flex">
+            <a href="#situaciones" class="menu-enlace">Situaciones</a>
+            <a href="#diagnostico" class="menu-enlace">Diagnóstico</a>
+            <a href="#proceso" class="menu-enlace">Cómo funciona</a>
+        </nav>
+
+        <div class="ml-auto md:ml-0">
+            <?= Vista::botonWhatsapp($waBase, 'Escribir', 'compacto') ?>
+        </div>
+    </div>
+</header>
 
 <main id="contenido">
 <?php

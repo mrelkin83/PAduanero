@@ -28,7 +28,7 @@ if ($promesas === []) {
             <div class="lg:col-span-7">
                 <p class="rotulo revelar">Diagnóstico gratuito</p>
 
-                <h2 class="titular-seccion revelar mt-6" style="--retardo:80ms">
+                <h2 class="titular-seccion revelar mt-6 text-[2rem] md:text-[2.75rem]" style="--retardo:80ms">
                     <?= $e($bloque->titulo) ?>
                 </h2>
 
@@ -57,7 +57,7 @@ if ($promesas === []) {
                         </span>
                     </span>
 
-                    <span class="titular-menor mt-8 block">
+                    <span class="titular-menor mt-8 block text-[1.5rem]">
                         <?= $e($bloque->texto('cta_texto', 'Diagnosticar mi caso')) ?>
                     </span>
 
