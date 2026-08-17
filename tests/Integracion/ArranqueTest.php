@@ -32,7 +32,7 @@ final class ArranqueTest extends TestCase
         parent::setUp();
         $this->raiz = dirname(__DIR__, 2);
 
-        foreach (['MASTER_KEY', 'PEPPER_TELEFONO'] as $clave) {
+        foreach (['MASTER_KEY'] as $clave) {
             $this->original[$clave] = getenv($clave);
         }
     }
@@ -56,7 +56,6 @@ final class ArranqueTest extends TestCase
 
     #[Test]
     #[TestWith(['MASTER_KEY'])]
-    #[TestWith(['PEPPER_TELEFONO'])]
     public function sinLaClaveLaAppNoArranca(string $clave): void
     {
         putenv($clave);

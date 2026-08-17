@@ -68,4 +68,3 @@ if (!is_string($base) || !str_ends_with($base, '_pruebas')) {
 // propósito: una clave aleatoria por corrida haría irreproducible cualquier
 // fallo de cifrado.
 putenv('MASTER_KEY=' . base64_encode(str_repeat("\x01", 32)));
-putenv('PEPPER_TELEFONO=' . base64_encode(str_repeat("\x02", 32)));

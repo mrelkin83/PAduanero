@@ -5,12 +5,25 @@ declare(strict_types=1);
 use App\Soporte\Vista;
 
 /**
+ * Tablero.
+ *
+ * Se encogió con el motor. Antes abría con los dos interruptores de la IA
+ * —pausa y modo sombra— y seguía con el embudo hasta la asesoría pagada.
+ * Ahora mide solo lo que ocurre dentro de esta aplicación: qué canal trae
+ * visitas y cuántas terminan pulsando el botón de WhatsApp.
+ *
+ * Eso obliga a un cuidado al leerlo, y por eso está escrito en la pantalla:
+ * la conversión que muestra es a CONVERSACIÓN INICIADA, no a cliente. Lo que
+ * pase después del clic ocurre en WhatsApp, donde este sistema ya no mira.
+ *
  * @var \App\Panel\Contexto $ctx
- * @var bool  $iaPausada
- * @var bool  $modoSombra
- * @var int   $precio
- * @var string $pasarela
+ * @var int    $precio
  * @var list<string> $pendientes
+ * @var string $desde
+ * @var string $hasta
+ * @var list<array{canal:string,tipo:string,eventos:int}> $canales
+ * @var array<string,int> $inversion
+ * @var bool   $puedeAnotarInversion
  * @var array{ok:string,error:string} $avisos
  */
 
@@ -20,81 +33,68 @@ $titulo = 'Tablero';
 $contenido = static function () use (
     $e,
     $ctx,
-    $iaPausada,
-    $modoSombra,
     $precio,
-    $pasarela,
     $pendientes,
     $desde,
     $hasta,
-    $embudo,
-    $landing,
+    $canales,
+    $inversion,
     $puedeAnotarInversion,
-): void { ?>
+): void {
+    /* Se pivota aquí y no en el servicio porque es presentación: la consulta
+       devuelve una fila por canal y tipo, que es la forma correcta de
+       agregarlo en SQL; la tabla necesita una fila por canal. */
+    $filas = [];
 
-    <?php /* Los dos interruptores, siempre a la vista: «que nunca se olvide
-             encendida o apagada por descuido» (PANEL_ADMIN §2.1). */ ?>
+    foreach ($canales as $fila) {
+        $canal = $fila['canal'];
+        $filas[$canal] ??= ['vista' => 0, 'scroll_50' => 0, 'click_whatsapp' => 0, 'perfil' => 0];
+
+        if (str_starts_with($fila['tipo'], 'perfil_')) {
+            $filas[$canal]['perfil'] += $fila['eventos'];
+        } elseif (isset($filas[$canal][$fila['tipo']])) {
+            $filas[$canal][$fila['tipo']] += $fila['eventos'];
+        }
+    }
+
+    ksort($filas);
+    ?>
+
     <section class="grid gap-4 sm:grid-cols-2">
         <div class="tarjeta p-4">
-            <p class="rotulo">Motor de IA</p>
-            <p class="mt-2 text-lg font-semibold <?= $iaPausada ? 'text-sello' : '' ?>">
-                <?= $iaPausada ? 'PAUSADA' : 'Activa' ?>
-            </p>
-            <p class="mt-1 text-sm text-acero">
-                <?= $iaPausada
-                    ? 'El bot está callado. Chatwoot y WhatsApp siguen funcionando.'
-                    : 'El bot responde según su horario.' ?>
-            </p>
-        </div>
-
-        <div class="tarjeta p-4">
-            <p class="rotulo">Modo sombra</p>
-            <p class="mt-2 text-lg font-semibold <?= $modoSombra ? 'text-ambar' : '' ?>">
-                <?= $modoSombra ? 'ENCENDIDO' : 'Envío automático' ?>
-            </p>
-            <p class="mt-1 text-sm text-acero">
-                <?= $modoSombra
-                    ? 'La IA escribe como nota privada; no envía nada al cliente.'
-                    : 'La IA responde directamente al cliente.' ?>
-            </p>
-        </div>
-    </section>
-
-    <section class="mt-6 grid gap-4 sm:grid-cols-2">
-        <div class="tarjeta p-4">
-            <p class="rotulo">Tarifa vigente</p>
+            <p class="rotulo">Precio de la asesoría</p>
             <p class="mt-2 font-mono text-lg font-semibold">
                 $<?= $e(number_format($precio, 0, ',', '.')) ?>
             </p>
-            <p class="mt-1 text-sm text-acero">
-                En pesos. Las reservas ya creadas conservan el precio que tenían.
+            <p class="mt-1 text-xs text-acero">
+                En pesos. Es el que se pinta en la landing y en el diagnóstico.
             </p>
         </div>
 
         <div class="tarjeta p-4">
-            <p class="rotulo">Pasarela activa</p>
-            <p class="mt-2 font-mono text-lg font-semibold"><?= $e($pasarela ?: '—') ?></p>
-            <?php if ($ctx->puede('pagos.credenciales.ver')): ?>
-                <a href="/panel/pagos" class="mt-1 inline-block text-sm underline">Probar conexión</a>
-            <?php endif; ?>
+            <p class="rotulo">Alcance de esta pantalla</p>
+            <p class="mt-2 text-sm">Hasta el clic a WhatsApp</p>
+            <p class="mt-1 text-xs text-acero">
+                Lo que ocurre en la conversación ya no se mide aquí: el motor
+                y la pasarela se retiraron.
+            </p>
         </div>
     </section>
 
     <?php if ($pendientes !== []): ?>
     <section class="mt-8">
-        <h2 class="rotulo">Antes de poder cobrar</h2>
-        <ul class="mt-3 space-y-2">
+        <h2 class="rotulo">Antes de publicar</h2>
+        <ul class="mt-3 space-y-2 text-sm">
             <?php foreach ($pendientes as $pendiente): ?>
-                <li class="aviso aviso-atencion"><?= $e($pendiente) ?></li>
+            <li class="aviso-atencion p-3"><?= $e($pendiente) ?></li>
             <?php endforeach; ?>
         </ul>
     </section>
     <?php endif; ?>
 
-    <?php /* ── El embudo por canal (Etapa 8) ─────────────────────────── */ ?>
     <section class="mt-10">
         <div class="flex flex-wrap items-baseline justify-between gap-3">
-            <h2 class="rotulo">Embudo por canal</h2>
+            <h2 class="rotulo">Landing por canal</h2>
 
             <form method="get" action="/panel" class="flex flex-wrap items-center gap-2 text-sm">
                 <input type="date" name="desde" value="<?= $e($desde) ?>" class="campo" style="max-width:11rem">
@@ -104,48 +104,49 @@ $contenido = static function () use (
             </form>
         </div>
 
-        <?php if ($embudo === []): ?>
-            <p class="mt-3 text-sm text-acero">Sin contactos en el rango.</p>
+        <?php if ($filas === []): ?>
+            <p class="mt-3 text-sm text-acero">Sin visitas registradas en el rango.</p>
         <?php else: ?>
         <div class="mt-3 overflow-x-auto">
         <table class="tabla">
             <thead>
                 <tr>
                     <th>Canal</th>
-                    <th>Leads</th>
-                    <th>Casos</th>
-                    <th>Pagadas</th>
+                    <th>Vistas</th>
+                    <th>Leyeron</th>
+                    <th>Diagnóstico</th>
+                    <th>Clics a WhatsApp</th>
                     <th>Conversión</th>
                     <th>Inversión</th>
-                    <th>Costo / lead</th>
-                    <th>Ingresos</th>
+                    <th>Costo / clic</th>
                 </tr>
             </thead>
             <tbody>
-            <?php foreach ($embudo as $f): ?>
+            <?php foreach ($filas as $canal => $f): ?>
+                <?php
+                $gastado = $inversion[$canal] ?? null;
+
+                /* Ambos se pintan como raya cuando no hay denominador, nunca
+                   como 0: un cero ahí diría que nadie convirtió o que los
+                   clics salieron gratis, y las dos cosas son falsas. */
+                $conversion = $f['vista'] > 0 ? $f['click_whatsapp'] / $f['vista'] : null;
+                $costo = ($gastado !== null && $f['click_whatsapp'] > 0)
+                    ? (int) round($gastado / $f['click_whatsapp'])
+                    : null;
+                ?>
                 <tr>
-                    <td class="font-mono text-sm"><?= $e($f['canal']) ?></td>
-                    <td><?= $f['leads'] ?></td>
-                    <td><?= $f['casos'] ?></td>
-                    <td><?= $f['pagadas'] ?></td>
+                    <td class="font-mono text-sm"><?= $e($canal) ?></td>
+                    <td><?= $f['vista'] ?></td>
+                    <td><?= $f['scroll_50'] ?></td>
+                    <td><?= $f['perfil'] ?></td>
+                    <td><?= $f['click_whatsapp'] ?></td>
+                    <td><?= $conversion !== null ? number_format($conversion * 100, 1) . ' %' : '—' ?></td>
                     <td>
-                        <?php /* NULL se pinta como raya, no como 0 %: un cero
-                                donde no hay denominador es un dato falso. */ ?>
-                        <?= $f['conversion'] !== null
-                            ? number_format($f['conversion'] * 100, 1) . ' %'
-                            : '—' ?>
-                    </td>
-                    <td>
-                        <?= $f['inversion_cop'] > 0
-                            ? '$' . number_format($f['inversion_cop'], 0, ',', '.')
+                        <?= $gastado !== null
+                            ? '$' . number_format($gastado, 0, ',', '.')
                             : '<span class="text-acero">sin anotar</span>' ?>
                     </td>
-                    <td>
-                        <?= $f['costo_por_lead_cop'] !== null
-                            ? '$' . number_format($f['costo_por_lead_cop'], 0, ',', '.')
-                            : '—' ?>
-                    </td>
-                    <td>$<?= number_format($f['ingresos_cop'], 0, ',', '.') ?></td>
+                    <td><?= $costo !== null ? '$' . number_format($costo, 0, ',', '.') : '—' ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -153,22 +154,13 @@ $contenido = static function () use (
         </div>
         <?php endif; ?>
 
-        <?php if ($landing !== []): ?>
-        <p class="mt-3 text-xs text-acero">
-            Landing en el rango:
-            <?php foreach ($landing as $l): ?>
-                <span class="ml-2 font-mono"><?= $e($l['canal']) ?>·<?= $e($l['tipo']) ?>: <?= $l['eventos'] ?></span>
-            <?php endforeach; ?>
-        </p>
-        <?php endif; ?>
-
         <?php if ($puedeAnotarInversion): ?>
         <details class="mt-4">
             <summary class="cursor-pointer text-sm text-acero">Anotar inversión mensual de un canal</summary>
             <p class="mt-2 text-xs text-acero">
                 Mientras no haya tokens de Meta Ads y Google Ads, la inversión se anota a
-                mano. Sin ella, el costo por lead sale como raya — nunca como $0, que
-                diría que los leads fueron gratis.
+                mano. Sin ella, el costo por clic sale como raya — nunca como $0, que
+                diría que los clics fueron gratis.
             </p>
             <form method="post" action="/panel/inversion" class="mt-2 flex flex-wrap items-end gap-2">
                 <?= $ctx->csrf->campoOculto() ?>
@@ -189,10 +181,6 @@ $contenido = static function () use (
         </details>
         <?php endif; ?>
     </section>
-
-    <p class="mt-8 text-sm text-acero">
-        Las conversaciones viven en Chatwoot, no aquí (ADR-006).
-    </p>
 
 <?php };
 

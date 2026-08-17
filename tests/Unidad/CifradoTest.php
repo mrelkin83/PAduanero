@@ -15,11 +15,10 @@ use PHPUnit\Framework\TestCase;
 final class CifradoTest extends TestCase
 {
     private const CLAVE = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';   // 32 bytes
-    private const PEPPER = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=';
 
     private function cifrado(): Cifrado
     {
-        return new Cifrado(self::CLAVE, self::PEPPER);
+        return new Cifrado(self::CLAVE);
     }
 
     #[Test]
@@ -68,7 +67,7 @@ final class CifradoTest extends TestCase
     public function otraClaveMaestraNoDescifra(): void
     {
         $blob = $this->cifrado()->cifrar('secreto');
-        $otro = new Cifrado('CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=', self::PEPPER);
+        $otro = new Cifrado('CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=');
 
         $this->expectException(CifradoException::class);
         $otro->descifrar($blob);
@@ -88,53 +87,14 @@ final class CifradoTest extends TestCase
     public function sinClaveDe32BytesNoSeConstruye(): void
     {
         $this->expectException(ConfiguracionFatalException::class);
-        new Cifrado(base64_encode('corta'), self::PEPPER);
+        new Cifrado(base64_encode('corta'));
     }
 
     #[Test]
     public function claveQueNoEsBase64SeRechaza(): void
     {
         $this->expectException(ConfiguracionFatalException::class);
-        new Cifrado('esto no es base64 !!!', self::PEPPER);
-    }
-
-    #[Test]
-    public function elHashDeTelefonoEsDeterministaYDependeDelPepper(): void
-    {
-        $a = new Cifrado(self::CLAVE, self::PEPPER);
-        $b = new Cifrado(self::CLAVE, 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=');
-
-        self::assertSame($a->hashTelefono('573159923676'), $a->hashTelefono('573159923676'));
-        self::assertNotSame(
-            $a->hashTelefono('573159923676'),
-            $b->hashTelefono('573159923676'),
-            'con otro pepper el hash debe cambiar: es lo que impide la fuerza bruta',
-        );
-    }
-
-    #[Test]
-    public function elHashDeTelefonoNormalizaElFormato(): void
-    {
-        $c = $this->cifrado();
-
-        // El mismo número llega escrito de varias formas según el canal.
-        // Si no se normaliza, el mismo contacto se duplica.
-        $esperado = $c->hashTelefono('573159923676');
-
-        self::assertSame($esperado, $c->hashTelefono('+573159923676'));
-        self::assertSame($esperado, $c->hashTelefono('+57 315 992 3676'));
-    }
-
-    #[Test]
-    public function elHashNoEsSha256Pelado(): void
-    {
-        // Si alguien "simplifica" hashTelefono() a hash('sha256', $tel), esta
-        // prueba lo detecta: un número de 12 dígitos se rompe por fuerza
-        // bruta en segundos (ADR-012).
-        self::assertNotSame(
-            hash('sha256', '573159923676'),
-            $this->cifrado()->hashTelefono('573159923676'),
-        );
+        new Cifrado('esto no es base64 !!!');
     }
 
     #[Test]

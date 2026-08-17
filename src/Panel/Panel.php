@@ -14,7 +14,6 @@ use App\Repositorios\AuditoriaRepo;
 use App\Repositorios\UsuarioRepo;
 use App\Servicios\Autenticacion;
 use App\Servicios\Config;
-use App\Servicios\Credenciales;
 use App\Servicios\Permisos;
 use App\Servicios\SinPermisoException;
 use App\Soporte\Entorno;
@@ -139,33 +138,6 @@ final class Panel
             'GET /tarifas' => $modulos['tarifas']->listar($ctx),
             'POST /tarifas' => $modulos['tarifas']->guardar($ctx),
 
-            'GET /pagos' => $modulos['pagos']->inicio($ctx),
-            'POST /pagos/credenciales' => $modulos['pagos']->guardarCredencial($ctx),
-            'POST /pagos/probar' => $modulos['pagos']->probar($ctx),
-
-            'GET /prompts' => $modulos['prompts']->listar($ctx),
-            'POST /prompts' => $modulos['prompts']->crear($ctx),
-            'POST /prompts/activar' => $modulos['prompts']->activar($ctx),
-            'GET /prompts/diff' => $modulos['prompts']->diferencias($ctx),
-
-            'GET /conocimiento' => $modulos['conocimiento']->inicio($ctx),
-            'POST /conocimiento' => $modulos['conocimiento']->crear($ctx),
-            'POST /conocimiento/verificar' => $modulos['conocimiento']->verificar($ctx),
-            'POST /conocimiento/vigencia' => $modulos['conocimiento']->alternarVigencia($ctx),
-
-            'GET /ia' => $modulos['ia']->inicio($ctx),
-            'POST /ia/proveedor' => $modulos['ia']->crearProveedor($ctx),
-            'POST /ia/proveedor/activo' => $modulos['ia']->alternarProveedor($ctx),
-            'POST /ia/credencial' => $modulos['ia']->guardarCredencial($ctx),
-            'POST /ia/sincronizar' => $modulos['ia']->sincronizar($ctx),
-            'POST /ia/proveedor/sincronizar' => $modulos['ia']->sincronizarProveedor($ctx),
-            'GET /ia/modelos' => $modulos['ia']->modelosDe($ctx),
-            'POST /ia/configurar' => $modulos['ia']->configurar($ctx),
-            'POST /ia/probar' => $modulos['ia']->probar($ctx),
-            'POST /ia/costo' => $modulos['ia']->guardarCosto($ctx),
-            'POST /ia/activo' => $modulos['ia']->alternarActivo($ctx),
-            'POST /ia/promover' => $modulos['ia']->promover($ctx),
-
             'GET /usuarios' => $modulos['usuarios']->listar($ctx),
             'POST /usuarios' => $modulos['usuarios']->crear($ctx),
 
@@ -190,7 +162,7 @@ final class Panel
             'tablero' => new TableroControlador(
                 $this->c->obtener(BD::class),
                 $this->c->obtener(Config::class),
-                new \App\Servicios\Metricas($this->c->obtener(BD::class)),
+                $this->c->obtener(\App\Servicios\MetricasLanding::class),
             ),
             'configuracion' => new ConfiguracionControlador(
                 $this->c->obtener(Config::class),
@@ -199,38 +171,12 @@ final class Panel
                 $this->c->obtener(BD::class),
                 $this->c->obtener(AuditoriaRepo::class),
             ),
-            'pagos' => new PagosControlador(
-                $this->c->obtener(Credenciales::class),
-                $this->c->obtener(\App\Repositorios\CredencialRepo::class),
-                $this->c->obtener(Config::class),
-                rtrim(Entorno::obtener('APP_URL', '') ?? '', '/'),
-            ),
-            'prompts' => new PromptsControlador(
-                $this->c->obtener(\App\Repositorios\PromptRepo::class),
-                $this->c->obtener(\App\Servicios\GateDorado::class),
-                $this->c->obtener(AuditoriaRepo::class),
-            ),
-            'conocimiento' => new ConocimientoControlador(
-                $this->c->obtener(BD::class),
-                $this->c->obtener(\App\Servicios\BaseConocimiento::class),
-                $this->c->obtener(AuditoriaRepo::class),
-            ),
-            'ia' => new IaControlador(
-                $this->c->obtener(BD::class),
-                $this->c->obtener(\App\Servicios\CatalogoModelos::class),
-                $this->c->obtener(\App\Servicios\GateDorado::class),
-                $this->c->obtener(Credenciales::class),
-                $this->c->obtener(\App\Repositorios\CredencialRepo::class),
-                $this->c->obtener(AuditoriaRepo::class),
-                $this->c->obtener(\App\Servicios\Llm::class),
-            ),
             'usuarios' => new UsuariosControlador(
                 $this->c->obtener(UsuarioRepo::class),
                 $this->c->obtener(Autenticacion::class),
                 $this->c->obtener(AuditoriaRepo::class),
                 $this->c->obtener(BD::class),
                 $this->c->obtener(Logger::class),
-                $this->c->obtener(\App\Servicios\ChatwootAgentes::class),
             ),
             'auditoria' => new AuditoriaControlador(
                 $this->c->obtener(AuditoriaRepo::class),

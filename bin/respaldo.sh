@@ -94,12 +94,12 @@ tar cf "${TRABAJO}/archivos/publicos.tar" \
 
 # .env SIN las claves de cifrado: se respalda la configuración de conexión,
 # no las llaves. Esas van por otro canal (docs/RESPALDOS.md §4).
-grep -vE '^(MASTER_KEY|PEPPER_TELEFONO)=' "${RAIZ}/.env" \
+grep -vE '^MASTER_KEY=' "${RAIZ}/.env" \
   > "${TRABAJO}/archivos/env.sinclave" || true
 
 # Verificación: si el filtro se rompe, el respaldo cifrado contendría las
 # llaves que lo protegen. Preferimos fallar el respaldo a filtrarlas.
-if grep -qE '^(MASTER_KEY|PEPPER_TELEFONO)=.' "${TRABAJO}/archivos/env.sinclave"; then
+if grep -qE '^MASTER_KEY=.' "${TRABAJO}/archivos/env.sinclave"; then
   fallo "el .env filtrado todavía contiene claves de cifrado"
 fi
 

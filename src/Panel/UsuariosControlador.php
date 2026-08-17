@@ -9,7 +9,6 @@ use App\Core\Respuesta;
 use App\Repositorios\AuditoriaRepo;
 use App\Repositorios\UsuarioRepo;
 use App\Servicios\Autenticacion;
-use App\Servicios\ChatwootAgentes;
 use App\Soporte\Logger;
 
 final class UsuariosControlador extends ControladorBase
@@ -20,7 +19,6 @@ final class UsuariosControlador extends ControladorBase
         private readonly AuditoriaRepo $auditoria,
         private readonly BD $bd,
         private readonly Logger $log,
-        private readonly ?ChatwootAgentes $chatwoot = null,
     ) {
     }
 
@@ -54,8 +52,10 @@ final class UsuariosControlador extends ControladorBase
             return $this->redirigirCon('/panel/usuarios', 'error', 'El nombre no puede estar vacío.');
         }
 
-        // 12 caracteres para una cuenta que puede ver credenciales de una
-        // pasarela de pagos. Es el mismo mínimo que bin/crear-usuario.php.
+        // 12 caracteres. El mínimo se fijó cuando estas cuentas podían ver
+        // las credenciales de la pasarela; ya no existen, pero siguen
+        // pudiendo editar el contenido público del despacho y cambiar quién
+        // entra. Es el mismo mínimo que bin/crear-usuario.php.
         if (mb_strlen($password) < 12) {
             return $this->redirigirCon('/panel/usuarios', 'error', 'La contraseña debe tener al menos 12 caracteres.');
         }
@@ -82,53 +82,15 @@ final class UsuariosControlador extends ControladorBase
 
         $mensaje = "Usuario creado con rol «{$rol['clave']}».";
 
-        // Aprovisionamiento del agente en Chatwoot: una sola alta, no dos
-        // (docs/PANEL_ADMIN.md §2.9).
-        if (in_array($rol['clave'], ['abogado', 'asistente'], true)) {
-            $mensaje .= ' ' . $this->aprovisionar($id, $email, $nombre, $ctx);
-        }
+        // Aquí se daba de alta además el agente en Chatwoot, para que un
+        // usuario del panel fuera una sola alta y no dos. Se retiró con la
+        // bandeja: ya no hay segundo sistema al que dar de alta a nadie.
 
         if (in_array($rol['clave'], ['super_admin', 'abogado'], true)) {
             $mensaje .= ' Este rol exige verificación en dos pasos: se le pedirá activarla al entrar.';
         }
 
         return $this->redirigirCon('/panel/usuarios', 'ok', $mensaje);
-    }
-
-    /**
-     * Crea el agente en Chatwoot.
-     *
-     * **Nunca tumba el alta del usuario.** Chatwoot puede no estar desplegado
-     * todavía (la Etapa 2 no cierra hasta que el PO ejecute el despliegue), o
-     * estar caído. Que eso impida crear un usuario del panel sería acoplar
-     * dos sistemas que no tienen por qué caerse juntos: se avisa y se puede
-     * reintentar después.
-     */
-    private function aprovisionar(string $usuarioId, string $email, string $nombre, Contexto $ctx): string
-    {
-        if ($this->chatwoot === null) {
-            return 'Chatwoot no está configurado todavía: el agente habrá que crearlo cuando lo esté.';
-        }
-
-        try {
-            $agenteId = $this->chatwoot->crearAgente($email, $nombre);
-
-            if ($agenteId === null) {
-                return 'No se pudo crear el agente en Chatwoot; revisar y reintentar.';
-            }
-
-            $this->usuarios->guardarChatwootAgentId($usuarioId, $agenteId);
-
-            $this->auditoria->registrar('usuario', $usuarioId, 'agente_chatwoot_creado', $ctx->actor(), [
-                'chatwoot_agent_id' => $agenteId,
-            ], $ctx->ip());
-
-            return "Agente creado en Chatwoot (id {$agenteId}).";
-        } catch (\Throwable $e) {
-            $this->log->error('panel.chatwoot_aprovisionar_fallido', ['excepcion' => $e::class]);
-
-            return 'El usuario quedó creado, pero falló el alta del agente en Chatwoot.';
-        }
     }
 
     // ── Seguridad de la propia cuenta ────────────────────────────────────

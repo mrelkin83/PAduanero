@@ -10,18 +10,15 @@ use App\Modelos\Usuario;
 use App\Panel\AuditoriaControlador;
 use App\Panel\ConfiguracionControlador;
 use App\Panel\Contexto;
-use App\Panel\PagosControlador;
 use App\Panel\TableroControlador;
 use App\Panel\TarifasControlador;
 use App\Panel\UsuariosControlador;
 use App\Repositorios\AuditoriaRepo;
-use App\Repositorios\CredencialRepo;
 use App\Repositorios\IntentoAccesoRepo;
 use App\Repositorios\SesionRepo;
 use App\Repositorios\UsuarioRepo;
 use App\Servicios\Autenticacion;
 use App\Servicios\ConfigMysql;
-use App\Servicios\CredencialesAes;
 use App\Servicios\Permisos;
 use App\Servicios\SinPermisoException;
 use App\Soporte\Cifrado;
@@ -45,7 +42,6 @@ final class PanelTest extends CasoBaseBd
     private ConfigMysql $config;
     private AuditoriaRepo $auditoria;
     private UsuarioRepo $usuarios;
-    private CredencialesAes $credenciales;
     private Logger $log;
 
     protected function setUp(): void
@@ -64,13 +60,6 @@ final class PanelTest extends CasoBaseBd
         $this->auditoria = new AuditoriaRepo($this->bd);
         $this->usuarios = new UsuarioRepo($this->bd, $cifrado);
         $this->log = new Logger(sys_get_temp_dir() . '/pa-panel.log', 'error');
-
-        // Con el mismo probador que registra la aplicación: sin él, «Probar
-        // conexión» respondería «no hay probador» y la prueba mediría otra
-        // cosa distinta de la que corre en producción.
-        $this->credenciales = new CredencialesAes($this->bd, $cifrado, $this->log, [
-            new \App\Servicios\Probadores\ProbadorWompi(new \App\Soporte\Http()),
-        ]);
     }
 
     // ── Andamiaje ────────────────────────────────────────────────────────
@@ -83,7 +72,6 @@ final class PanelTest extends CasoBaseBd
             nombre: ucfirst($rol) . ' de prueba',
             rol: $rol,
             rolId: 1,
-            chatwootAgentId: null,
             totpActivo: true,
             activo: true,
             intentosFallidos: 0,
@@ -110,7 +98,11 @@ final class PanelTest extends CasoBaseBd
 
     private function tablero(): TableroControlador
     {
-        return new TableroControlador($this->bd, $this->config, new \App\Servicios\Metricas($this->bd));
+        return new TableroControlador(
+            $this->bd,
+            $this->config,
+            new \App\Servicios\MetricasLanding($this->bd, $this->config),
+        );
     }
 
     private function configuracion(): ConfiguracionControlador
@@ -123,16 +115,6 @@ final class PanelTest extends CasoBaseBd
         return new TarifasControlador($this->bd, $this->auditoria);
     }
 
-    private function pagos(): PagosControlador
-    {
-        return new PagosControlador(
-            $this->credenciales,
-            new CredencialRepo($this->bd),
-            $this->config,
-            'https://pedroabogadoaduanero.com',
-        );
-    }
-
     private function modalidadId(): string
     {
         return (string) $this->bd->pdo()->query('SELECT id FROM modalidades_asesoria LIMIT 1')->fetchColumn();
@@ -141,26 +123,25 @@ final class PanelTest extends CasoBaseBd
     // ── Tablero ──────────────────────────────────────────────────────────
 
     #[Test]
-    public function elTableroMuestraLosDosInterruptoresDelMotor(): void
+    public function elTableroMuestraElPrecioQueSePintaEnLaLanding(): void
     {
         $html = $this->tablero()->inicio($this->ctx('abogado'))->cuerpo;
 
-        // «Que nunca se olvide encendida o apagada por descuido».
-        self::assertStringContainsString('Modo sombra', $html);
-        self::assertStringContainsString('ENCENDIDO', $html);
-        self::assertStringContainsString('Motor de IA', $html);
+        // El precio sobrevivió al recorte porque no lo usaba la pasarela: lo
+        // pintan la landing y el diagnóstico. Si deja de verse aquí, se
+        // cambia a ciegas.
+        self::assertStringContainsString('Precio de la asesoría', $html);
     }
 
     #[Test]
-    public function elTableroAvisaDeLoQueBloqueaElCobro(): void
+    public function elTableroDiceHastaDondeMide(): void
     {
         $html = $this->tablero()->inicio($this->ctx('abogado'))->cuerpo;
 
-        // Con las semillas de fábrica, la política de reembolso y el aviso de
-        // habeas data están vacíos. Si no se ven aquí, se descubren el día
-        // que un cliente intenta pagar.
-        self::assertStringContainsString('política de reembolso', $html);
-        self::assertStringContainsString('habeas data', $html);
+        // Lo que esta pantalla llama «conversión» es a conversación iniciada,
+        // no a cliente: lo que pasa después del clic ocurre en WhatsApp. Sin
+        // decirlo en la propia pantalla, el número se lee como lo que no es.
+        self::assertStringContainsString('Hasta el clic a WhatsApp', $html);
     }
 
     #[Test]
@@ -333,85 +314,6 @@ final class PanelTest extends CasoBaseBd
             'precio_cop' => '1',
             'duracion_min' => '60',
         ]));
-    }
-
-    // ── Pagos ────────────────────────────────────────────────────────────
-
-    #[Test]
-    public function elAbogadoNoVeLaSeccionDeCredenciales(): void
-    {
-        $this->credenciales->guardar('wompi', 'llave_privada', 'prv_test_SECRETO', 'pruebas', 'u');
-
-        $html = $this->pagos()->inicio($this->ctx('abogado'))->cuerpo;
-
-        self::assertStringNotContainsString('prv_test_SECRETO', $html);
-        self::assertStringContainsString('solo las ve y edita el administrador', $html);
-    }
-
-    #[Test]
-    public function elAdministradorTecnicoVeSoloLaMascara(): void
-    {
-        $this->credenciales->guardar('wompi', 'llave_privada', 'prv_test_SECRETO123', 'pruebas', 'u');
-
-        $html = $this->pagos()->inicio($this->ctx('super_admin'))->cuerpo;
-
-        self::assertStringNotContainsString('prv_test_SECRETO123', $html);
-        self::assertStringNotContainsString('SECRETO', $html);
-        self::assertStringContainsString('••••••••123', $html);
-    }
-
-    #[Test]
-    public function laPantallaMuestraLaUrlDelWebhook(): void
-    {
-        $html = $this->pagos()->inicio($this->ctx('super_admin'))->cuerpo;
-
-        self::assertStringContainsString('https://pedroabogadoaduanero.com/webhooks/pagos', $html);
-    }
-
-    #[Test]
-    public function elAbogadoNoPuedeGuardarCredenciales(): void
-    {
-        $this->expectException(SinPermisoException::class);
-
-        $this->pagos()->guardarCredencial($this->ctx('abogado', [
-            'servicio' => 'wompi', 'clave' => 'llave_privada',
-            'entorno' => 'pruebas', 'valor' => 'x',
-        ]));
-    }
-
-    #[Test]
-    public function unaClaveNoReconocidaSeRechaza(): void
-    {
-        $r = $this->pagos()->guardarCredencial($this->ctx('super_admin', [
-            'servicio' => 'wompi', 'clave' => 'clave_inventada',
-            'entorno' => 'pruebas', 'valor' => 'x',
-        ]));
-
-        self::assertStringContainsString('no+reconocida', $r->cabeceras['Location']);
-    }
-
-    #[Test]
-    public function guardarUnaCredencialDevuelveSoloLaMascara(): void
-    {
-        $r = $this->pagos()->guardarCredencial($this->ctx('super_admin', [
-            'servicio' => 'wompi', 'clave' => 'llave_publica',
-            'entorno' => 'pruebas', 'valor' => 'pub_test_ABCDEFGH123',
-        ]));
-
-        $destino = urldecode($r->cabeceras['Location']);
-
-        self::assertStringNotContainsString('pub_test_ABCDEFGH', $destino);
-        self::assertStringContainsString('••••••••123', $destino);
-    }
-
-    #[Test]
-    public function probarSinCredencialesDiceQueFalta(): void
-    {
-        $r = $this->pagos()->probar($this->ctx('super_admin', [
-            'servicio' => 'wompi', 'entorno' => 'pruebas',
-        ]));
-
-        self::assertStringContainsString('Faltan+credenciales', $r->cabeceras['Location']);
     }
 
     // ── Auditoría ────────────────────────────────────────────────────────

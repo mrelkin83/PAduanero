@@ -18,13 +18,14 @@ $e = Vista::e(...);
 $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/panel.css') ?: '';
 $rutaActual = $ctx->peticion->ruta;
 
+// Se retiraron «Pagos», «Modelos de IA», «Prompts del bot» y «Conocimiento»
+// junto con el motor y la pasarela. «Agenda y tarifas» se queda a medias a
+// propósito: la agenda ya no existe, pero el precio sigue alimentando el
+// copy de la landing y del diagnóstico, así que la pantalla sobrevive por
+// la tarifa.
 $menu = [
     ['/panel', 'Tablero', 'tablero.ver'],
-    ['/panel/tarifas', 'Agenda y tarifas', 'agenda.ver'],
-    ['/panel/pagos', 'Pagos', 'pagos.transacciones.ver'],
-    ['/panel/ia', 'Modelos de IA', 'ia.proveedores.ver'],
-    ['/panel/prompts', 'Prompts del bot', 'ia.prompts.editar'],
-    ['/panel/conocimiento', 'Conocimiento', 'kb.cargar'],
+    ['/panel/tarifas', 'Tarifas', 'agenda.ver'],
     ['/panel/configuracion', 'Configuración', 'config.ver'],
     ['/panel/usuarios', 'Usuarios', 'usuarios.ver'],
     ['/panel/auditoria', 'Bitácora', 'auditoria.ver'],
@@ -88,19 +89,15 @@ $menu = [
         </div>
 
         <?php
-        /* Aviso de uso de Evolution API.
-           Lo exige la cláusula 1.b de su LICENSE: notificación clara, visible
-           para los administradores del sistema y accesible desde la página de
-           ajustes. Va aquí y no en la landing porque es a los administradores
-           a quienes debe verse (CLAUDE.md §1.3). No se quita. */
+        /* Aquí iba el aviso de uso de Evolution API, que exigía la cláusula
+           1.b de su LICENSE: notificación clara y visible para los
+           administradores. Se retira porque la obligación se extingue con el
+           uso — este sistema ya no integra Evolution ni Chatwoot, y dejar el
+           aviso sería afirmar algo que no es cierto.
+
+           Si algún día vuelve la bandeja omnicanal, el aviso vuelve con
+           ella: es condición de la licencia, no cortesía. */
         ?>
-        <footer class="mt-14 border-t border-acero/20 pt-4 text-xs text-acero">
-            <p>
-                Este sistema utiliza <strong>Evolution API</strong> para la integración con WhatsApp
-                (Apache 2.0, © Evolution API) y <strong>Chatwoot</strong> Community Edition
-                (MIT) como bandeja omnicanal.
-            </p>
-        </footer>
     </main>
 </div>
 

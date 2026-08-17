@@ -38,7 +38,6 @@ final class PermisosTest extends CasoBaseBd
             nombre: ucfirst($rol),
             rol: $rol,
             rolId: 1,
-            chatwootAgentId: null,
             totpActivo: true,
             activo: true,
             intentosFallidos: 0,
@@ -115,7 +114,7 @@ final class PermisosTest extends CasoBaseBd
     public function unaCuentaDesactivadaPierdeTodo(): void
     {
         $inactivo = new Usuario(
-            '1', 'x@y.co', 'X', 'super_admin', 1, null, true, false, 0, null,
+            '1', 'x@y.co', 'X', 'super_admin', 1, true, false, 0, null,
         );
 
         self::assertFalse($this->permisos->puede($inactivo, 'tablero.ver'));

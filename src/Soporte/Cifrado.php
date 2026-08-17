@@ -30,26 +30,20 @@ final class Cifrado
     private const BYTES_TAG = 16;
 
     private readonly string $claveMaestra;
-    private readonly string $pepper;
 
     /**
      * @param string $claveMaestraB64 MASTER_KEY, 32 bytes en base64
-     * @param string $pepperB64       PEPPER_TELEFONO, 32 bytes en base64
      *
-     * @throws ConfiguracionFatalException si alguna falta o no mide 32 bytes
+     * @throws ConfiguracionFatalException si falta o no mide 32 bytes
      */
-    public function __construct(string $claveMaestraB64, string $pepperB64)
+    public function __construct(string $claveMaestraB64)
     {
         $this->claveMaestra = self::decodificar($claveMaestraB64, 'MASTER_KEY');
-        $this->pepper = self::decodificar($pepperB64, 'PEPPER_TELEFONO');
     }
 
     public static function desdeEntorno(): self
     {
-        return new self(
-            Entorno::exigir('MASTER_KEY'),
-            Entorno::exigir('PEPPER_TELEFONO'),
-        );
+        return new self(Entorno::exigir('MASTER_KEY'));
     }
 
     private static function decodificar(string $b64, string $nombre): string
@@ -132,26 +126,19 @@ final class Cifrado
         return $claro;
     }
 
-    /**
-     * HMAC-SHA256 del teléfono con PEPPER_TELEFONO (ADR-012).
-     *
-     * Determinista, para poder buscar por él. Nunca `hash('sha256', $tel)` a
-     * secas: un número de 12 dígitos se rompe por fuerza bruta en segundos.
-     *
-     * El pepper NO se deriva de MASTER_KEY y NO rota: un hash no es
-     * reversible, así que rotarlo dejaría huérfanos todos los hashes
-     * existentes y la búsqueda por teléfono fallaría en silencio.
-     */
-    public function hashTelefono(string $telefonoE164): string
-    {
-        $normalizado = preg_replace('/\D+/', '', $telefonoE164) ?? '';
+    /* Aquí vivía `hashTelefono()`, el HMAC-SHA256 de ADR-012 con su propio
+       pepper. Se retira con el motor, que era su único cliente: solo
+       `contactos` guardaba teléfonos, y esa tabla ya no recibe filas.
 
-        if ($normalizado === '') {
-            throw new \InvalidArgumentException('Teléfono vacío tras normalizar.');
-        }
+       Se va también la exigencia de `PEPPER_TELEFONO` al arrancar. Una
+       variable obligatoria que nada usa no es inofensiva: obliga a generarla
+       y custodiarla en cada despliegue —`docs/RESPALDOS.md` pedía tres
+       copias de ella— a cambio de nada.
 
-        return hash_hmac('sha256', $normalizado, $this->pepper);
-    }
+       Si vuelve el motor, vuelve el ADR-012 entero y con su razón intacta:
+       un SHA-256 pelado sobre un número de doce dígitos se rompe por fuerza
+       bruta en segundos, y el pepper no puede derivarse de MASTER_KEY porque
+       esa sí rota y un hash no es reversible. */
 
     /**
      * Lo único de una credencial que puede salir por HTTP.

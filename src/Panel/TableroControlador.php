@@ -11,17 +11,22 @@ use App\Servicios\Config;
 /**
  * Tablero.
  *
- * Los dos interruptores del motor arriba de todo —«que nunca se olvide
- * encendida o apagada por descuido» (docs/PANEL_ADMIN.md §2.1)— y, desde la
- * Etapa 8, el embudo por canal: costo por lead y conversión a asesoría
- * pagada, que son los dos números que dicen si la pauta paga.
+ * Encogió con el motor. Antes arrancaba con los dos interruptores de la IA
+ * —pausa y modo sombra— y seguía con el embudo por canal hasta la asesoría
+ * pagada. Sin motor ni pasarela, de ese embudo solo queda el tramo que
+ * ocurre dentro de esta aplicación: qué canal trae visitas y cuántas de
+ * ellas terminan pulsando el botón de WhatsApp.
+ *
+ * Lo que pase después de ese clic ya no se mide aquí, y conviene tenerlo
+ * presente al leer los números: la conversión que muestra esta pantalla es
+ * a conversación iniciada, no a cliente.
  */
 final class TableroControlador extends ControladorBase
 {
     public function __construct(
         private readonly BD $bd,
         private readonly Config $config,
-        private readonly \App\Servicios\Metricas $metricas,
+        private readonly \App\Servicios\MetricasLanding $metricas,
     ) {
     }
 
@@ -43,17 +48,14 @@ final class TableroControlador extends ControladorBase
 
         return $this->vista('panel/tablero', [
             'ctx' => $ctx,
-            'iaPausada' => (bool) $this->config->get('motor_ia_pausado', false),
-            'modoSombra' => (bool) $this->config->get('motor_modo_sombra', true),
             'precio' => (int) ($this->bd->pdo()
                 ->query('SELECT precio_cop FROM modalidades_asesoria WHERE activo = 1 ORDER BY orden LIMIT 1')
                 ->fetchColumn() ?: 0),
-            'pasarela' => (string) $this->config->get('pasarela_activa', ''),
             'pendientes' => $this->pendientes(),
             'desde' => $desde,
             'hasta' => $hasta,
-            'embudo' => $this->metricas->porCanal($desde, $hasta),
-            'landing' => $this->metricas->eventosLanding($desde, $hasta),
+            'canales' => $this->metricas->porCanal($desde, $hasta),
+            'inversion' => $this->metricas->inversionPorCanal($desde, $hasta),
             'puedeAnotarInversion' => $ctx->puede('config.editar'),
             'avisos' => $this->avisos($ctx),
         ]);
@@ -79,11 +81,13 @@ final class TableroControlador extends ControladorBase
     }
 
     /**
-     * Lo que falta para poder cobrar.
+     * Lo que falta para que la landing pueda salir a producción.
      *
-     * Se pinta en el tablero porque son las cosas que bloquean la puesta en
-     * marcha y que, si no están a la vista, se descubren el día que un
-     * cliente intenta pagar.
+     * La lista era otra: reembolsos, habeas data, WhatsApp de alertas y el
+     * widget de Chatwoot, todo lo que bloqueaba el día que un cliente
+     * intentara pagar. Sin motor ni pasarela nada de eso aplica —esta
+     * aplicación ya no cobra ni persiste datos de un caso—, así que queda lo
+     * que sí sigue bloqueando: que la página no salga indexada a medias.
      *
      * @return list<string>
      */
@@ -91,20 +95,12 @@ final class TableroControlador extends ControladorBase
     {
         $faltan = [];
 
-        if (trim((string) $this->config->get('politica_reembolso', '')) === '') {
-            $faltan[] = 'La política de reembolso está vacía. Debe redactarse antes de cobrar el primer peso.';
+        if (trim((string) $this->config->get('whatsapp_numero_negocio', '')) === '') {
+            $faltan[] = 'Falta el número de WhatsApp del negocio: los botones de la landing no llevan a ninguna parte.';
         }
 
-        if (trim((string) $this->config->get('texto_aviso_habeas_data', '')) === '') {
-            $faltan[] = 'El aviso de habeas data está vacío. Sin él el motor no puede persistir datos de un caso.';
-        }
-
-        if (trim((string) $this->config->get('whatsapp_alertas_abogado', '')) === '') {
-            $faltan[] = 'Falta el WhatsApp de alertas internas, y debe ser distinto del número del negocio.';
-        }
-
-        if (trim((string) $this->config->get('chatwoot_widget_token', '')) === '') {
-            $faltan[] = 'El widget de Chatwoot no está configurado: la landing no lo emite.';
+        if (!$this->config->get('landing_indexable', false)) {
+            $faltan[] = 'La landing está marcada como no indexable: sale con «noindex» y no aparecerá en búsquedas.';
         }
 
         return $faltan;

@@ -17,8 +17,10 @@ use App\Repositorios\AuditoriaRepo;
  * tarifa no toca ninguna consulta viva, y esa es justamente la razón de que
  * ese precio esté duplicado en dos tablas.
  *
- * El precio va en PESOS enteros (ADR-010). La conversión a centavos ocurre
- * solo en `Pagos::crearLink()`.
+ * El precio va en PESOS enteros (ADR-010). Ya no hay ninguna conversión a
+ * centavos en el sistema: vivía en `Pagos::crearLink()`, que se retiró con la
+ * pasarela. Hoy este número solo se lee — lo pintan la landing y el
+ * diagnóstico— y por eso la pantalla sobrevivió al recorte.
  */
 final class TarifasControlador extends ControladorBase
 {
@@ -79,9 +81,11 @@ final class TarifasControlador extends ControladorBase
         // asesoría de una hora por encima de diez millones no existe, así que
         // cualquier cosa así es un error de dedo o de unidades.
         //
-        // El error es fácil justo porque la pasarela SÍ cobra en centavos
-        // (ADR-010): la conversión existe, solo que vive en Pagos::crearLink()
-        // y no aquí.
+        // El error era fácil porque la pasarela cobraba en centavos y la
+        // conversión vivía en otro archivo (ADR-010). La pasarela ya no está,
+        // así que hoy nada convierte nada — pero la guarda se queda: quien
+        // teclea el precio sigue siendo una persona, y un cero de más sigue
+        // acabando en la landing.
         if ($precio >= 10_000_000) {
             return $this->redirigirCon(
                 '/panel/tarifas',

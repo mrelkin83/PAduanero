@@ -7,8 +7,6 @@ namespace App\Core;
 use App\Excepciones\ConfiguracionFatalException;
 use App\Servicios\Config;
 use App\Servicios\ConfigMysql;
-use App\Servicios\Credenciales;
-use App\Servicios\CredencialesAes;
 use App\Servicios\Landing;
 use App\Servicios\MetricasLanding;
 use App\Servicios\Seo;
@@ -21,9 +19,15 @@ use App\Soporte\Logger;
  * Arranque de la aplicación.
  *
  * El constructor valida el entorno y falla si falta algo esencial. Es
- * deliberado y está probado: sin `MASTER_KEY` la aplicación NO arranca
- * (docs/PLAN_BUILD.md, criterio de cierre de la Etapa 0). Arrancar sin ella
- * significaría escribir credenciales que nadie podrá volver a descifrar.
+ * deliberado y está probado: sin `MASTER_KEY` la aplicación NO arranca.
+ * Sigue siendo obligatoria aunque ya no haya credenciales de proveedores que
+ * guardar —el motor y la pasarela se retiraron—: cifra los secretos TOTP de
+ * `usuarios`, y arrancar sin ella significaría escribir segundos factores
+ * que nadie podrá volver a descifrar.
+ *
+ * Lo que este archivo cablea, ahora que es todo lo que hay: las dos páginas
+ * públicas (`/` y `/perfil`), su SEO, el registro de eventos de la landing y
+ * el panel de contenido.
  */
 final class Aplicacion
 {
@@ -51,8 +55,8 @@ final class Aplicacion
      */
     private function verificarEntorno(): void
     {
-        // Construir el Cifrado valida de una vez que MASTER_KEY y
-        // PEPPER_TELEFONO existan, sean base64 y midan 32 bytes.
+        // Construir el Cifrado valida de una vez que MASTER_KEY exista, sea
+        // base64 y mida 32 bytes.
         Cifrado::desdeEntorno();
 
         Entorno::exigir('DB_NAME');
@@ -86,268 +90,6 @@ final class Aplicacion
             ),
         );
 
-        $this->contenedor->registrar(
-            \App\Soporte\Http::class,
-            static fn (): \App\Soporte\Http => new \App\Soporte\Http(),
-        );
-
-        $this->contenedor->registrar(
-            Credenciales::class,
-            static fn (Contenedor $c): Credenciales => new CredencialesAes(
-                $c->obtener(BD::class),
-                $c->obtener(Cifrado::class),
-                $c->obtener(Logger::class),
-                [
-                    // Los probadores llegan con su integración: Wompi en la
-                    // Etapa 3, Chatwoot y Evolution en la 2, el LLM en la 4.
-                    new \App\Servicios\Probadores\ProbadorWompi($c->obtener(\App\Soporte\Http::class)),
-                ],
-            ),
-        );
-
-        // Catálogo de modelos: descubrimiento automático, adopción manual.
-        // Los descubridores se enumeran aquí y no se autodetectan: la lista
-        // de proveedores a los que este sistema le pide su catálogo es una
-        // decisión, y tiene que poder leerse de un vistazo.
-        $this->contenedor->registrar(
-            \App\Servicios\CatalogoModelos::class,
-            static fn (Contenedor $c): \App\Servicios\CatalogoModelos => new \App\Servicios\CatalogoModelos(
-                $c->obtener(BD::class),
-                $c->obtener(Credenciales::class),
-                $c->obtener(Logger::class),
-                [
-                    new \App\Servicios\Descubridores\DescubridorAnthropic(
-                        $c->obtener(\App\Soporte\Http::class),
-                    ),
-                    new \App\Servicios\Descubridores\DescubridorOpenAiCompatible(
-                        $c->obtener(\App\Soporte\Http::class),
-                    ),
-                    new \App\Servicios\Descubridores\DescubridorOllama(
-                        $c->obtener(\App\Soporte\Http::class),
-                    ),
-                ],
-                $c->obtener(\App\Servicios\Outbox::class),
-            ),
-        );
-
-        // ── Cobro (Etapa 5) ──────────────────────────────────────────────
-        $this->contenedor->registrar(
-            \App\Servicios\Pagos::class,
-            static fn (Contenedor $c): \App\Servicios\Pagos => new \App\Servicios\PagosWompi(
-                $c->obtener(BD::class),
-                $c->obtener(Credenciales::class),
-                $c->obtener(\App\Repositorios\ConsultaRepo::class),
-                $c->obtener(Config::class),
-                $c->obtener(\App\Servicios\Outbox::class),
-                $c->obtener(\App\Soporte\Http::class),
-                $c->obtener(Logger::class),
-            ),
-        );
-
-        // ── Conocimiento (Etapa 7) ───────────────────────────────────────
-        $this->contenedor->registrar(
-            \App\Servicios\Embeddings::class,
-            static fn (Contenedor $c): \App\Servicios\Embeddings => new \App\Servicios\EmbeddingsHttp(
-                $c->obtener(BD::class),
-                $c->obtener(Credenciales::class),
-                $c->obtener(\App\Soporte\Http::class),
-                $c->obtener(Logger::class),
-            ),
-        );
-
-        $this->contenedor->registrar(
-            \App\Servicios\BaseConocimiento::class,
-            static fn (Contenedor $c): \App\Servicios\BaseConocimiento => new \App\Servicios\BaseConocimientoMysql(
-                $c->obtener(BD::class),
-                $c->obtener(\App\Servicios\Embeddings::class),
-                $c->obtener(Logger::class),
-            ),
-        );
-
-        // ── Motor (Etapa 4) ──────────────────────────────────────────────
-        $this->contenedor->registrar(
-            \App\Repositorios\ContactoRepo::class,
-            static fn (Contenedor $c): \App\Repositorios\ContactoRepo => new \App\Repositorios\ContactoRepo(
-                $c->obtener(BD::class),
-                $c->obtener(Cifrado::class),
-                $c->obtener(\App\Repositorios\AuditoriaRepo::class),
-            ),
-        );
-
-        $this->contenedor->registrar(
-            \App\Repositorios\ConsentimientoRepo::class,
-            static fn (Contenedor $c): \App\Repositorios\ConsentimientoRepo
-                => new \App\Repositorios\ConsentimientoRepo($c->obtener(BD::class)),
-        );
-
-        $this->contenedor->registrar(
-            \App\Repositorios\CasoRepo::class,
-            static fn (Contenedor $c): \App\Repositorios\CasoRepo
-                => new \App\Repositorios\CasoRepo($c->obtener(BD::class)),
-        );
-
-        $this->contenedor->registrar(
-            \App\Repositorios\ConversacionEstadoRepo::class,
-            static fn (Contenedor $c): \App\Repositorios\ConversacionEstadoRepo
-                => new \App\Repositorios\ConversacionEstadoRepo($c->obtener(BD::class)),
-        );
-
-        $this->contenedor->registrar(
-            \App\Repositorios\ConsultaRepo::class,
-            static fn (Contenedor $c): \App\Repositorios\ConsultaRepo
-                => new \App\Repositorios\ConsultaRepo($c->obtener(BD::class)),
-        );
-
-        $this->contenedor->registrar(
-            \App\Repositorios\PromptRepo::class,
-            static fn (Contenedor $c): \App\Repositorios\PromptRepo
-                => new \App\Repositorios\PromptRepo($c->obtener(BD::class)),
-        );
-
-        $this->contenedor->registrar(
-            \App\Motor\ConstructorPrompt::class,
-            static fn (Contenedor $c): \App\Motor\ConstructorPrompt => new \App\Motor\ConstructorPrompt(
-                $c->obtener(\App\Repositorios\PromptRepo::class),
-                $c->obtener(\App\Servicios\GateDorado::class),
-                $c->obtener(\App\Servicios\BaseConocimiento::class),
-                $c->obtener(\App\Repositorios\CasoRepo::class),
-                max(1, (int) $c->obtener(Config::class)->get('rag_fragmentos_max', 4)),
-            ),
-        );
-
-        // El motor NO recibe Chatwoot. Lo que dice sale por el outbox y se
-        // entrega con `entregar()`, que consulta `motor_modo_sombra`. Es la
-        // garantía estructural del modo sombra: aquí no se le pasa el objeto
-        // con el que se podría enviar un mensaje directo a un cliente.
-        $this->contenedor->registrar(
-            \App\Motor\MotorConversacional::class,
-            static fn (Contenedor $c): \App\Motor\MotorConversacional
-                => new \App\Motor\MotorConversacional(
-                    $c->obtener(\App\Repositorios\ContactoRepo::class),
-                    $c->obtener(\App\Repositorios\ConsentimientoRepo::class),
-                    $c->obtener(\App\Repositorios\CasoRepo::class),
-                    $c->obtener(\App\Repositorios\ConversacionEstadoRepo::class),
-                    $c->obtener(\App\Servicios\Llm::class),
-                    $c->obtener(\App\Servicios\Outbox::class),
-                    $c->obtener(Config::class),
-                    $c->obtener(Logger::class),
-                    $c->obtener(\App\Motor\ConstructorPrompt::class),
-                    new \App\Motor\Agenda(
-                        $c->obtener(\App\Repositorios\ConsultaRepo::class),
-                        $c->obtener(\App\Servicios\Pagos::class),
-                        $c->obtener(Config::class),
-                        $c->obtener(Logger::class),
-                    ),
-                ),
-        );
-
-        $this->contenedor->registrar(
-            \App\Servicios\WebhookChatwoot::class,
-            static fn (Contenedor $c): \App\Servicios\WebhookChatwoot
-                => new \App\Servicios\WebhookChatwoot(
-                    $c->obtener(\App\Motor\MotorConversacional::class),
-                    $c->obtener(\App\Repositorios\ConversacionEstadoRepo::class),
-                    $c->obtener(\App\Servicios\Outbox::class),
-                    $c->obtener(Logger::class),
-                    Entorno::obtener('CHATWOOT_WEBHOOK_SECRET', '') ?? '',
-                ),
-        );
-
-        $this->contenedor->registrar(
-            \App\Servicios\Outbox::class,
-            static fn (Contenedor $c): \App\Servicios\Outbox
-                => new \App\Servicios\OutboxMysql($c->obtener(BD::class)),
-        );
-
-        // Evolution SOLO para alertas internas al abogado (ADR-001). Lo que va
-        // a un cliente sale por Chatwoot, sin excepción.
-        $this->contenedor->registrar(
-            \App\Servicios\EvolucionAlertas::class,
-            static fn (Contenedor $c): \App\Servicios\EvolucionAlertas
-                => new \App\Servicios\EvolucionAlertas(
-                    $c->obtener(\App\Soporte\Http::class),
-                    $c->obtener(Logger::class),
-                    rtrim(Entorno::obtener('EVOLUTION_URL', '') ?? '', '/'),
-                    Entorno::obtener('EVOLUTION_INSTANCE', 'pedro') ?? 'pedro',
-                    Entorno::obtener('EVOLUTION_API_KEY', '') ?? '',
-                    // La misma variable que ya usan salud.sh y respaldo.sh.
-                    // Tener dos nombres para el mismo número garantiza que
-                    // alguien rellene uno y deje el otro vacío.
-                    Entorno::obtener('ALERTA_WHATSAPP', '') ?? '',
-                ),
-        );
-
-        $this->contenedor->registrar(
-            \App\Servicios\WorkerOutbox::class,
-            static fn (Contenedor $c): \App\Servicios\WorkerOutbox => new \App\Servicios\WorkerOutbox(
-                $c->obtener(\App\Servicios\Outbox::class),
-                $c->obtener(Logger::class),
-                [
-                    new \App\Servicios\Manejadores\ManejadorChatwoot(
-                        $c->obtener(\App\Servicios\Chatwoot::class),
-                    ),
-                    new \App\Servicios\Manejadores\ManejadorAlertaAbogado(
-                        $c->obtener(\App\Servicios\EvolucionAlertas::class),
-                        rtrim(Entorno::obtener('CHATWOOT_URL', '') ?? '', '/'),
-                        Entorno::obtener('CHATWOOT_ACCOUNT_ID', '1') ?? '1',
-                    ),
-                ],
-            ),
-        );
-
-        $this->contenedor->registrar(
-            \App\Servicios\Chatwoot::class,
-            static fn (Contenedor $c): \App\Servicios\Chatwoot => new \App\Servicios\ChatwootApi(
-                $c->obtener(\App\Soporte\Http::class),
-                $c->obtener(Config::class),
-                $c->obtener(Logger::class),
-                rtrim(Entorno::obtener('CHATWOOT_URL', '') ?? '', '/'),
-                Entorno::obtener('CHATWOOT_ACCOUNT_ID', '1') ?? '1',
-                Entorno::obtener('CHATWOOT_BOT_TOKEN', '') ?? '',
-                // Agente de Pedro, para asignarle los escalamientos. Si falta,
-                // el escalamiento sigue ocurriendo sin asignar: peor atendido,
-                // pero atendido.
-                ($id = Entorno::obtener('CHATWOOT_AGENTE_ABOGADO_ID', '')) !== null && $id !== ''
-                    ? (int) $id
-                    : null,
-            ),
-        );
-
-        $this->contenedor->registrar(
-            \App\Servicios\Llm::class,
-            static fn (Contenedor $c): \App\Servicios\Llm => new \App\Servicios\Llm(
-                $c->obtener(BD::class),
-                $c->obtener(Credenciales::class),
-                $c->obtener(Config::class),
-                $c->obtener(\App\Servicios\GateDorado::class),
-                $c->obtener(Logger::class),
-                [
-                    new \App\Servicios\ClientesLlm\ClienteAnthropic(
-                        $c->obtener(\App\Soporte\Http::class),
-                    ),
-                    new \App\Servicios\ClientesLlm\ClienteOpenAiCompatible(
-                        $c->obtener(\App\Soporte\Http::class),
-                    ),
-                    // Ollama expone el formato de OpenAI bajo `/v1`. Se
-                    // reutiliza el mismo cliente en vez de duplicarlo.
-                    new \App\Servicios\ClientesLlm\ClienteOpenAiCompatible(
-                        $c->obtener(\App\Soporte\Http::class),
-                        'ollama',
-                        '/v1',
-                    ),
-                ],
-            ),
-        );
-
-        // La regla «¿puede este modelo hablar con clientes?» en un solo sitio.
-        // La usan el panel al promover y el corredor del conjunto dorado al
-        // terminar; duplicada, uno de los dos se quedaría atrás.
-        $this->contenedor->registrar(
-            \App\Servicios\GateDorado::class,
-            static fn (Contenedor $c): \App\Servicios\GateDorado
-                => new \App\Servicios\GateDorado($c->obtener(BD::class)),
-        );
-
         // ── Panel (Etapa 3) ──────────────────────────────────────────────
         $this->contenedor->registrar(
             \App\Repositorios\UsuarioRepo::class,
@@ -376,12 +118,6 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
-            \App\Repositorios\CredencialRepo::class,
-            static fn (Contenedor $c): \App\Repositorios\CredencialRepo
-                => new \App\Repositorios\CredencialRepo($c->obtener(BD::class)),
-        );
-
-        $this->contenedor->registrar(
             \App\Servicios\Permisos::class,
             static fn (Contenedor $c): \App\Servicios\Permisos
                 => new \App\Servicios\Permisos($c->obtener(BD::class)),
@@ -398,17 +134,6 @@ final class Aplicacion
                 // El tope del segundo factor es parámetro operativo, no
                 // constante: se ajusta desde el panel sin desplegar.
                 (int) $c->obtener(Config::class)->get('totp_max_intentos', 5),
-            ),
-        );
-
-        $this->contenedor->registrar(
-            \App\Servicios\ChatwootAgentes::class,
-            static fn (Contenedor $c): \App\Servicios\ChatwootAgentes => new \App\Servicios\ChatwootAgentes(
-                $c->obtener(\App\Soporte\Http::class),
-                $c->obtener(Logger::class),
-                rtrim(Entorno::obtener('CHATWOOT_URL', '') ?? '', '/'),
-                Entorno::obtener('CHATWOOT_ACCOUNT_ID', '1') ?? '1',
-                Entorno::obtener('CHATWOOT_BOT_TOKEN', '') ?? '',
             ),
         );
 
@@ -504,67 +229,6 @@ final class Aplicacion
             }
 
             return new Respuesta('', 204);
-        });
-
-        // Webhook de Chatwoot. El secreto viaja en la ruta porque la interfaz
-        // de Chatwoot solo deja configurar una URL, sin cabeceras propias.
-        $this->router->post('/webhook/chatwoot/{secreto}', function (Peticion $p): Respuesta {
-            $webhook = $this->contenedor->obtener(\App\Servicios\WebhookChatwoot::class);
-
-            if (!$webhook->autenticado($p->parametros['secreto'] ?? null)) {
-                $this->contenedor->obtener(Logger::class)->warn('webhook.rechazado', [
-                    'ip' => $p->ip,
-                ]);
-
-                // 404 y no 401: a quien sondea el endpoint no se le confirma
-                // que existe.
-                return new Respuesta('', 404);
-            }
-
-            try {
-                $resultado = $webhook->manejar($p->json());
-            } catch (\Throwable $e) {
-                $this->contenedor->obtener(Logger::class)->error('webhook.excepcion', [
-                    'excepcion' => $e::class,
-                    'mensaje' => $e->getMessage(),
-                ]);
-
-                // 200 igualmente: un 500 hace que Chatwoot reintente el mismo
-                // evento roto para siempre, y el problema es nuestro.
-                return new Respuesta('', 200);
-            }
-
-            return Respuesta::json($resultado);
-        });
-
-        // Webhook de la pasarela de pago. Sin secreto en la ruta: aquí la
-        // autenticación ES la firma del evento (regla 6), verificada contra
-        // el cuerpo crudo. Un evento sin firma válida no escribe nada.
-        $this->router->post('/webhook/pago/wompi', function (Peticion $p): Respuesta {
-            try {
-                $resultado = $this->contenedor->obtener(\App\Servicios\Pagos::class)
-                    ->procesarWebhook($p->cuerpoCrudo, $p->cabeceras);
-            } catch (\Throwable $e) {
-                $this->contenedor->obtener(Logger::class)->error('webhook_pago.excepcion', [
-                    'excepcion' => $e::class,
-                    'mensaje' => $e->getMessage(),
-                ]);
-
-                // 500 a propósito, al contrario que el webhook de Chatwoot:
-                // si el fallo es nuestro (base caída a mitad), QUEREMOS que
-                // Wompi reintente — perder un evento de pago aprobado deja a
-                // un cliente que pagó sin su cita.
-                return new Respuesta('', 500);
-            }
-
-            if (!$resultado['valido']) {
-                return new Respuesta('', 403);
-            }
-
-            return Respuesta::json([
-                'procesado' => $resultado['procesado'],
-                'referencia' => $resultado['referencia'],
-            ]);
         });
 
         $this->router->get('/salud', function (): Respuesta {

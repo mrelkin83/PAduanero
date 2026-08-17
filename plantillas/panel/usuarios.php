@@ -19,7 +19,7 @@ $contenido = static function () use ($e, $ctx, $usuarios, $roles, $puedeEditar):
 
     <table class="tabla">
         <thead>
-            <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>2FA</th><th>Chatwoot</th><th>Estado</th></tr>
+            <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>2FA</th><th>Estado</th></tr>
         </thead>
         <tbody>
         <?php foreach ($usuarios as $u): ?>
@@ -36,7 +36,6 @@ $contenido = static function () use ($e, $ctx, $usuarios, $roles, $puedeEditar):
                         <span class="text-acero">—</span>
                     <?php endif; ?>
                 </td>
-                <td class="font-mono text-xs"><?= $u->chatwootAgentId !== null ? $e((string) $u->chatwootAgentId) : '—' ?></td>
                 <td><?= $u->activo ? 'Activo' : 'Inactivo' ?></td>
             </tr>
         <?php endforeach; ?>
@@ -73,12 +72,6 @@ $contenido = static function () use ($e, $ctx, $usuarios, $roles, $puedeEditar):
                     </select>
                 </div>
             </div>
-
-            <p class="mt-3 text-sm text-acero">
-                Con rol <strong>abogado</strong> o <strong>asistente</strong> se crea también
-                su agente en Chatwoot: una sola alta, no dos. Si Chatwoot no está
-                disponible el usuario se crea igual y se avisa.
-            </p>
 
             <button type="submit" class="boton mt-4">Crear usuario</button>
         </form>

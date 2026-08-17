@@ -13,7 +13,7 @@ use App\Soporte\Cifrado;
  */
 final class UsuarioRepo
 {
-    private const CAMPOS = 'u.id, u.email, u.nombre, u.rol_id, u.chatwoot_agent_id,
+    private const CAMPOS = 'u.id, u.email, u.nombre, u.rol_id,
                             u.totp_activo, u.activo, u.intentos_fallidos, u.bloqueado_hasta,
                             r.clave AS rol';
 
@@ -167,12 +167,6 @@ final class UsuarioRepo
     {
         $this->bd->pdo()->prepare('UPDATE usuarios SET activo = ? WHERE id = ?')
             ->execute([(int) $activo, $usuarioId]);
-    }
-
-    public function guardarChatwootAgentId(string $usuarioId, int $agenteId): void
-    {
-        $this->bd->pdo()->prepare('UPDATE usuarios SET chatwoot_agent_id = ? WHERE id = ?')
-            ->execute([$agenteId, $usuarioId]);
     }
 
     // ── TOTP ─────────────────────────────────────────────────────────────
