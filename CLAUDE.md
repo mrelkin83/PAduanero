@@ -807,3 +807,96 @@ verde sobre un modelo que no era el que se estaba probando. Por eso sigue
 exigiendo el `id` y no acepta `proposito`.
 
 Un modelo de `embeddings` nunca entró en esto: no le dice nada a nadie.
+
+---
+
+## 13. El diagnóstico público — ADR-017
+
+`/perfil` es un cuestionario de seis pasos, con dos ramas (aduanera y
+tributaria), que termina componiendo el mensaje prellenado de WhatsApp. Nace
+de una petición del PO: una landing dinámica, con la mecánica de
+`manuelaaduanera.com/perfil-importador/`.
+
+**Qué es en realidad.** No es un captador de datos ni un router comercial —la
+referencia tiene tres programas que vender; aquí hay uno solo—. Es el
+**triage de la Etapa 4 adelantado a la landing**: las mismas señales que el
+bot recoge a lo largo de una conversación de WhatsApp, recogidas antes de que
+la conversación empiece. Quien lo termina llega a la bandeja con el caso ya
+descrito en el vocabulario correcto, y Pedro deja de gastar seis mensajes en
+averiguar qué pasó.
+
+### 13.1 Cero persistencia, y por qué eso no es pereza
+
+**Nada de lo que se responde se guarda.** Ni una fila, ni un log, ni una cola.
+El cuestionario se resuelve entero en el navegador y su única salida es el
+texto del mensaje, que la persona lee antes de enviarlo.
+
+Esa decisión es lo que mantiene el diagnóstico **fuera del alcance de la regla
+1**: no hay tratamiento de dato personal, así que no hay habeas data que
+pedir, y la landing no tiene que exhibir un aviso que además **sigue
+pendiente de redacción** (§11). La primera vez que este sistema guarde algo
+de esa persona seguirá siendo el motor, con el consentimiento que siempre
+exige.
+
+Guardar las respuestas «para que Pedro las vea aunque no escriban» es la
+tentación evidente y es exactamente lo que convertiría una página anónima en
+un fichero de datos personales de gente que solo estaba mirando.
+
+### 13.2 Solo procesos correctivos
+
+El despacho atiende procedimientos **ya abiertos**. La primera pregunta
+ofrece de forma explícita la salida «todavía no hay nada abierto», y esa
+opción **termina el cuestionario ahí**, en `fuera_alcance`.
+
+Está en el paso 1 y no en el 6 a propósito: negar después de que alguien
+contestó cinco preguntas es peor que no preguntar. `CuestionarioTest` lo
+verifica.
+
+### 13.3 Lo que la página no puede decir
+
+Las reglas 2, 3 y 4 gobiernan cada cadena de texto de `App\Motor\Cuestionario`
+y de `plantillas/perfil/`. El sitio donde más tienta romperlas es justo el
+resultado: un diagnóstico que dijera «le quedan diez días para responder»
+sería mucho más útil, y es lo que la gente vino a buscar.
+
+Por eso no se defiende con un comentario sino con una prueba:
+`CuestionarioTest::elCopyNoNombraPlazosNiNormas()` rechaza plazos en días o
+meses y normas numeradas en cualquier texto del cuestionario. El resultado
+nombra **la existencia** de los términos y dice quién los dice —el abogado
+mirando los documentos— sin nombrar ninguno.
+
+Tampoco aparece el **puntaje**. Sigue siendo interno (§3.2) y mide en parte
+capacidad de pago; no puede llegar a quien acaba de perder su mercancía. El
+diagnóstico ni siquiera lo calcula: solo recoge lo que lo alimentaría.
+
+### 13.4 La salida crítica sale del catálogo, no de una lista nueva
+
+Marcar «operativo en curso» corta el cuestionario en seco y lleva a escribir
+ya (regla 5). Esa condición **no está escrita a mano** en la opción:
+`Cuestionario::definicion()` la deduce de `Catalogo::esCritico()`.
+
+Es el principio de §4 aplicado otra vez: si alguien añade un tipo a
+`Catalogo::CRITICOS`, el diagnóstico deja de preguntarle la cuantía a quien
+tiene la POLFA en la puerta **sin que haya que acordarse** de tocar el
+cuestionario. Con dos listas, la segunda se queda atrás y nadie lo nota.
+
+El mensaje de esa salida no lleva ninguna respuesta: solo el motivo, que es
+una constante nuestra. Misma disciplina que la regla 14 y por la misma razón
+—lo que se componga acaba en el historial de WhatsApp de dos teléfonos para
+siempre—, aunque aquí no haya persistencia que regular.
+
+### 13.5 La página funciona sin JavaScript
+
+Los seis pasos y las dos ramas se emiten **enteros** desde el servidor, como
+un formulario de radios corriente. El script solo esconde lo que no toca y
+anima el paso de uno a otro. Sin él, `/perfil` es un documento legible que
+termina en el botón de WhatsApp de siempre.
+
+Dos consecuencias buscadas: la conversión nunca depende de un script —la
+regla de esta landing desde la Etapa 1— y las preguntas son indexables, que
+es lo único que hace que una página valga para las búsquedas de las que
+salen estos clientes.
+
+El movimiento son muelles escritos a mano en `public/js/perfil.js`, sin
+dependencias: el presupuesto de la página es de 300 KB y lo mide
+`bin/auditar-landing.mjs` en cada cierre de etapa.

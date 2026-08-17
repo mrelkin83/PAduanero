@@ -436,6 +436,22 @@ final class Aplicacion
             ),
         );
 
+        // El diagnóstico comparte el centinela de la landing: sus bloques
+        // viven en la misma tabla, así que guardar uno tiene que invalidar
+        // las dos páginas.
+        $this->contenedor->registrar(
+            \App\Servicios\Perfil::class,
+            static fn (Contenedor $c): \App\Servicios\Perfil => new \App\Servicios\Perfil(
+                $c->obtener(BD::class),
+                $c->obtener(Config::class),
+                $c->obtener(Seo::class),
+                $urlBase,
+                $raiz . '/storage/cache/perfil.html',
+                $raiz . '/storage/landing.sentinel',
+                $raiz . '/public/css/app.css',
+            ),
+        );
+
         $this->contenedor->registrar(
             MetricasLanding::class,
             static fn (Contenedor $c): MetricasLanding => new MetricasLanding(
@@ -450,6 +466,10 @@ final class Aplicacion
     {
         $this->router->get('/', function (): Respuesta {
             return $this->contenedor->obtener(Landing::class)->responder();
+        });
+
+        $this->router->get('/perfil', function (): Respuesta {
+            return $this->contenedor->obtener(\App\Servicios\Perfil::class)->responder();
         });
 
         $this->router->get('/robots.txt', function (): Respuesta {

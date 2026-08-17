@@ -21,8 +21,19 @@ use App\Core\BD;
  */
 final class MetricasLanding
 {
-    /** Cerrada: coincide con el comentario de la columna en el esquema. */
-    public const TIPOS = ['vista', 'scroll_50', 'click_whatsapp', 'envio_form'];
+    /**
+     * Cerrada: coincide con el comentario de la columna en el esquema.
+     *
+     * Los tres `perfil_*` son el embudo del diagnóstico. `perfil_paso`
+     * guarda en `ruta` en qué paso ocurrió —`/perfil/antiguedad`—, que es lo
+     * único que permite ver dónde abandona la gente el cuestionario; sin
+     * eso, un diagnóstico que nadie termina se ve igual que uno que nadie
+     * empieza.
+     */
+    public const TIPOS = [
+        'vista', 'scroll_50', 'click_whatsapp', 'envio_form',
+        'perfil_inicio', 'perfil_paso', 'perfil_resultado',
+    ];
 
     private const MAX_UTM = 100;
     private const MAX_RUTA = 250;

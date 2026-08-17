@@ -70,7 +70,10 @@ $waBase = 'https://wa.me/' . rawurlencode($whatsapp['numero'])
 
 <main id="contenido">
 <?php
-foreach (['hero', 'casos', 'credenciales', 'proceso', 'cta_final'] as $clave) {
+// El orden de esta lista es el que manda; `landing_bloques.orden` solo
+// ordena la edición en el panel. `perfil` va detrás del índice de
+// situaciones a propósito: ver `bloques/perfil.php`.
+foreach (['hero', 'casos', 'perfil', 'credenciales', 'proceso', 'cta_final'] as $clave) {
     if (!isset($bloques[$clave])) {
         continue;
     }

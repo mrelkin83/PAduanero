@@ -61,7 +61,14 @@ final class Seo
     {
         $base = $this->urlBase();
 
-        $urls = [['loc' => $base . '/', 'prioridad' => '1.0', 'cambio' => 'weekly']];
+        $urls = [
+            ['loc' => $base . '/', 'prioridad' => '1.0', 'cambio' => 'weekly'],
+            // El diagnóstico. Prioridad alta y no la de una página
+            // secundaria: sus preguntas son literalmente las búsquedas por
+            // las que este despacho quiere aparecer («me llegó un acta de
+            // aprehensión»), y es la única URL del sitio que las contiene.
+            ['loc' => $base . '/perfil', 'prioridad' => '0.9', 'cambio' => 'monthly'],
+        ];
 
         // Los artículos llegan en la Etapa 8; la consulta ya los recoge para
         // que el sitemap no haya que tocarlo entonces.
