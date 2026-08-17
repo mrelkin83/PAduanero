@@ -74,11 +74,14 @@
     var SESION = sesion();
 
     // ── Registro de eventos ─────────────────────────────────────────────
-    function registrar(tipo) {
+    // `ruta` es opcional y por defecto es la de la página. El diagnóstico la
+    // usa para decir en qué PASO ocurrió el evento —`/perfil/antiguedad`—,
+    // que es la única forma de saber dónde abandona la gente el cuestionario.
+    function registrar(tipo, ruta) {
         var carga = {
             tipo: tipo,
             sesion: SESION,
-            ruta: window.location.pathname,
+            ruta: ruta || window.location.pathname,
             dispositivo: dispositivo()
         };
 
@@ -150,4 +153,76 @@
 
     window.addEventListener('scroll', alDesplazar, { passive: true });
     alDesplazar();
+
+    // ── Entrada de los bloques ──────────────────────────────────────────
+    //
+    // Nada aparece de golpe: cada elemento sube, se enfoca y aparece a la
+    // vez, con la salida larga de `--ease-fina` y el retardo que le pone su
+    // propio `--retardo` en la plantilla. El escalonado es lo que hace que
+    // una sección se lea como una composición y no como una descarga.
+    //
+    // IntersectionObserver y NO un listener de scroll: el segundo dispara
+    // en cada cuadro y obliga a recalcular la disposición, que es como se
+    // arruina el rendimiento en un móvil. Aquí el navegador avisa.
+    //
+    // Se observa una sola vez por elemento —`unobserve` al revelar—: un
+    // bloque que se desvanece al salir de cuadro y vuelve al scrollear
+    // hacia arriba es mareante, no elegante.
+    function revelar() {
+        // Este archivo llegó: se desarma la red del `<head>`, que existe
+        // justo para el caso contrario.
+        clearTimeout(window.__paRedRevelado);
+
+        var elementos = document.querySelectorAll('.revelar');
+
+        if (elementos.length === 0) { return; }
+
+        // Sin soporte, o con movimiento reducido, se muestran de una vez.
+        // La preferencia no significa «sin respuesta», significa que la
+        // respuesta no puede desplazar cosas por la pantalla; aquí eso se
+        // resuelve mostrando y ya, que es lo que hace el CSS.
+        if (!('IntersectionObserver' in window)) {
+            elementos.forEach(function (el) { el.setAttribute('data-visible', ''); });
+            return;
+        }
+
+        var observador = new IntersectionObserver(function (entradas) {
+            entradas.forEach(function (entrada) {
+                if (!entrada.isIntersecting) { return; }
+
+                entrada.target.setAttribute('data-visible', '');
+                observador.unobserve(entrada.target);
+            });
+        }, {
+            // El margen inferior negativo retrasa el disparo hasta que el
+            // elemento entró de verdad: al ras del borde, la animación
+            // termina antes de que el ojo llegue y no se ve.
+            rootMargin: '0px 0px -12% 0px',
+            threshold: 0.01
+        });
+
+        elementos.forEach(function (el) { observador.observe(el); });
+    }
+
+    revelar();
+
+    // ── Lo que este archivo le presta a perfil.js ───────────────────────
+    //
+    // El diagnóstico necesita dos cosas que ya viven aquí: la referencia de
+    // campaña, para anexarla al mensaje que compone, y el registro de
+    // eventos. Duplicarlas allá significaría dos copias de la clave de
+    // `sessionStorage`, dos generadores de identificador de sesión y dos
+    // criterios de `sendBeacon`; y el día que alguien cambiara una, la
+    // atribución del embudo del diagnóstico se separaría de la del resto
+    // sin que nada fallara visiblemente.
+    //
+    // La superficie es deliberadamente mínima. `perfil.js` funciona sin
+    // esto —comprueba que exista— porque el orden de carga de dos scripts
+    // diferidos es una garantía del navegador, no de este proyecto.
+    window.PA = {
+        referencia: function () {
+            return UTM.utm_campaign || UTM.utm_source || '';
+        },
+        registrar: registrar
+    };
 })();

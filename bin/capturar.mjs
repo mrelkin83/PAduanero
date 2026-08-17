@@ -48,24 +48,33 @@ for (const vista of vistas) {
     await pagina.setViewport(viewport);
     await pagina.goto(URL_BASE, { waitUntil: 'networkidle0' });
 
-    // Las imágenes perezosas no se descargan hasta que entran en cuadro, y
-    // en una captura de página completa saldrían en blanco.
+    // Barrido de scroll. Hace falta por dos cosas que solo ocurren cuando
+    // algo entra en cuadro: las imágenes perezosas no se descargan hasta
+    // entonces, y las entradas de `.revelar` las dispara un
+    // IntersectionObserver.
+    //
+    // El barrido va posición a posición y NO con `scrollBy`: la hoja de
+    // estilos pone `scroll-behavior: smooth`, y con desplazamientos
+    // encadenados cada uno interrumpe al anterior — el contador llega al
+    // final del documento mientras la ventana sigue por la mitad. El
+    // síntoma es una captura con medio contenido en blanco, que se lee como
+    // un fallo de la página y no de la herramienta.
     await pagina.evaluate(async () => {
-        await new Promise((listo) => {
-            let y = 0;
-            const paso = setInterval(() => {
-                window.scrollBy(0, 400);
-                y += 400;
-                if (y >= document.body.scrollHeight) {
-                    clearInterval(paso);
-                    window.scrollTo(0, 0);
-                    listo();
-                }
-            }, 40);
-        });
+        document.documentElement.style.scrollBehavior = 'auto';
+
+        const alto = window.innerHeight;
+        const total = document.documentElement.scrollHeight;
+
+        for (let y = 0; y < total; y += Math.round(alto * 0.75)) {
+            window.scrollTo(0, y);
+            await new Promise((r) => setTimeout(r, 120));
+        }
+
+        window.scrollTo(0, 0);
+        await new Promise((r) => setTimeout(r, 200));
     });
 
-    await new Promise((r) => setTimeout(r, 600));
+    await new Promise((r) => setTimeout(r, 1200));
 
     const ruta = `${DESTINO}/${nombre}.png`;
     await pagina.screenshot({ path: ruta, fullPage: true });

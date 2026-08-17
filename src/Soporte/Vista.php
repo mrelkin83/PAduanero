@@ -56,12 +56,20 @@ final class Vista
             . '11.7 0 0 0 12.05 0C5.6 0 .36 5.24.36 11.68c0 2.06.54 4.07 1.56 5.85L.26 24l6.62-1.74a11.66 11.66 0 0 0 '
             . '5.17 1.24h.01c6.44 0 11.69-5.24 11.69-11.68a11.6 11.6 0 0 0-3.43-8.27"/></svg>';
 
+        // Botón dentro de botón: el glifo no va suelto al lado del texto,
+        // va en su propio disco al ras del borde interior. En el hover el
+        // disco se desplaza en diagonal mientras el botón entero se
+        // comprime — la pieza se siente pulsable antes de pulsarla.
+        //
+        // El orden es texto-luego-disco y no al revés porque el disco hace
+        // de flecha: señala hacia dónde lleva.
         return sprintf(
-            '<a href="%s" class="boton-wa js-wa %s" data-evento="click_whatsapp" rel="noopener">%s<span>%s</span></a>',
+            '<a href="%s" class="boton-wa js-wa %s" data-evento="click_whatsapp" rel="noopener">'
+            . '<span>%s</span><span class="disco">%s</span></a>',
             self::e($href),
             self::e($clases),
-            $glifo,
             self::e($texto),
+            $glifo,
         );
     }
 

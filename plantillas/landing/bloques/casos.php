@@ -19,8 +19,8 @@ declare(strict_types=1);
  */
 
 $columnas = [
-    'aduanero' => 'Aduanero y comercio exterior',
-    'tributario' => 'Tributario',
+    'aduanero' => ['Aduanero y comercio exterior', 'A'],
+    'tributario' => ['Tributario', 'B'],
 ];
 ?>
 <section id="situaciones" class="bg-papel py-16 md:py-24">
@@ -37,12 +37,13 @@ $columnas = [
         <?php endif; ?>
 
         <div class="mt-12 grid gap-x-14 gap-y-10 md:grid-cols-2">
-            <?php foreach ($columnas as $clave => $encabezado): ?>
+            <?php foreach ($columnas as $clave => [$encabezado, $letra]): ?>
                 <?php $items = $bloque->lista($clave); ?>
                 <?php if ($items === []) { continue; } ?>
 
                 <div>
-                    <h3 class="font-mono text-eyebrow font-medium uppercase tracking-[0.14em] text-acero">
+                    <h3 class="flex items-baseline gap-3 font-mono text-eyebrow font-medium uppercase tracking-[0.16em] text-acero">
+                        <span class="text-sello"><?= $e($letra) ?></span>
                         <?= $e($encabezado) ?>
                     </h3>
 

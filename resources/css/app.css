@@ -24,29 +24,41 @@
    ===================================================================== */
 
 @theme {
-  --color-tinta: #16213A;
-  --color-tinta-alta: #0E1628;
-  --color-tinta-suave: #9AA6B8;
+  --color-tinta: #0E1628;
+  --color-tinta-alta: #060A12;
+  --color-tinta-suave: #8392A8;
 
-  --color-papel: #F2F3F1;
-  --color-papel-puro: #FBFBFA;
+  --color-papel: #F7F8F6;
+  --color-papel-puro: #FFFFFF;
 
-  --color-sello: #B4341F;
-  --color-ambar: #E8A33D;
-  --color-acero: #5A6478;
+  --color-sello: #C43D26;
+  --color-ambar: #EFA83E;
+  --color-acero: #64748B;
 
   /* Verde de WhatsApp, oscurecido. Se conserva el color porque la gente lo
      reconoce y sabe qué aplicación va a abrir —eso pesa más que la coherencia
      cromática en el único botón que hay que pulsar—, pero el tono de marca
      (#25D366) y su versión oscura (#128C4A) dan 2.4:1 y 4.3:1 con texto
      blanco, ambos por debajo del 4.5:1 que exige la WCAG AA. Este da 5.2:1. */
-  --color-whatsapp: #0F7D42;
-  --color-whatsapp-hover: #0B6234;
+  --color-whatsapp: #059669;
+  --color-whatsapp-hover: #047857;
 
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
 
   --text-eyebrow: 0.6875rem;
+  
+  /* Curva de muelle Apple: salida larga, respuesta inmediata y física fluida */
+  --ease-fina: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@font-face {
+  font-family: "Instrument Serif";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/instrument-serif.woff2") format("woff2");
 }
 
 @layer base {
@@ -69,6 +81,8 @@
     font-family: var(--font-sans);
     line-height: 1.65;
     text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* El foco tiene que verse sobre las dos superficies. */
@@ -89,9 +103,19 @@
     font-family: var(--font-mono);
     font-size: var(--text-eyebrow);
     font-weight: 500;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--color-sello);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .rotulo::before {
+    content: "";
+    width: 1.5rem;
+    height: 1px;
+    background-color: currentColor;
+    opacity: 0.4;
   }
   .sobre-tinta .rotulo { color: var(--color-ambar); }
 
@@ -100,16 +124,22 @@
      por defecto se ve suelto y blando, y esto es un despacho de litigio. */
   .titular {
     font-weight: 800;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.035em;
     line-height: 1.05;
     text-wrap: balance;
   }
 
   .titular-seccion {
     font-weight: 700;
-    letter-spacing: -0.018em;
+    letter-spacing: -0.025em;
     line-height: 1.15;
     text-wrap: balance;
+  }
+
+  .titular-menor {
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
   }
 
   /* --- La regla de sello ---------------------------------------------
@@ -143,12 +173,13 @@
     display: flex;
     align-items: baseline;
     gap: 0.75rem;
-    padding: 0.5rem 0 0.5rem 0.875rem;
-    border-top: 1px solid color-mix(in srgb, var(--color-acero) 22%, transparent);
+    padding: 0.75rem 0 0.75rem 1rem;
+    border-top: 1px solid color-mix(in srgb, var(--color-acero) 18%, transparent);
     font-family: var(--font-mono);
     font-size: 0.8125rem;
-    line-height: 1.45;
+    line-height: 1.5;
     position: relative;
+    transition: padding-left 400ms var(--ease-fina);
   }
 
   /* Marcador de sello: aparece a la izquierda, como quien va tachando la
@@ -157,61 +188,333 @@
     content: "";
     position: absolute;
     left: 0;
-    top: 0.85rem;
+    top: 1.1rem;
     width: 0.3125rem;
     height: 0.3125rem;
     background-color: var(--color-sello);
-    opacity: 0.32;
-    transition: opacity 140ms ease, transform 140ms ease;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: opacity 400ms var(--ease-fina), transform 400ms var(--ease-fina);
   }
+  .indice-fila:hover { padding-left: 1.5rem; }
   .indice-fila:hover::before {
     opacity: 1;
-    transform: scale(1.5);
+    transform: scale(1);
   }
+
+  .sobre-tinta .indice-fila { border-top-color: color-mix(in srgb, #8392A8 22%, transparent); }
+  .sobre-tinta .indice-fila::before { background-color: var(--color-ambar); }
 
   /* --- Botón de WhatsApp ---------------------------------------------- */
   .boton-wa {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.625rem;
+    gap: 0.75rem;
     background-color: var(--color-whatsapp);
     color: #fff;
-    font-weight: 650;
+    font-weight: 600;
     font-size: 1rem;
     line-height: 1.2;
-    padding: 0.9375rem 1.5rem;
-    border-radius: 2px;
+    padding: 0.875rem 1.75rem;
+    border-radius: 999px; /* Botón píldora estilo Apple */
     text-align: center;
-    transition: background-color 140ms ease, transform 140ms ease;
+    box-shadow: 0 4px 14px -4px rgba(5, 150, 105, 0.4), 0 1px 0 rgba(255, 255, 255, 0.2) inset;
+    transition: background-color 400ms var(--ease-fina), transform 400ms var(--ease-fina), box-shadow 400ms var(--ease-fina);
   }
-  .boton-wa:hover { background-color: var(--color-whatsapp-hover); }
-  .boton-wa:active { transform: translateY(1px); }
+  .boton-wa:hover { 
+    background-color: var(--color-whatsapp-hover); 
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px -4px rgba(5, 150, 105, 0.5), 0 1px 0 rgba(255, 255, 255, 0.25) inset;
+  }
+  .boton-wa:active { transform: translateY(1px) scale(0.98); }
+
+  /* El glifo va en su propio disco al ras del borde interior. En el hover
+     el disco se desplaza en diagonal —la pieza se siente pulsable antes
+     de pulsarla. */
+  .boton-wa .disco {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.875rem;
+    height: 1.875rem;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.18);
+    margin-left: 0.25rem;
+    transition: transform 400ms var(--ease-fina);
+  }
+  .boton-wa:hover .disco {
+    transform: translate(1px, -1px) rotate(-3deg);
+  }
 
   .boton-fantasma {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.625rem;
     font-weight: 600;
     font-size: 0.9375rem;
-    padding: 0.9375rem 0.25rem;
+    padding: 0.5rem 0;
     color: var(--color-tinta);
-    border-bottom: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-    transition: border-color 140ms ease;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    transition: border-color 400ms var(--ease-fina);
   }
   .boton-fantasma:hover { border-bottom-color: currentColor; }
   .sobre-tinta .boton-fantasma { color: var(--color-papel); }
 
+  .boton-fantasma span[aria-hidden] { transition: transform 400ms var(--ease-fina); }
+  .boton-fantasma:hover span[aria-hidden] { transform: translateX(3px); }
+
   /* --- Casilla numerada del proceso -----------------------------------
      Numerada porque el contenido SÍ es una secuencia: primero escribe,
      luego agenda, luego envía documentos, luego recibe la hoja de ruta.
-     El orden es información que el lector necesita. Va con cero a la
-     izquierda y filete superior, como las casillas de un formulario. */
+     Va con cero a la izquierda y filete superior, como las casillas de un
+     formulario. */
   .casilla-num {
     font-family: var(--font-mono);
     font-size: 0.75rem;
-    font-weight: 500;
-    letter-spacing: 0.08em;
+    font-weight: 600;
+    letter-spacing: 0.12em;
     color: var(--color-ambar);
+  }
+
+  /* --- Entrada: párrafo de lectura ------------------------------------ */
+  .entrada {
+    font-size: 1.0625rem;
+    line-height: 1.7;
+    color: var(--color-tinta-suave);
+  }
+  .sobre-tinta .entrada { color: #B8C4D6; }
+
+  /* --- Dato: pequeño, mono -------------------------------------------- */
+  .dato {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--color-acero);
+  }
+
+  /* --- Animación de revelado (entrada en viewport) --------------------- */
+  .revelar {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 700ms var(--ease-fina), transform 700ms var(--ease-fina);
+    transition-delay: var(--retardo, 0ms);
+  }
+  .revelar[data-visible] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* =====================================================================
+     Perfil — tarjetas de vidrio (glass) sobre tinta
+     ---------------------------------------------------------------------
+     El diagnóstico `/perfil` es oscuro: fondo de tinta y superficies de
+     cristal con bisel doble, como las tarjetas de iOS. La serif de display
+     (Instrument Serif) solo se precarga en esa página.
+     ==================================================================== */
+
+  /* Fondo y encuadre del perfil: el cuerpo azul noche sobre el que
+     flotan las tarjetas. */
+  .perfil-cuerpo {
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(239, 168, 62, 0.09), transparent 60%),
+      radial-gradient(900px 500px at 10% 110%, rgba(196, 61, 38, 0.10), transparent 60%),
+      var(--color-tinta);
+    min-height: 100vh;
+  }
+
+  /* Barra superior fija con desenfoque: el mismo cristal de las tarjetas,
+     estirado a lo ancho. */
+  .barra-perfil {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: color-mix(in srgb, var(--color-tinta) 78%, transparent);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid color-mix(in srgb, #FFFFFF 8%, transparent);
+  }
+
+  /* Tarjeta de vidrio con bisel doble: borde exterior de luz en la cara
+     superior y sombra profunda abajo, como un cristal iluminado desde
+     arriba. */
+  .doble-bisel {
+    position: relative;
+    border-radius: 1.75rem;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03) 55%);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.14) inset,
+      0 -1px 0 rgba(0, 0, 0, 0.35) inset,
+      0 24px 60px -24px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+  }
+  .doble-bisel-interior {
+    border-radius: 1.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02) 60%);
+  }
+
+  /* Paso activo: la tarjeta del paso en curso se ilumina un poco más. */
+  .paso {
+    display: none;
+  }
+  .paso[data-activo] {
+    display: block;
+    animation: paso-entra 600ms var(--ease-fina);
+  }
+  @keyframes paso-entra {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  /* Sin JavaScript todo se ve: el atributo data-js solo se pone en el
+     head cuando hay script disponible. */
+  html:not([data-js]) .paso {
+    display: block;
+  }
+
+  /* Opción del cuestionario: fila de cristal con marca circular. */
+  .opcion {
+    display: flex;
+    align-items: center;
+    gap: 1.125rem;
+    padding: 1rem 1.125rem;
+    border-radius: 1.125rem;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    position: relative;
+    transition: background-color 400ms var(--ease-fina), border-color 400ms var(--ease-fina), transform 200ms var(--ease-fina);
+  }
+  .opcion:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(239, 168, 62, 0.45);
+  }
+  .opcion:active { transform: scale(0.99); }
+  .opcion > input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .opcion > input:checked + .opcion-marca {
+    background-color: var(--color-ambar);
+    color: var(--color-tinta);
+    border-color: var(--color-ambar);
+  }
+  .opcion > input:checked ~ span .opcion-etiqueta {
+    color: var(--color-ambar);
+  }
+  .opcion > input:focus-visible + .opcion-marca {
+    outline: 2px solid var(--color-ambar);
+    outline-offset: 3px;
+  }
+
+  .opcion-marca {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.125rem;
+    height: 2.125rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-papel);
+    transition: background-color 400ms var(--ease-fina), color 400ms var(--ease-fina), border-color 400ms var(--ease-fina);
+  }
+  .opcion-etiqueta {
+    display: block;
+    font-size: 1rem;
+    font-weight: 550;
+    color: var(--color-papel);
+    line-height: 1.3;
+    transition: color 400ms var(--ease-fina);
+  }
+  .opcion-detalle {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #9AA7BC;
+    line-height: 1.4;
+  }
+  .opcion-flecha {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: #5C6B82;
+    font-size: 1.0625rem;
+    transition: transform 400ms var(--ease-fina), color 400ms var(--ease-fina);
+  }
+  .opcion:hover .opcion-flecha {
+    color: var(--color-ambar);
+    transform: translateX(3px);
+  }
+
+  /* Barra de progreso: un hilo ámbar que se llena. */
+  .progreso {
+    width: 8rem;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+  }
+  .progreso > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    background: linear-gradient(to right, var(--color-ambar), #F6C36B);
+    transition: width 600ms var(--ease-fina);
+  }
+
+  /* Ficha de la asesoría en el resultado: la tarjeta que cierra. */
+  .ficha-asesoria {
+    padding: 1.75rem;
+    border-radius: 1.25rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(239, 168, 62, 0.22);
+  }
+
+  /* Tarjeta del diagnóstico (invitación en la landing): cristal sobre
+     tinta con la numeración «01 → 06» como casilla de orden. */
+  .tarjeta-diagnostico {
+    display: block;
+    padding: 1.5rem 1.75rem;
+    border-radius: 1.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.10) inset,
+      0 20px 50px -20px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    transition: transform 500ms var(--ease-fina), border-color 500ms var(--ease-fina), box-shadow 500ms var(--ease-fina);
+  }
+  .tarjeta-diagnostico:hover {
+    transform: translateY(-3px);
+    border-color: rgba(239, 168, 62, 0.40);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.12) inset,
+      0 30px 60px -20px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Salidas (urgente, fuera de alcance, resultado): bloque sobre tinta. */
+  .bloque-salida {
+    margin-top: 4rem;
+  }
+
+  /* Textura de grano sutil sobre la tinta, para que el vidrio no se vea
+     plano. */
+  .grano {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' /%3E%3C/svg%3E");
   }
 }

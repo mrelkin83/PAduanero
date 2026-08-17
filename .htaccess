@@ -11,7 +11,7 @@
     # src, mientras que en disco están en public/img (CLAUDE.md §12.6).
     # En el VPS lo equivalente es un `location /img { alias …/public/img; }`
     # en Nginx; esta regla es para el Apache de desarrollo.
-    RewriteRule ^(img|css|js)/(.*)$ public/$1/$2 [L]
+    RewriteRule ^(img|css|js|fonts)/(.*)$ public/$1/$2 [L]
 
     # Cualquier otro archivo o directorio real se sirve directo.
     RewriteCond %{REQUEST_FILENAME} -f [OR]

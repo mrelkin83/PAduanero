@@ -438,7 +438,27 @@ server {
     root /var/www/pedro;
     index index.php;
 
-    location ~ ^/(img|css|js)/ {
+    # Compresión. NO es opcional y NO viene por defecto: `gzip` está en
+    # `off` en la configuración de fábrica de Nginx, y `gzip_types` de
+    # fábrica solo cubre `text/html`. Sin estas cuatro líneas la landing
+    # viaja en 60 KB donde caben 13, y el diagnóstico en 80 donde caben 15
+    # — el HTML lleva el CSS incrustado, así que es el archivo que más se
+    # beneficia y justo el que está en el camino crítico del LCP.
+    #
+    # `font/woff2`, `image/avif` y `image/webp` quedan fuera a propósito:
+    # ya vienen comprimidos y volver a pasarlos por gzip gasta CPU para
+    # dejarlos igual o un poco más grandes.
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json
+               image/svg+xml application/xml;
+
+    # `fonts` incluido: las tres tipografías se autoalojan en
+    # `public/fonts` y se piden como `/fonts/*.woff2`. Sin esta línea la
+    # página no falla — cae a la tipografía de reserva— y ese es el
+    # problema: se ve peor sin dar un solo error en ninguna parte.
+    location ~ ^/(img|css|js|fonts)/ {
         alias /var/www/pedro/public/;
         try_files $uri =404;
         expires 30d;

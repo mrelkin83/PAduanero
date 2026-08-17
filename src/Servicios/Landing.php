@@ -23,15 +23,18 @@ use App\Modelos\Bloque;
  */
 final class Landing
 {
+    private readonly CachePagina $cache;
+
     public function __construct(
         private readonly BD $bd,
         private readonly Config $config,
         private readonly Seo $seo,
         private readonly string $urlBase,
-        private readonly string $rutaCache,
-        private readonly string $rutaSentinela,
-        private readonly string $rutaCss,
+        string $rutaCache,
+        string $rutaSentinela,
+        string $rutaCss,
     ) {
+        $this->cache = new CachePagina($rutaCache, $rutaSentinela, $rutaCss);
     }
 
     public function responder(): Respuesta
@@ -49,23 +52,10 @@ final class Landing
 
     public function htmlCacheado(): string
     {
-        $ttl = (int) $this->config->get('landing_cache_segundos', 300);
-
-        if ($ttl > 0 && $this->cacheVigente($ttl)) {
-            $html = @file_get_contents($this->rutaCache);
-
-            if (is_string($html) && $html !== '') {
-                return $html;
-            }
-        }
-
-        $html = $this->render();
-
-        if ($ttl > 0) {
-            $this->guardarCache($html);
-        }
-
-        return $html;
+        return $this->cache->obtener(
+            (int) $this->config->get('landing_cache_segundos', 300),
+            fn (): string => $this->render(),
+        );
     }
 
     public function render(): string
@@ -113,73 +103,12 @@ final class Landing
         return $bloques;
     }
 
+    /**
+     * El centinela lo comparte con `/perfil`: los bloques de las dos páginas
+     * viven en la misma tabla, así que invalidar una invalida la otra.
+     */
     public function invalidarCache(): void
     {
-        @unlink($this->rutaCache);
-        $this->tocarSentinela();
-    }
-
-    private function cacheVigente(int $ttl): bool
-    {
-        clearstatcache(true, $this->rutaCache);
-
-        if (!is_file($this->rutaCache)) {
-            return false;
-        }
-
-        $generada = (int) @filemtime($this->rutaCache);
-
-        if ($generada + $ttl < time()) {
-            return false;
-        }
-
-        // Un centinela más reciente que la caché significa que alguien
-        // guardó un bloque desde el panel.
-        clearstatcache(true, $this->rutaSentinela);
-        $sentinela = is_file($this->rutaSentinela) ? (int) @filemtime($this->rutaSentinela) : 0;
-
-        if ($sentinela > $generada) {
-            return false;
-        }
-
-        // El CSS va incrustado en el HTML, así que recompilarlo tiene que
-        // invalidar la caché igual que editar un bloque. Sin esto, un
-        // `npm run build:css` no se vería hasta que expirara el TTL, y el
-        // síntoma —cambio de CSS que no aparece— es de los que cuestan una
-        // tarde encontrar.
-        clearstatcache(true, $this->rutaCss);
-        $css = is_file($this->rutaCss) ? (int) @filemtime($this->rutaCss) : 0;
-
-        return $css <= $generada;
-    }
-
-    private function guardarCache(string $html): void
-    {
-        $directorio = dirname($this->rutaCache);
-        if (!is_dir($directorio)) {
-            @mkdir($directorio, 0o770, true);
-        }
-
-        // Escritura atómica: sin el rename, una visita concurrente puede leer
-        // el archivo a medio escribir y servir HTML truncado.
-        $temporal = $this->rutaCache . '.' . bin2hex(random_bytes(4)) . '.tmp';
-
-        if (@file_put_contents($temporal, $html) === false) {
-            return;
-        }
-
-        if (!@rename($temporal, $this->rutaCache)) {
-            @unlink($temporal);
-        }
-    }
-
-    private function tocarSentinela(): void
-    {
-        $directorio = dirname($this->rutaSentinela);
-        if (!is_dir($directorio)) {
-            @mkdir($directorio, 0o770, true);
-        }
-
-        @touch($this->rutaSentinela);
+        $this->cache->invalidar();
     }
 }
