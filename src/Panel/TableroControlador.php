@@ -136,7 +136,15 @@ final class TableroControlador extends ControladorBase
             return [];
         }
 
-        $conDato = static function (mixed $lista, string $campo): int {
+        /* Cuenta solo lo REAL: con dato y sin la marca `pendiente`.
+         *
+         * Esa segunda condición es la que sostiene todo el mecanismo. El
+         * relleno provisional tiene texto, así que un conteo ingenuo lo daría
+         * por bueno y el aviso desaparecería — y entonces nada volvería a
+         * recordar que ese número de tarjeta profesional es de mentira. El
+         * relleno se quedaría ahí para siempre, que es exactamente cómo
+         * terminan quedándose los rellenos. */
+        $reales = static function (mixed $lista, string $campo): int {
             if (!is_array($lista)) {
                 return 0;
             }
@@ -144,7 +152,11 @@ final class TableroControlador extends ControladorBase
             $n = 0;
 
             foreach ($lista as $fila) {
-                if (is_array($fila) && trim((string) ($fila[$campo] ?? '')) !== '') {
+                if (!is_array($fila) || ($fila['pendiente'] ?? null) === true) {
+                    continue;
+                }
+
+                if (trim((string) ($fila[$campo] ?? '')) !== '') {
                     $n++;
                 }
             }
@@ -154,15 +166,16 @@ final class TableroControlador extends ControladorBase
 
         $avisos = [];
 
-        if ($conDato($contenido['verificables'] ?? null, 'valor') === 0) {
-            $avisos[] = 'La sección «Puede comprobar todo lo que dice esta página» está oculta: '
-                . 'faltan la tarjeta profesional y el NIT. Sin datos comprobables no se pinta.';
+        if ($reales($contenido['verificables'] ?? null, 'valor') === 0) {
+            $avisos[] = 'Confianza: la tarjeta profesional y el NIT siguen siendo relleno. '
+                . 'Se ven en gris y marcados como pendientes, y sin ellos no hay enlace de '
+                . 'verificación — que es la mitad del argumento de esa sección.';
         }
 
-        if ($conDato($contenido['sedes'] ?? null, 'direccion') === 0) {
-            $avisos[] = 'Ninguna oficina tiene dirección escrita. Es el argumento más fuerte '
-                . 'contra el miedo a una estafa, y además alimenta la dirección postal del '
-                . 'marcado para buscadores.';
+        if ($reales($contenido['sedes'] ?? null, 'direccion') === 0) {
+            $avisos[] = 'Confianza: ninguna oficina tiene dirección real. Es el argumento más '
+                . 'fuerte contra el miedo a una estafa; además, mientras sea relleno no se '
+                . 'invita a visitar ni se emite la dirección postal para buscadores.';
         }
 
         return $avisos;

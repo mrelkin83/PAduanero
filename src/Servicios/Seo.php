@@ -209,7 +209,13 @@ final class Seo
 
             $direccion = trim((string) ($sede['direccion'] ?? ''));
 
-            if ($direccion === '') {
+            // Vacía o marcada como pendiente, fuera. El relleno provisional
+            // se ve en la página como lo que es —en gris y con su marca—,
+            // pero en el marcado no hay forma de decir «esto todavía no es
+            // cierto»: `PostalAddress` es una afirmación a secas. Emitir aquí
+            // una dirección de relleno la convertiría en un dato falso
+            // publicado por un abogado sobre su propio despacho.
+            if ($direccion === '' || ($sede['pendiente'] ?? null) === true) {
                 continue;
             }
 

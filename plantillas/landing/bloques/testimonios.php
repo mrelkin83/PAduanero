@@ -56,12 +56,20 @@ foreach ($bloque->lista('items') as $item) {
         continue;
     }
 
+    $pendiente = ($item['pendiente'] ?? null) === true;
+
     // `autorizado` estricto: solo el booleano verdadero abre la puerta. Un
     // `"si"`, un `1` o una cadena vacía no cuentan — si el permiso llegó
     // como texto suelto desde algún formulario, quien lo cargó tiene que
     // volver y marcarlo bien, que es exactamente el momento de detenerse a
     // comprobar si el permiso existe de verdad.
-    if (($item['autorizado'] ?? null) !== true) {
+    //
+    // Un ejemplo de relleno se salta esa puerta, y puede hacerlo sin abrirla
+    // para nadie más: se pinta con la marca «ejemplo» encima y el nombre en
+    // gris, así que no dice nada sobre ningún cliente real. Lo que la puerta
+    // protege —el secreto profesional de alguien que existe— no está en
+    // juego mientras no haya alguien que exista detrás.
+    if (!$pendiente && ($item['autorizado'] ?? null) !== true) {
         continue;
     }
 
@@ -75,7 +83,7 @@ foreach ($bloque->lista('items') as $item) {
         continue;
     }
 
-    $items[] = $item + ['texto' => $texto, 'autor' => $autor];
+    $items[] = $item + ['texto' => $texto, 'autor' => $autor, 'pendiente' => $pendiente];
 }
 
 if ($items === []) {
@@ -102,13 +110,20 @@ if ($items === []) {
                 $empresa = trim((string) ($item['empresa'] ?? ''));
                 $pie = implode(' · ', array_filter([$cargo, $empresa]));
                 ?>
+                <?php $pendiente = $item['pendiente'] === true; ?>
                 <figure class="tarjeta flex flex-col p-8 md:p-10">
-                    <blockquote class="entrada text-[1.0625rem]">
+                    <?php if ($pendiente): ?>
+                    <p class="mb-6"><span class="marca-pendiente ml-0">Ejemplo · sin publicar</span></p>
+                    <?php endif; ?>
+
+                    <blockquote class="entrada text-[1.0625rem] <?= $pendiente ? 'pendiente' : '' ?>">
                         <?= $e($item['texto']) ?>
                     </blockquote>
 
                     <figcaption class="mt-8 border-t border-linea pt-6">
-                        <p class="titular-menor text-[1.0625rem]"><?= $e($item['autor']) ?></p>
+                        <p class="titular-menor text-[1.0625rem] <?= $pendiente ? 'pendiente' : '' ?>">
+                            <?= $e($item['autor']) ?>
+                        </p>
 
                         <?php if ($pie !== ''): ?>
                         <p class="rotulo mt-2 text-acero"><?= $e($pie) ?></p>

@@ -223,10 +223,42 @@ final class LandingTest extends CasoBaseBd
     #[Test]
     public function laSeccionDeConfianzaNoSePintaSinDatosComprobables(): void
     {
-        // Es como nace de la migración 0014: sin tarjeta profesional, sin NIT
-        // y sin dirección. Media sección, con rayas donde deberían ir los
-        // datos, confirma la sospecha en vez de desmentirla.
+        // Vaciar es explícito porque la migración 0015 dejó relleno sembrado:
+        // lo que se prueba aquí es el estado sin NADA, ni real ni provisional.
+        // Media sección, con rayas donde deberían ir los datos, confirma la
+        // sospecha en vez de desmentirla.
+        $this->ponerBloque('confianza', ['verificables' => [], 'sedes' => []]);
+
         self::assertStringNotContainsString('id="confianza"', $this->construir()->render());
+    }
+
+    #[Test]
+    public function elRellenoProvisionalSeVeComoRellenoYNoComoDato(): void
+    {
+        // El relleno se sembró para poder ver la sección antes de tener los
+        // datos. La condición para que eso sea inofensivo es esta: que no
+        // pueda leerse como un dato verdadero. Un número de tarjeta
+        // profesional inventado con aspecto real, en la página de un abogado,
+        // no es un pendiente — es una constancia falsa.
+        $this->ponerBloque('confianza', [
+            'verificables' => [[
+                'etiqueta' => 'Tarjeta profesional',
+                'valor' => 'Pendiente de cargar',
+                'pendiente' => true,
+                'enlace_texto' => 'Registro Nacional de Abogados',
+                'url' => 'https://ejemplo.invalido/',
+            ]],
+            'sedes' => [],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString('id="confianza"', $html, 'debe verse para poder trabajarla');
+        self::assertStringContainsString('marca-pendiente', $html, 'y verse marcada');
+
+        // Sin enlace: mandar a alguien a un registro donde no hay nada que
+        // consultar es peor que no ofrecerle el camino.
+        self::assertStringNotContainsString('https://ejemplo.invalido/', $html);
     }
 
     #[Test]
@@ -298,6 +330,8 @@ final class LandingTest extends CasoBaseBd
         // trabajo es demostrar que no es una fachada. El menú se deriva del
         // cuerpo ya compuesto para que esto no pueda ocurrir con ningún
         // bloque, ni con los que se añadan después.
+        $this->ponerBloque('confianza', ['verificables' => [], 'sedes' => []]);
+
         $html = $this->construir()->render();
 
         self::assertStringNotContainsString('href="#confianza"', $html);
@@ -309,6 +343,53 @@ final class LandingTest extends CasoBaseBd
         ]);
 
         self::assertStringContainsString('href="#confianza"', $this->construir()->render());
+    }
+
+    #[Test]
+    public function unaDireccionDeRellenoNoInvitaAVisitarNiSaleEnElMarcado(): void
+    {
+        // Los dos sitios donde el relleno sí haría daño. «Puede venir a
+        // comprobar que existimos» bajo un renglón que dice «dirección
+        // pendiente» es la única frase del bloque que alguien podría llegar a
+        // intentar; y `PostalAddress` no tiene forma de decir «esto todavía
+        // no es cierto» — es una afirmación a secas.
+        $this->ponerBloque('confianza', [
+            'verificables' => [],
+            'sedes' => [[
+                'nombre' => 'Zona Franca de Bogotá',
+                'direccion' => 'Dirección pendiente de cargar',
+                'pendiente' => true,
+            ]],
+            'invitacion' => 'Puede venir a comprobar que existimos.',
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString('Dirección pendiente', $html, 'la sede sí se ve');
+        self::assertStringNotContainsString('Puede venir a comprobar', $html);
+        self::assertStringNotContainsString('PostalAddress', $html);
+    }
+
+    #[Test]
+    public function unTestimonioDeEjemploSePintaMarcadoYSinAutorizacion(): void
+    {
+        // El relleno se salta la puerta del `autorizado` y puede hacerlo sin
+        // abrirla para nadie más: lo que esa puerta protege es el secreto
+        // profesional de alguien que existe, y detrás de un ejemplo no hay
+        // nadie. Lo que no puede es parecer una reseña real.
+        $this->ponerBloque('testimonios', [
+            'items' => [[
+                'texto' => 'Contestó el mismo día.',
+                'autor' => 'Nombre pendiente',
+                'pendiente' => true,
+                // sin `autorizado`
+            ]],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString('id="testimonios"', $html);
+        self::assertStringContainsString('Ejemplo · sin publicar', $html);
     }
 
     #[Test]

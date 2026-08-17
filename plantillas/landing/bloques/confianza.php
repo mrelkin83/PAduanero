@@ -80,24 +80,41 @@ $invitacion = $bloque->texto('invitacion');
                 $url = (string) ($dato['url'] ?? '');
                 $enlaceTexto = (string) ($dato['enlace_texto'] ?? '');
                 ?>
+                <?php $pendiente = ($dato['pendiente'] ?? null) === true; ?>
+                <?php /* La nota y el enlace van DENTRO del `<dd>`, no sueltos
+                         a su lado. Un `<div>` dentro de un `<dl>` solo admite
+                         `<dt>` y `<dd>`; con un `<p>` colgando ahí, el árbol
+                         de accesibilidad queda mal formado y el lector de
+                         pantalla pierde la relación entre el término y su
+                         valor. Lo detecta `bin/auditar-landing.mjs` — pasó, y
+                         costó cuatro puntos de accesibilidad. */ ?>
                 <div class="tarjeta p-8 md:p-10">
                     <dt class="rotulo text-acero"><?= $e($etiqueta) ?></dt>
 
-                    <dd class="cifra-oro mt-5 break-words text-[1.375rem] md:text-[1.75rem]">
-                        <?= $e($valor) ?>
+                    <dd class="mt-5">
+                        <span class="block break-words text-[1.375rem] md:text-[1.75rem] <?= $pendiente ? 'pendiente font-mono' : 'cifra-oro' ?>">
+                            <?= $e($valor) ?>
+                            <?php if ($pendiente): ?>
+                            <span class="marca-pendiente">Pendiente</span>
+                            <?php endif; ?>
+                        </span>
+
+                        <?php if ($nota !== ''): ?>
+                        <span class="cuerpo mt-4 block text-[0.9375rem]"><?= $e($nota) ?></span>
+                        <?php endif; ?>
+
+                        <?php /* Sin enlace mientras el dato esté pendiente:
+                                 mandar a alguien a un registro donde no hay
+                                 nada que consultar es peor que no ofrecerle
+                                 el camino. */ ?>
+                        <?php if (!$pendiente && $url !== '' && $enlaceTexto !== ''): ?>
+                        <a href="<?= $e($url) ?>" class="menu-enlace mt-6 inline-flex items-center gap-2"
+                           target="_blank" rel="noopener noreferrer">
+                            <?= $e($enlaceTexto) ?>
+                            <span aria-hidden="true">↗</span>
+                        </a>
+                        <?php endif; ?>
                     </dd>
-
-                    <?php if ($nota !== ''): ?>
-                    <p class="cuerpo mt-4 text-[0.9375rem]"><?= $e($nota) ?></p>
-                    <?php endif; ?>
-
-                    <?php if ($url !== '' && $enlaceTexto !== ''): ?>
-                    <a href="<?= $e($url) ?>" class="menu-enlace mt-6 inline-flex items-center gap-2"
-                       target="_blank" rel="noopener noreferrer">
-                        <?= $e($enlaceTexto) ?>
-                        <span aria-hidden="true">↗</span>
-                    </a>
-                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </dl>
@@ -117,13 +134,17 @@ $invitacion = $bloque->texto('invitacion');
                 $detalle = (string) ($sede['detalle'] ?? '');
                 $horario = (string) ($sede['horario'] ?? '');
                 ?>
+                <?php $pendiente = ($sede['pendiente'] ?? null) === true; ?>
                 <div class="tarjeta p-8 md:p-10">
                     <p class="rotulo text-acero">Oficina</p>
 
                     <p class="titular-menor mt-5"><?= $e($nombre) ?></p>
 
-                    <address class="cuerpo mt-3 not-italic">
+                    <address class="mt-3 not-italic <?= $pendiente ? 'pendiente font-mono text-[0.9375rem]' : 'cuerpo' ?>">
                         <?= $e($direccion) ?>
+                        <?php if ($pendiente): ?>
+                        <span class="marca-pendiente">Pendiente</span>
+                        <?php endif; ?>
                     </address>
 
                     <?php if ($horario !== ''): ?>
@@ -140,9 +161,15 @@ $invitacion = $bloque->texto('invitacion');
         </div>
         <?php endif; ?>
 
-        <?php if ($invitacion !== '' && $sedes !== []): ?>
-        <?php /* Solo se invita si hay a dónde. Sin dirección, esta frase sería
-                 justo la clase de promesa vacía que la sección desmiente. */ ?>
+        <?php
+        /* Solo se invita si hay a dónde ir DE VERDAD. Una dirección marcada
+           como pendiente no cuenta: «puede venir a comprobar que existimos»
+           bajo un renglón que dice «dirección pendiente» es justo la clase de
+           promesa vacía que esta sección vino a desmentir, y la única frase
+           de todo el bloque que un visitante podría llegar a intentar. */
+        $sedesReales = array_filter($sedes, static fn (array $s): bool => ($s['pendiente'] ?? null) !== true);
+        ?>
+        <?php if ($invitacion !== '' && $sedesReales !== []): ?>
         <p class="entrada mt-12 max-w-2xl border-l-2 border-oro pl-6">
             <?= $e($invitacion) ?>
         </p>

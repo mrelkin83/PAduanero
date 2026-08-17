@@ -536,6 +536,40 @@
     color: var(--color-acero);
   }
 
+  /* --- Dato pendiente de cargar ---------------------------------------
+     Marca lo que todavía es relleno: el número de tarjeta profesional, una
+     dirección, un testimonio de ejemplo.
+
+     Existe para que un dato provisional NO pueda parecerse a uno real. En
+     una página cuyo trabajo es desmentir la sospecha de estafa, un dato
+     inventado con aspecto verdadero no es un pendiente: es una constancia
+     falsa. Por eso el valor pierde el oro —que en este sistema significa
+     «esto manda»— y se va al gris del texto terciario, con la palabra al
+     lado y sin enlace de verificación detrás.
+
+     El gris no es decorativo: es la señal de que ese renglón no afirma nada
+     todavía. */
+  .pendiente {
+    color: var(--color-acero);
+  }
+
+  .marca-pendiente {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-left: 0.625rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px dashed var(--color-linea-fuerte);
+    border-radius: var(--radius-pieza);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-acero);
+    vertical-align: middle;
+  }
+
   /* Distintivo de la salida urgente. Va aquí y no suelto en la plantilla
      porque es la única pieza del sistema que puede usar el rojo, y tenerla
      con nombre propio es lo que impide que ese rojo se copie a otro sitio. */
