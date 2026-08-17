@@ -204,4 +204,129 @@ final class LandingTest extends CasoBaseBd
 
         self::assertStringContainsString('noindex', $this->construir()->render());
     }
+
+    // ── Confianza y testimonios ──────────────────────────────────────────
+    //
+    // Estas cinco prueban una sola idea: que la página **no pueda afirmar
+    // sobre sí misma nada que no sea cierto**. Es la sección que existe para
+    // desmentir el miedo a una estafa, así que un dato inventado ahí hace más
+    // daño que en cualquier otro sitio del proyecto.
+
+    /** @param array<string,mixed> $contenido */
+    private function ponerBloque(string $clave, array $contenido): void
+    {
+        $this->bd->pdo()
+            ->prepare('UPDATE landing_bloques SET contenido = ? WHERE clave = ?')
+            ->execute([json_encode($contenido, JSON_UNESCAPED_UNICODE), $clave]);
+    }
+
+    #[Test]
+    public function laSeccionDeConfianzaNoSePintaSinDatosComprobables(): void
+    {
+        // Es como nace de la migración 0014: sin tarjeta profesional, sin NIT
+        // y sin dirección. Media sección, con rayas donde deberían ir los
+        // datos, confirma la sospecha en vez de desmentirla.
+        self::assertStringNotContainsString('id="confianza"', $this->construir()->render());
+    }
+
+    #[Test]
+    public function laSeccionDeConfianzaAparaceEnCuantoHayUnDatoReal(): void
+    {
+        $this->ponerBloque('confianza', [
+            'verificables' => [
+                ['etiqueta' => 'Tarjeta profesional', 'valor' => '000000', 'nota' => '', 'url' => ''],
+            ],
+            'sedes' => [],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString('id="confianza"', $html);
+        self::assertStringContainsString('000000', $html);
+    }
+
+    #[Test]
+    public function laInvitacionAVisitarNoSaleSinDireccionADondeIr(): void
+    {
+        // «Puede venir a comprobar que existimos» sin dirección es justo la
+        // clase de promesa vacía que esta sección vino a desmentir.
+        $this->ponerBloque('confianza', [
+            'verificables' => [['etiqueta' => 'NIT', 'valor' => '900000000-0']],
+            'sedes' => [['nombre' => 'Zona Franca de Bogotá', 'direccion' => '']],
+            'invitacion' => 'Puede venir a comprobar que existimos.',
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString('id="confianza"', $html, 'el NIT sí debe pintarse');
+        self::assertStringNotContainsString('Puede venir a comprobar', $html);
+    }
+
+    #[Test]
+    public function unTestimonioSinAutorizacionNoSePublica(): void
+    {
+        // La puerta que impide que una cita llegue a producción sin permiso
+        // escrito del cliente. Publicarla revelaría que esa empresa tuvo un
+        // problema con la DIAN — información suya, no del despacho.
+        $this->ponerBloque('testimonios', [
+            'items' => [
+                [
+                    'texto' => 'Contestó el mismo día y explicó todo en español.',
+                    'autor' => 'Nombre Apellido',
+                    'empresa' => 'Importadora Ejemplo',
+                    // sin `autorizado`
+                ],
+                [
+                    'texto' => 'Dijo desde el principio qué no se podía hacer.',
+                    'autor' => 'Otro Nombre',
+                    'autorizado' => 'si',   // texto, no booleano: no cuenta
+                ],
+            ],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringNotContainsString('id="testimonios"', $html);
+        self::assertStringNotContainsString('Contestó el mismo día', $html);
+        self::assertStringNotContainsString('Dijo desde el principio', $html);
+    }
+
+    #[Test]
+    public function elMenuNoOfreceUnaSeccionQueNoSePinto(): void
+    {
+        // Un enlace que no lleva a ninguna parte, justo en la página cuyo
+        // trabajo es demostrar que no es una fachada. El menú se deriva del
+        // cuerpo ya compuesto para que esto no pueda ocurrir con ningún
+        // bloque, ni con los que se añadan después.
+        $html = $this->construir()->render();
+
+        self::assertStringNotContainsString('href="#confianza"', $html);
+        self::assertStringContainsString('href="#situaciones"', $html);
+
+        $this->ponerBloque('confianza', [
+            'verificables' => [['etiqueta' => 'NIT', 'valor' => '900000000-0']],
+            'sedes' => [],
+        ]);
+
+        self::assertStringContainsString('href="#confianza"', $this->construir()->render());
+    }
+
+    #[Test]
+    public function unTestimonioAnonimoNoSePublicaAunqueEsteAutorizado(): void
+    {
+        // Sin nombre no distingue a este despacho de uno inventado, que es
+        // exactamente el problema que la sección vino a resolver.
+        $this->ponerBloque('testimonios', [
+            'items' => [
+                ['texto' => 'Muy buen trato.', 'autor' => '', 'autorizado' => true],
+                ['texto' => 'Contestó el mismo día.', 'autor' => 'Nombre Real', 'autorizado' => true],
+            ],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString('id="testimonios"', $html);
+        self::assertStringContainsString('Contestó el mismo día', $html);
+        self::assertStringNotContainsString('Muy buen trato', $html);
+    }
 }

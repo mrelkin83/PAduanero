@@ -147,13 +147,81 @@ final class Seo
             $datos['telephone'] = '+' . $telefono;
         }
 
-        // Sin `address`: el despacho no ha dado una dirección postal y
-        // schema.org no es el sitio para improvisarla. Sin `aggregateRating`
-        // ni `review`: no hay reseñas reales que declarar.
+        // `address` sale del bloque `confianza`, y solo si allí hay una
+        // dirección escrita de verdad. Es el mismo dato que el visitante ve
+        // en la página: si alguna vez difirieran, el marcado sería una
+        // afirmación pública distinta de la visible, que es peor que no
+        // marcar nada.
+        $sedes = $this->sedes();
+
+        if ($sedes !== []) {
+            // Una sede da un objeto; varias, una lista. Schema.org acepta
+            // ambas formas y una lista de un solo elemento se lee peor en las
+            // herramientas de validación.
+            $datos['address'] = count($sedes) === 1 ? $sedes[0] : $sedes;
+        }
+
+        // Sin `aggregateRating` ni `review`: los testimonios del bloque
+        // `testimonios` son citas autorizadas sobre el trato recibido, no
+        // reseñas con estrella. Convertirlas en `Review` con `ratingValue`
+        // sería inventarle una puntuación a alguien que nunca la dio, y
+        // además es justo el marcado que hace a Google penalizar un sitio.
         // Sin `priceRange`: la tarifa está en el bloque `proceso`, en pesos y
         // sin adornos.
 
         return $datos;
+    }
+
+    /**
+     * Las sedes con dirección, en formato `PostalAddress`.
+     *
+     * Devuelve lista vacía si el bloque no existe, si no tiene sedes o si
+     * ninguna trae dirección. La regla de esta clase —solo datos que
+     * existen— aplica aquí con más razón que en ningún otro campo: una
+     * dirección postal inventada en el marcado de un abogado es exactamente
+     * la clase de afirmación que la Ley 1123 de 2007 regula.
+     *
+     * @return list<array<string,string>>
+     */
+    private function sedes(): array
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            "SELECT contenido FROM landing_bloques WHERE clave = 'confianza' AND visible = 1"
+        );
+        $stmt->execute();
+        $crudo = $stmt->fetchColumn();
+
+        if (!is_string($crudo)) {
+            return [];
+        }
+
+        $contenido = json_decode($crudo, true);
+        $sedes = is_array($contenido) && is_array($contenido['sedes'] ?? null)
+            ? $contenido['sedes']
+            : [];
+
+        $salida = [];
+
+        foreach ($sedes as $sede) {
+            if (!is_array($sede)) {
+                continue;
+            }
+
+            $direccion = trim((string) ($sede['direccion'] ?? ''));
+
+            if ($direccion === '') {
+                continue;
+            }
+
+            $salida[] = [
+                '@type' => 'PostalAddress',
+                'streetAddress' => $direccion,
+                'addressLocality' => 'Bogotá',
+                'addressCountry' => 'CO',
+            ];
+        }
+
+        return $salida;
     }
 
     private function indexable(): bool

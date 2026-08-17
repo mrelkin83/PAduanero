@@ -103,6 +103,68 @@ final class TableroControlador extends ControladorBase
             $faltan[] = 'La landing está marcada como no indexable: sale con «noindex» y no aparecerá en búsquedas.';
         }
 
+        // El bloque de confianza nace vacío a propósito —inventar una
+        // dirección o una tarjeta profesional sería el fraude que esa sección
+        // existe para desmentir— y la plantilla lo esconde entero mientras lo
+        // esté. Ese silencio es correcto de cara al visitante y peligroso de
+        // cara a nosotros: la sección que responde «¿esto existe?» puede
+        // llevar meses sin publicarse sin que nada lo delate. Por eso se
+        // avisa aquí.
+        foreach ($this->confianzaIncompleta() as $aviso) {
+            $faltan[] = $aviso;
+        }
+
         return $faltan;
+    }
+
+    /** @return list<string> */
+    private function confianzaIncompleta(): array
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            "SELECT contenido FROM landing_bloques WHERE clave = 'confianza'"
+        );
+        $stmt->execute();
+        $crudo = $stmt->fetchColumn();
+
+        if (!is_string($crudo)) {
+            return [];
+        }
+
+        $contenido = json_decode($crudo, true);
+
+        if (!is_array($contenido)) {
+            return [];
+        }
+
+        $conDato = static function (mixed $lista, string $campo): int {
+            if (!is_array($lista)) {
+                return 0;
+            }
+
+            $n = 0;
+
+            foreach ($lista as $fila) {
+                if (is_array($fila) && trim((string) ($fila[$campo] ?? '')) !== '') {
+                    $n++;
+                }
+            }
+
+            return $n;
+        };
+
+        $avisos = [];
+
+        if ($conDato($contenido['verificables'] ?? null, 'valor') === 0) {
+            $avisos[] = 'La sección «Puede comprobar todo lo que dice esta página» está oculta: '
+                . 'faltan la tarjeta profesional y el NIT. Sin datos comprobables no se pinta.';
+        }
+
+        if ($conDato($contenido['sedes'] ?? null, 'direccion') === 0) {
+            $avisos[] = 'Ninguna oficina tiene dirección escrita. Es el argumento más fuerte '
+                . 'contra el miedo a una estafa, y además alimenta la dirección postal del '
+                . 'marcado para buscadores.';
+        }
+
+        return $avisos;
     }
 }

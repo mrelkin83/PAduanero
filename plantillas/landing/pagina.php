@@ -105,45 +105,37 @@ window.__paRedRevelado = setTimeout(function () {
 </a>
 
 <?php
-/* Cabecera.
- *
- * Los tres enlaces son anclas a secciones de esta misma página, no rutas: la
- * landing es un documento único y un menú que llevara a otras páginas
- * repartiría en cuatro sitios la atención que tiene que terminar en un solo
- * botón. La única salida real es `/perfil`, y por eso es la que va nombrada
- * como diagnóstico.
- *
- * En móvil los enlaces desaparecen y quedan la firma y el botón. No hay
- * hamburguesa a propósito: abrir un panel exige JavaScript, y §13.5 dice que
- * la conversión no depende de un script. Con la página completa a un scroll
- * de distancia, un menú plegable resolvería un problema que no existe.
- */
-?>
-<header class="barra-sitio">
-    <div class="mx-auto flex max-w-[78rem] items-center gap-6 px-6 py-4 md:px-20">
-        <a href="#contenido" class="marca" aria-label="Pedro, abogado aduanero y tributario">Pedro</a>
-
-        <?php /* Los enlaces marcan la sección en curso con un punto de oro
-                 que pone `landing.js` con un observador. Es adorno: sin
-                 script los enlaces siguen llevando a su ancla. */ ?>
-        <nav aria-label="Secciones" class="ml-auto hidden items-center gap-10 md:flex" data-menu>
-            <a href="#situaciones" class="menu-enlace">Situaciones</a>
-            <a href="#diagnostico" class="menu-enlace">Diagnóstico</a>
-            <a href="#proceso" class="menu-enlace">Metodología</a>
-        </nav>
-
-        <div class="ml-auto md:ml-0">
-            <?= Vista::botonWhatsapp($waBase, 'Consultar', 'compacto') ?>
-        </div>
-    </div>
-</header>
-
-<main id="contenido">
-<?php
 // El orden de esta lista es el que manda; `landing_bloques.orden` solo
 // ordena la edición en el panel. `perfil` va detrás del índice de
 // situaciones a propósito: ver `bloques/perfil.php`.
-foreach (['hero', 'casos', 'perfil', 'credenciales', 'proceso', 'cta_final'] as $clave) {
+//
+// `confianza` y `testimonios` van juntos y detrás de `credenciales`, que es
+// donde la página termina de presentar a Pedro. La secuencia contesta tres
+// preguntas en el orden en que se hacen: quién es (credenciales), si existe
+// de verdad (confianza) y cómo trata a la gente (testimonios).
+//
+// El orden entre esos dos importa. `confianza` se comprueba sin creerle a
+// nadie; `testimonios` exige creerle a alguien. Un testimonio leído antes de
+// cualquier prueba de existencia se lee como el decorado de la estafa que el
+// visitante teme, no como su desmentido.
+//
+// Y los tres van ANTES de `proceso`, que es donde aparece el precio. Nadie
+// evalúa una tarifa de $400.000 hasta que decidió que el cobrador existe.
+//
+// Se compone a un búfer y no directamente a la salida porque el menú de la
+// cabecera se deriva de esto — ver abajo—, y la cabecera va antes en el HTML.
+ob_start();
+
+foreach ([
+    'hero',
+    'casos',
+    'perfil',
+    'credenciales',
+    'confianza',
+    'testimonios',
+    'proceso',
+    'cta_final',
+] as $clave) {
     if (!isset($bloques[$clave])) {
         continue;
     }
@@ -155,7 +147,71 @@ foreach (['hero', 'casos', 'perfil', 'credenciales', 'proceso', 'cta_final'] as 
         require $parcial;
     }
 }
+
+$cuerpo = (string) ob_get_clean();
+
+/* El menú se deriva de lo que REALMENTE se pintó, no de una lista paralela.
+ *
+ * Un bloque puede no salir por tres motivos distintos —no está en
+ * `landing_bloques`, está oculto, o se esconde solo por falta de datos, como
+ * hacen `confianza` y `testimonios`— y ninguno de los tres es visible desde
+ * aquí. Con una lista escrita a mano, el menú acabaría ofreciendo «Confianza»
+ * mientras esa sección no existe: un enlace que no lleva a ninguna parte, en
+ * la página cuyo trabajo es demostrar que no es una fachada.
+ *
+ * Se filtra por el ancla, que es lo único que el menú necesita saber. Así el
+ * problema no puede volver con el próximo bloque que alguien añada.
+ */
+$menu = [
+    ['#situaciones', 'Situaciones'],
+    ['#diagnostico', 'Diagnóstico'],
+    ['#confianza', 'Confianza'],
+    ['#proceso', 'Metodología'],
+];
+
+$menu = array_values(array_filter(
+    $menu,
+    static fn (array $i): bool => str_contains($cuerpo, 'id="' . substr($i[0], 1) . '"'),
+));
 ?>
+<?php
+/* Cabecera.
+ *
+ * Los enlaces son anclas a secciones de esta misma página, no rutas: la
+ * landing es un documento único y un menú que llevara a otras páginas
+ * repartiría en varios sitios la atención que tiene que terminar en un solo
+ * botón. La única salida real es `/perfil`, y por eso es la que va nombrada
+ * como diagnóstico.
+ *
+ * En móvil los enlaces desaparecen y quedan la firma y el botón. No hay
+ * hamburguesa a propósito: abrir un panel exige JavaScript, y la conversión
+ * no depende de un script. Con la página completa a un scroll de distancia,
+ * un menú plegable resolvería un problema que no existe.
+ */
+?>
+<header class="barra-sitio">
+    <div class="mx-auto flex max-w-[78rem] items-center gap-6 px-6 py-4 md:px-20">
+        <a href="#contenido" class="marca" aria-label="Pedro, abogado aduanero y tributario">Pedro</a>
+
+        <?php if ($menu !== []): ?>
+        <?php /* Los enlaces marcan la sección en curso con un punto de oro
+                 que pone `landing.js` con un observador. Es adorno: sin
+                 script los enlaces siguen llevando a su ancla. */ ?>
+        <nav aria-label="Secciones" class="ml-auto hidden items-center gap-10 md:flex" data-menu>
+            <?php foreach ($menu as [$ancla, $texto]): ?>
+            <a href="<?= $e($ancla) ?>" class="menu-enlace"><?= $e($texto) ?></a>
+            <?php endforeach; ?>
+        </nav>
+        <?php endif; ?>
+
+        <div class="<?= $menu === [] ? 'ml-auto' : 'ml-auto md:ml-0' ?>">
+            <?= Vista::botonWhatsapp($waBase, 'Consultar', 'compacto') ?>
+        </div>
+    </div>
+</header>
+
+<main id="contenido">
+<?= $cuerpo ?>
 </main>
 
 <?php require __DIR__ . '/bloques/pie.php'; ?>
