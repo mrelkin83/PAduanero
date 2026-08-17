@@ -1,123 +1,34 @@
 # PANEL ADMINISTRATIVO — Especificación
 
-## 1. La frontera con Chatwoot
-
-El error más caro de este proyecto sería construir una bandeja de conversaciones
-propia. Chatwoot ya la tiene, con años de trabajo encima. La división es rígida:
-
-| Vive en **Chatwoot** | Vive en el **panel propio** |
-|---|---|
-| Hilos de conversación, todos los canales | Configuración del sistema |
-| Responder, asignar, etiquetar | Tarifas y modalidades de asesoría |
-| Notas internas del equipo | Credenciales y pasarelas |
-| Historial de mensajes y adjuntos | Proveedores y modelos de IA |
-| Búsqueda de conversaciones | Prompts versionados |
-| Perfil de contacto y atributos | Pipeline de casos y puntajes |
-| Notificaciones al agente | Base de conocimiento jurídico |
-| — | Contenido de la landing y artículos |
-| — | Métricas de adquisición y conversión |
-| — | Usuarios, roles y auditoría |
-
-Punto de contacto: el panel muestra, en la ficha de cada caso, un enlace directo
-al hilo de Chatwoot (`https://chat.pedroabogadoaduanero.com/app/accounts/1/conversations/{id}`).
-No se embebe ni se replica. Un clic y estás en la bandeja.
-
-**ADR-009 — Runtime del panel.** El panel corre en el **mismo proceso PHP** que el
-motor y la landing, sobre la **misma base MySQL**. Razón: comparten
-`configuraciones`, `credenciales` y la capa `src/Repositorios/`. Separarlos
-obligaría a duplicar el cifrado de credenciales, la invalidación de caché y toda
-la capa de datos, con dos fuentes de verdad sobre los mismos secretos.
-
-> Este ADR decía "mismo proceso Node, mismo Postgres" y estaba marcado como
-> pendiente de confirmación. Lo resolvió el **ADR-005** de `CLAUDE.md`
-> (PHP 8.2+ / MySQL 8) el 2026-07-31; el argumento de no duplicar la capa de datos
-> sobrevive intacto, solo cambia el runtime. Se renumeró de ADR-005 a ADR-009
-> porque ese número ya estaba tomado por la decisión de stack.
-
----
+> **Encogió con el sistema.** Este documento describía nueve módulos; cuatro
+> —Casos, Pagos, Inteligencia artificial y Base de conocimiento— se retiraron
+> con el motor y la pasarela, y con ellos la sección «La frontera con
+> Chatwoot», que ya no tiene frontera que trazar.
+>
+> Lo que el panel administra hoy es **contenido y acceso**. Si algún día
+> vuelve una bandeja de conversaciones, vuelve como sistema aparte: el panel
+> no la reimplementa (ADR-006).
 
 ## 2. Módulos
 
 ### 2.1 Tablero
-Casos nuevos hoy, casos sin atender por antigüedad, asesorías del día, conversión
-del mes, gasto de IA acumulado contra presupuesto. Alerta visible si el modo
-sombra está activo o si la IA está pausada — que nunca se olvide encendida o
-apagada por descuido.
+Precio vigente de la asesoría, lo que falta para publicar la landing, y las
+métricas de la landing por canal en un rango de fechas: vistas, lecturas a
+media página, entradas al diagnóstico y clics a WhatsApp, cruzados con la
+inversión publicitaria anotada a mano.
 
-### 2.2 Casos
-Lista con filtros por estado, tipo, urgencia, canal y puntaje. Orden por defecto:
-puntaje descendente dentro de los no atendidos. Ficha con: datos del caso, línea
-de tiempo, contrapartes declaradas, consultas asociadas, pagos y enlace al hilo.
-Acciones: reasignar estado, marcar fuera de alcance, descartar con motivo,
-agendar manualmente sin cobro (hay casos que Pedro querrá atender de una).
+> **La pantalla dice hasta dónde mide, y tiene que seguir diciéndolo.** Su
+> «conversión» es a conversación iniciada, no a cliente: lo que ocurre tras
+> el clic pasa en WhatsApp, fuera de este sistema. Hay una prueba que exige
+> que ese aviso siga en pantalla.
 
-### 2.3 Agenda y tarifas
-CRUD de `modalidades_asesoria`: nombre, duración, **precio**, modalidad,
-si requiere pago. CRUD de `horarios` semanales y `bloqueos` puntuales.
-Vista de calendario con las consultas.
+### 2.3 Tarifas
+CRUD de `modalidades_asesoria`: nombre, duración y **precio**.
 
-> El precio se define aquí, nunca en código. Al cambiarlo, las reservas ya
-> creadas conservan el precio vigente al momento de reservar.
-
-### 2.4 Pagos
-Selección de pasarela activa, credenciales por entorno (pruebas/producción),
-botón **Probar conexión**, URL del webhook para copiar y pegar en el panel de la
-pasarela, política de reembolso, horas de cancelación sin costo.
-Listado de transacciones con estado y conciliación.
-
-### 2.5 Inteligencia artificial
-- **Proveedores:** alta de proveedor (URL base, formato de API, país del servidor).
-  El país es dato de cumplimiento, no adorno: si está fuera de Colombia, el panel
-  muestra un aviso recordando que el consentimiento debe declarar transferencia
-  internacional.
-- **Modelos:** por propósito (conversación, embeddings, clasificación). Uno primario
-  y una cascada de fallback ordenada. Costos por millón de tokens para proyección.
-
-  El catálogo **se descubre solo** (ADR-016): un cron consulta a diario el endpoint
-  de modelos de cada proveedor, así que un modelo nuevo aparece aquí al día
-  siguiente sin tocar código. Lo que **no** es automático es adoptarlo. Lo nuevo
-  entra inactivo, sin costo verificado y sin ser primario, con una etiqueta
-  «nuevo · sin revisar». Tres puertas antes de que pueda ser primario:
-
-  1. **Costo registrado y verificado.** Se teclea porque ningún proveedor lo
-     publica en su endpoint. Sin él, el corte por `presupuesto_ia_mensual_usd`
-     no corta: un modelo a coste cero nunca agota un presupuesto. Lo impone un
-     CHECK en base, no solo la pantalla.
-  2. **Activo.**
-  3. **No retirado por el proveedor.**
-  4. **Conjunto dorado en verde contra ese modelo**, con el prompt que está
-     activo hoy. Si el prompt cambió después de la corrida, el verde caduca y
-     hay que repetirla.
-
-  Y **ascender lo hace el abogado, no el super_admin**: `ia.modelos.promover`
-  es la tercera asimetría del ADR-007. El super_admin hace todo el trabajo
-  técnico —descubrir, configurar, verificar costos, probar conexión, activar—
-  y no puede promover, igual que no puede aprobar un prompt. Lo que el abogado
-  firma no es la calidad técnica del modelo: es la responsabilidad profesional
-  sobre lo que el bot diga desde ese momento. La puerta 4 es lo que convierte
-  esa firma en un acto informado en vez de un trámite sobre un nombre.
-
-  Ascender queda registrado en la bitácora con quién, cuándo y cuál era el
-  anterior. El modelo que baja pasa a `orden_fallback = 1`: sigue activo y es
-  el suplente natural.
-
-  Si el proveedor retira el modelo primario, el panel lo avisa en rojo al entrar.
-  No es una caída —la cascada de fallback lo cubre— y precisamente por eso hay
-  que decirlo: el bot está respondiendo desde el suplente sin que nadie lo haya
-  decidido.
-- **Prompts:** editor con versionado. Un prompt nuevo nace inactivo; requiere
-  **aprobación del abogado** para activarse. Botón de rollback a cualquier versión.
-  Diff entre versiones.
-- **Consumo:** gráfica de gasto diario, tokens, latencia media, tasa de error,
-  y presupuesto mensual con alerta.
-
-### 2.6 Base de conocimiento
-Alta de documentos (tipo de fuente, referencia normativa, URL oficial, vigencia).
-La búsqueda es MySQL: prefiltro FULLTEXT y coseno en PHP sobre `kb_chunks`
-(ADR-005). No hay `pgvector`.
-Cola de verificación: ningún chunk entra al RAG sin `verificado_por` del abogado.
-Buscador de prueba: escribir una consulta y ver qué fragmentos recuperaría el
-motor, con su puntaje de similitud. Sirve para depurar respuestas raras.
+> El precio se define aquí, nunca en código. Ya no lo cobra nadie —no hay
+> pasarela— pero lo pintan la landing y el diagnóstico, y por eso la pantalla
+> sobrevivió al recorte. La guarda contra teclear centavos donde van pesos se
+> queda: quien escribe el número sigue siendo una persona.
 
 ### 2.7 Contenido y landing
 Bloques de la landing editables (`landing_bloques`) y artículos SEO
@@ -134,40 +45,42 @@ Historial de cambios visible: quién cambió qué, cuándo y por qué.
 ### 2.9 Usuarios y auditoría
 El primer `super_admin` no se crea desde aquí — el panel todavía no es accesible
 cuando hace falta. Se crea por consola con `bin/crear-usuario.php`, una sola vez.
-De ahí en adelante, alta de usuarios con rol. Al crear un usuario con rol `abogado` o `asistente`, el
-panel aprovisiona el agente correspondiente en Chatwoot vía API — una sola alta,
-no dos. 2FA obligatorio para `super_admin` y `abogado`.
-Bitácora consultable de `auditoria` y `configuraciones_historial`.
+De ahí en adelante, alta de usuarios con rol. 2FA obligatorio para
+`super_admin` y `abogado`. Bitácora consultable de `auditoria` y
+`configuraciones_historial`.
+
+> Aquí se daba de alta además el agente en Chatwoot, para que un usuario del
+> panel fuera una sola alta y no dos. Se retiró con la bandeja: ya no hay
+> segundo sistema al que dar de alta a nadie.
 
 ---
 
 ## 3. Matriz de roles
 
+Los permisos de los módulos retirados —Casos, Pagos, IA, prompts, base de
+conocimiento y el kill switch— **siguen sembrados en la base**, igual que sus
+tablas: no molestan y evitan una migración destructiva. Simplemente no hay
+pantalla que los consulte.
+
 | Módulo | super_admin | abogado | asistente | contador |
 |---|:--:|:--:|:--:|:--:|
 | Tablero | ✔ | ✔ | ✔ | lectura |
-| Casos | ✔ | ✔ | ✔ | — |
-| Agenda y tarifas | ✔ | ✔ | lectura | — |
-| Pagos — transacciones | ✔ | ✔ | — | lectura |
-| Pagos — credenciales | ✔ | — | — | — |
-| IA — proveedores y modelos | ✔ | lectura | — | — |
-| IA — prompts (editar) | ✔ | ✔ | — | — |
-| IA — prompts (**aprobar**) | — | ✔ | — | — |
-| Base de conocimiento (cargar) | ✔ | ✔ | ✔ | — |
-| Base de conocimiento (**verificar**) | — | ✔ | — | — |
+| Tarifas | ✔ | ✔ | lectura | — |
 | Contenido (editar) | ✔ | ✔ | ✔ | — |
 | Contenido (**publicar**) | — | ✔ | — | — |
 | Configuración general | ✔ | ✔ (parcial) | — | — |
 | Usuarios y auditoría | ✔ | lectura | — | — |
-| Kill switch de IA | ✔ | ✔ | — | — |
 
-Dos asimetrías deliberadas:
+La asimetría deliberada que sobrevive:
 
-- **El `super_admin` no aprueba prompts, ni verifica normas, ni publica contenido.**
-  Tú tienes las llaves técnicas; la responsabilidad profesional es de Pedro. Si el
-  bot dice una barbaridad jurídica, la firma que la autorizó debe ser la suya.
-- **El `abogado` no ve credenciales.** No las necesita y no debería poder filtrarlas.
-  Solo ve máscaras y el botón de probar conexión.
+- **El `super_admin` no publica contenido.** Tiene las llaves técnicas; la
+  responsabilidad profesional es de Pedro. Lo que sale en la página lleva su
+  firma como abogado, y bajo la Ley 1123 de 2007 esa firma tiene consecuencias
+  que un perfil técnico no puede asumir por él.
+
+  Eran tres asimetrías —aprobar prompts, verificar normas y publicar
+  contenido—. Las dos primeras se fueron con la IA y el RAG; el principio es
+  el mismo y ahora recae entero sobre el copy público.
 
 ---
 

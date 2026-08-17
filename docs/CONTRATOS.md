@@ -4,8 +4,8 @@
 > estas firmas. Si necesitas un parámetro que no está aquí, **detente y pregunta**.
 >
 > Convenciones: `declare(strict_types=1)` en todo archivo. Namespace raíz `App\`.
-> PSR-4 vía Composer. Fechas `'Y-m-d'`, horas `'H:i:s'`, dinero en **centavos de
-> COP** en todo lo que toque pasarelas (400.000 COP = `40000000`).
+> PSR-4 vía Composer. Fechas `'Y-m-d'`, horas `'H:i:s'`, dinero en **PESOS
+> enteros**: ya no queda ninguna pasarela que cobre en centavos (ADR-010).
 > Zona horaria de la aplicación: `America/Bogota`. En base de datos todo va en UTC.
 
 ---
@@ -16,408 +16,40 @@
 /
 ├── index.php                 ← único punto de entrada (front controller)
 ├── .env                      ← fuera del control de versiones
-├── composer.json
+├── composer.json  package.json
 ├── CLAUDE.md  README.md
-├── docs/                     CONTRATOS, PANEL_ADMIN, PLAN_BUILD, PRUEBAS,
-│                             RUNBOOK, RESPALDOS
-├── motor/index.js            ← referencia conceptual de la Etapa 4, no se ejecuta
+├── docs/                     CONTRATOS, PANEL_ADMIN, PRUEBAS, RUNBOOK,
+│                             RESPALDOS, ARRANQUE_LOCAL
+├── stitch_customs_law_digital_experience/   ← especificación visual
 ├── storage/                  logs/  cache/  config.sentinel   (no versionado)
 ├── public/
 │   ├── img/                  ← fotos de Pedro; se sirve como URL /img
+│   ├── fonts/                ← Geist y Geist Mono, servidas locales
 │   ├── css/  js/
 ├── src/
-│   ├── Core/                 Router, Request, Response, Container, Csrf
-│   ├── Motor/                MotorConversacional, Acciones, Estados
-│   ├── Servicios/            Llm, Chatwoot, Agenda, Pagos, Outbox, Credenciales, Config, BaseConocimiento
-│   ├── Repositorios/         ContactoRepo, CasoRepo, ConsultaRepo, …
+│   ├── Core/                 Aplicacion, Router, Peticion, Respuesta, Contenedor, Csrf
+│   ├── Motor/                Cuestionario y Catalogo — lo único que sobrevive
+│   │                         del motor, porque de ellos cuelga /perfil
+│   ├── Servicios/            Landing, Perfil, Seo, CachePagina, MetricasLanding,
+│   │                         Config, Autenticacion, Permisos
+│   ├── Repositorios/         UsuarioRepo, SesionRepo, IntentoAccesoRepo, AuditoriaRepo
 │   ├── Modelos/              DTOs inmutables (readonly classes)
 │   ├── Panel/                Controladores del panel administrativo
-│   └── Soporte/              Fechas, Logger, Cifrado, Validador
-├── plantillas/               Vistas (PHP plano, sin motor de plantillas)
-├── db/                       schema.sql, schema_admin.sql, seeds.sql, migraciones/
-└── bin/                      worker-outbox.php, cron-expirar-reservas.php
+│   └── Soporte/              Fechas, Logger, Cifrado, Totp, Base32, Vista
+├── plantillas/               landing/  perfil/  panel/   (PHP plano)
+├── db/migraciones/           esquema MySQL 8 y semillas
+└── bin/                      migrar, crear-usuario, cron-purgar, salud, respaldo,
+                              auditar-landing.mjs, capturar.mjs
 ```
+
+**El árbol conserva tablas y migraciones de un sistema que ya no existe.**
+`casos`, `consultas`, `pagos`, `contactos`, `prompts`, `kb_*` y
+`eventos_outbox` quedaron huérfanas al retirarse el motor y la pasarela, y se
+conservan intactas por el ADR-013. Ninguna clase las toca. **No las uses para
+nada nuevo:** si hace falta guardar algo, tabla nueva.
 
 **index.php en la raíz** es requisito del PO. Todo lo demás va bajo `src/`, servido
 con `AllowOverride` y un `.htaccess` que reescribe hacia `index.php`.
-
----
-
-## `App\Servicios\Llm`
-
-```php
-interface Llm
-{
-    /**
-     * @param array<int,array{role:'user'|'assistant',content:string}> $mensajes
-     * @return RespuestaLlm  {texto, tokens, tokensEntrada, tokensSalida, modeloId, latenciaMs}
-     * @throws LlmException  solo si fallan el primario y todos los fallbacks
-     */
-    public function chat(
-        string $systemPrompt,
-        array $mensajes,
-        int $maxTokens = 600,
-        float $temperatura = 0.4,
-        string $proposito = 'conversacion',
-        ?string $casoId = null
-    ): RespuestaLlm;
-
-    /** @param string|string[] $textos  @return array<int,array<int,float>> vectores de 1536 dims */
-    public function embeddings(string|array $textos): array;
-
-    public function recargarConfiguracion(): void;
-}
-```
-
-Obligatorio: lee proveedor y modelo de `modelos_ia` (el que tenga `es_primario`),
-cae en cascada por `orden_fallback` ante 5xx o timeout, escribe **siempre** una fila
-en `consumo_ia` (también en el fallo), y corta si se superó
-`presupuesto_ia_mensual_usd`. Transporte: cURL nativo, sin SDK.
-
-**Las tres invariantes, y por qué cada una fallaría en silencio:**
-
-1. **`consumo_ia` se escribe siempre.** Un timeout sin fila hace que el gasto y
-   la tasa de error mientan: el panel enseña un sistema barato y sano que está
-   quemando reintentos contra un proveedor caído.
-2. **El presupuesto se verifica ANTES de llamar.** Después es un informe del
-   daño, no un tope. Y un modelo sin costo **no entra en la cascada**: a coste
-   cero el presupuesto no se agota jamás (mismo patrón que el error 15).
-3. **La cascada no cae en un modelo sin firma.** Ni de otro propósito, ni sin
-   costo verificado, ni sin `GateDorado` en verde y vigente. Si el primario
-   muere y el suplente no está autorizado, se **escala a humano**; responder
-   con un modelo sin firma convertiría el mecanismo del ADR-016 en decorativo
-   justo el día que importa. Por eso `GateDorado` expone `puedeResponder()`
-   además de `puedePromover()`: es el mismo criterio, y tiene que serlo — si el
-   suplente pudiera responder con requisitos más laxos que el primario,
-   bastaría con tumbar el primario para saltarse la firma.
-
-**Lo que NO se envía a Anthropic, y no es un olvido:** `temperature` —los
-modelos actuales de la familia Opus/Sonnet 5 la rechazan con 400— y `thinking`,
-que se deja en el valor por defecto del modelo. La columna
-`modelos_ia.temperatura_default` sigue sirviendo para los proveedores
-compatibles con OpenAI, que sí la aceptan.
-
-**Consecuencia a vigilar:** `max_tokens` acota el pensamiento **más** la
-respuesta. Un tope corto puede agotarse pensando y devolver texto vacío, así
-que una respuesta sin bloques de texto se trata como fallo reintentable, no
-como turno válido: es preferible bajar al suplente que enviarle al contacto un
-mensaje en blanco. Lo mismo con `stop_reason: refusal`, que llega como **200**
-con `content` vacío — leer `content[0]` sin comprobarlo revienta con una
-respuesta exitosa.
-
----
-
-## `App\Servicios\CatalogoModelos`
-
-```php
-final class CatalogoModelos
-{
-    /** @return list<array{proveedor:string,ok:bool,nuevos:int,vistos:int,retirados:int,error:?string}> */
-    public function sincronizarTodo(): array;
-
-    /** @param array<string,mixed> $proveedor fila de `proveedores_ia` */
-    public function sincronizar(array $proveedor): array;
-}
-```
-
-Mantiene `modelos_ia` al día con lo que cada proveedor anuncia. Un descubridor
-por `formato_api` (`App\Servicios\Descubridores\Descubridor`): Anthropic
-`GET /v1/models`, compatibles con OpenAI `GET /models`, Ollama `GET /api/tags`.
-
-**Descubrimiento automático, adopción manual.** Lo que la sincronización puede
-hacer y lo que no:
-
-| Puede | No puede |
-|---|---|
-| Dar de alta un modelo nuevo | Activarlo |
-| Refrescar nombre, ventanas y capacidades | Escribir o cambiar costos |
-| Marcar `retirado_en` y revertirlo | Ascender o degradar un primario |
-
-Las tres razones, en orden: **ADR-008** —un modelo que se asciende solo cambia
-lo que el bot dice sin firma en `auditoria`, y es la única pieza del sistema
-capaz de hacerlo—; **el precio no viene en el endpoint** —ningún proveedor lo
-publica ahí, y un modelo a costo NULL hace que el corte por
-`presupuesto_ia_mensual_usd` no corte nunca—; y **el conjunto dorado**, que
-queda sin valor si el modelo cambia por debajo.
-
-Contrato de fallo del descubridor: **excepción, nunca lista vacía**. Un 401 y
-un catálogo genuinamente vacío son situaciones opuestas, y confundirlas haría
-que una credencial caducada apareciera como «retiraron todos los modelos».
-
-`retirado_en` no entra en `ck_modelo_primario_apto` a propósito: si entrara, el
-cron no podría anotar el retiro del modelo en uso —el UPDATE violaría la
-restricción y la corrida fallaría entera justo en el caso que más importa
-registrar. Ascender un modelo retirado lo impide `IaControlador`, que es donde
-corresponde: es una decisión de la persona, no un estado imposible de los datos.
-
----
-
-## `App\Servicios\Chatwoot`
-
-```php
-interface Chatwoot
-{
-    /** @return array{id:int,sombra:bool} — el ÚNICO método que el motor llama para hablar */
-    public function entregar(int $conversacionId, string $texto): array;
-
-    public function responder(int $conversacionId, string $texto): int;    // → id del mensaje
-    public function notaPrivada(int $conversacionId, string $texto): int;  // modo sombra
-    public function etiquetar(int $conversacionId, array $etiquetas): void;
-    public function cambiarPrioridad(int $conversacionId, string $prioridad): void; // urgent|high|medium|low
-    public function asignarAlAbogado(int $conversacionId): void;
-    public function cambiarEstado(int $conversacionId, string $estado): void;       // open|pending|resolved
-    public function setAtributos(int $contactoId, array $atributos): void;
-    public function sincronizarAgente(Usuario $usuario): int;              // → chatwoot_agent_id
-}
-```
-
-**`entregar()`, no `responder()`.** La decisión de modo sombra vive en un solo
-sitio. Si estuviera en cada punto que quiere hablar, bastaría un olvido para
-que un borrador sin revisar saliera hacia un cliente — y no habría ningún
-síntoma hasta que ese cliente contestara a algo que Pedro nunca aprobó. Lo
-comprueba `ArquitecturaTest`, que lee `src/Motor/` y falla si aparece una
-llamada directa a `responder()`.
-
-Ante la ausencia de la clave `motor_modo_sombra` —fila borrada, migración a
-medias, caché con basura— se asume **sombra**. El valor por defecto seguro es
-no enviarle nada a un cliente.
-
-El borrador va marcado (`ChatwootApi::MARCA_SOMBRA`). El día que se active el
-envío automático, una nota privada y un mensaje enviado se parecen demasiado en
-la bandeja como para distinguirlos de un vistazo.
-
-**Reintentos: tres, y solo ante lo que indica que la petición no llegó a
-procesarse** — error de red, 429, 502, 503, 504. Un **500 no se reintenta**:
-significa que Chatwoot corrió y pudo haber creado el mensaje antes de romperse,
-y repetir lo pondría dos veces en el hilo de un cliente. Tampoco se reintenta
-una respuesta 2xx sin `id`: Chatwoot aceptó, el mensaje está, y volver a
-enviarlo por no poder leer un número lo duplicaría.
-
-Riesgo residual asumido a conciencia: un 504 puede llegar *después* de que
-Chatwoot creara el mensaje. Entre perder un mensaje y repetirlo, se repite —
-el compromiso del ADR-004 es que nunca se pierde. En modo sombra el duplicado
-ni siquiera es visible para el cliente: son dos borradores para Pedro.
-
-Agotados los reintentos se lanza `ChatwootNoDisponible` y quien la captura lo
-encola en `eventos_outbox`. `agotoReintentos` distingue lo transitorio —a lo
-que el worker debe volver— del rechazo definitivo, que va a fallar igual dentro
-de una hora y solo llenaría la cola.
-
----
-
-## `App\Servicios\Outbox`
-
-```php
-interface Outbox
-{
-    public function encolar(string $tipo, array $payload, int $retrasoSegundos = 0): int;
-
-    /** Regla 14: SIN carga útil. No acepta texto, y esa es toda su razón de ser. */
-    public function encolarAlertaEscalamiento(
-        string $telefonoContacto, MotivoEscalamiento $motivo, int $chatwootConvId): int;
-
-    /** @return EventoOutbox[] reclamados con FOR UPDATE SKIP LOCKED */
-    public function tomar(int $limite = 20): array;
-
-    public function marcarEnviado(int $id): void;
-    public function reprogramar(int $id, string $error): void;   // siguiente escalón del backoff
-    public function marcarFallido(int $id, string $error): void; // definitivo
-    public function recuperarAtascados(int $minutos = 15): int;
-}
-```
-
-`encolar()` es una escritura y nada más: **se puede llamar dentro de una
-transacción**. Todo lo que sale a la red lo hace el worker, fuera. Eso es
-ADR-004 entero.
-
-**Por qué hay un método específico para el escalamiento.** La regla 14 prohíbe
-el texto del mensaje «en ninguna tabla, cola o notificación», y el outbox es
-literalmente esa cola. Un `encolar('alerta.escalamiento', $payload)` genérico
-deja la puerta abierta a que alguien meta el texto en el payload con toda la
-buena intención — para que Pedro no tenga que abrir Chatwoot, por ejemplo.
-`encolarAlertaEscalamiento()` construye el payload a partir de argumentos
-tipados y **no tiene ningún parámetro por el que quepa un texto**. Mismo
-recurso que `GateDorado::registrarCorrida()`, que no recibe el prompt sino que
-lo mira: cuando una regla no debe poder saltarse, la firma del método es mejor
-sitio que un comentario. Hay prueba que afirma sobre la lista de parámetros.
-
-**Backoff:** 1 m · 5 m · 15 m · 1 h · 6 h, y después `fallido`. Seguir
-golpeando cada seis horas un endpoint que lleva un día rechazando no arregla
-nada y esconde el problema entre reintentos que parecen actividad normal.
-
-**Contrato de los manejadores:** excepción → se reprograma; `EventoDescartado`
-→ se marca fallido sin más intentos. Sin esa distinción, un evento imposible
-—payload inválido, conversación borrada— se reintenta cinco veces y retrasa a
-los que sí podían salir.
-
-**`disponible_en` tiene dos significados según el estado**, y conviene saberlo
-antes de escribir una consulta contra esta tabla: en `pendiente` es cuándo
-estará listo; en `procesando` es cuándo se reclamó. Lo segundo es lo que hace
-posible `recuperarAtascados()` sin añadir columna. Medir el atasco contra
-`creado_en` recuperaría al instante cualquier evento que llevara un rato en
-cola y que un worker vivo acabara de tomar.
-
-El worker corre como servicio (`pedro-outbox`, `--demonio`) y no por cron: una
-alerta urgente que espera al siguiente tic del minuto llega tarde. La línea de
-cron es la red por si el servicio queda caído; correr ambos es seguro gracias
-al `SKIP LOCKED`.
-
----
-
-## `App\Servicios\Agenda`
-
-```php
-interface Agenda
-{
-    /** @return Modalidad[] activas, ordenadas por `orden` */
-    public function getModalidades(): array;
-    public function getModalidad(string $id): ?Modalidad;
-
-    /**
-     * Aplica horarios, bloqueos, consultas vivas, anticipacion_minima_horas
-     * y dias_max_anticipacion. Nunca devuelve slots en el pasado.
-     * @return array<int,array{hora:string,display:string}>
-     */
-    public function getSlotsDisponibles(string $modalidadId, string $fecha): array;
-
-    public function proximaFechaConCupo(string $modalidadId, string $desde): ?string;
-    public function generarEnlaceReunion(Consulta $consulta): ?string;
-}
-```
-
-`Modalidad` es un `readonly class` con `id, nombre, duracionMin, precioCop,
-modalidad, requierePago`.
-
----
-
-## `App\Servicios\Pagos`
-
-```php
-interface Pagos
-{
-    /** @return array{url:string,referencia:string,pagoId:string,expiraEn:DateTimeImmutable} */
-    public function crearLink(
-        string $consultaId,
-        int $montoPesos,
-        string $descripcion,
-        Contacto $contacto
-    ): array;
-
-    /**
-     * Valida la firma contra el CUERPO CRUDO, no contra el JSON parseado.
-     * NO toca la base de datos: solo dice si la firma cuadra.
-     * @return array{valido:bool,referencia:string,estado:string}
-     */
-    public function verificarWebhook(string $cuerpoCrudo, array $cabeceras): array;
-
-    /**
-     * Orquesta el webhook completo: llama a verificarWebhook() y, SOLO si la
-     * firma valida, registra el pago y confirma la consulta. Si no valida,
-     * no escribe nada en ninguna tabla.
-     * Idempotente por `pagos.referencia`: el mismo evento dos veces confirma una.
-     * @return array{valido:bool,procesado:bool,referencia:string,estado:string}
-     */
-    public function procesarWebhook(string $cuerpoCrudo, array $cabeceras): array;
-
-    public function consultarEstado(string $referencia): array;
-}
-```
-
-Innegociable: el webhook es idempotente — recibir dos veces el mismo evento no
-confirma dos veces. Nunca se marca `pagada` sin `firma_verificada = 1`.
-
-**Unidades (ADR-010).** `crearLink()` es el único punto del sistema donde los pesos
-se convierten a centavos, y `pagos.monto_centavos` la única columna en centavos.
-`modalidades_asesoria.precio_cop` y `consultas.precio_cop` están en pesos enteros.
-Hay una prueba de nivel 1 que exige `40000000` para la modalidad sembrada.
-
----
-
-## `App\Servicios\BaseConocimiento`
-
-```php
-interface BaseConocimiento
-{
-    /**
-     * Sin pgvector. Estrategia en tres pasos:
-     *  1. Prefiltro por `area` y `tipo_caso`.
-     *  2. Prefiltro léxico con MATCH … AGAINST sobre el índice FULLTEXT.
-     *  3. Coseno en PHP sobre los candidatos, usando `embedding_norma`
-     *     precalculada. Con ~2.000 chunks son milisegundos.
-     * Devuelve SOLO chunks de documentos con vigente=1 y verificado_por NOT NULL.
-     * @return array<int,array{contenido:string,referencia:string,documentoId:string,similitud:float}>
-     */
-    public function buscar(string $texto, ?string $area, ?string $tipoCaso, int $limite = 4): array;
-
-    public function indexarDocumento(string $documentoId): void;
-}
-```
-
-Un fragmento sin verificación del abogado no entra al RAG bajo ninguna
-circunstancia. Es la regla que impide que el bot cite algo que nadie revisó.
-
----
-
-## `App\Servicios\Outbox`
-
-```php
-interface Outbox
-{
-    public function encolar(string $tipo, array $payload, ?DateTimeImmutable $disponibleEn = null): int;
-    public function procesar(int $lote = 20): int;   // lo llama bin/worker-outbox.php
-}
-```
-
-Tipos válidos (los que los manejadores declaran en `tipos()`, que es la
-lista real — la de la v1 de este documento envejeció antes de implementarse):
-`chatwoot.entregar` · `chatwoot.etiquetar` · `chatwoot.escalar` ·
-`alerta.escalamiento` · `alerta.modelo_retirado` · `alerta.pago_confirmado` ·
-`alerta.pago_huerfano`. Los recordatorios son `chatwoot.entregar`
-programados con `retrasoSegundos`.
-Reintentos con backoff: 1 m, 5 m, 15 m, 1 h, 6 h. Al quinto fallo → `fallido` + alerta.
-
-El worker se lanza con systemd o supervisor, no con `cron` cada minuto: necesita
-correr en bucle con `sleep`, y reiniciarse solo si muere.
-
----
-
-## `App\Servicios\Credenciales`
-
-```php
-interface Credenciales
-{
-    /** Descifra y devuelve el valor real. Registra la lectura en `auditoria`. */
-    public function obtener(string $servicio, string $clave, string $entorno = 'produccion'): string;
-
-    /** @return array{mascara:string} */
-    public function guardar(string $servicio, string $clave, string $valor, string $entorno, string $usuarioId): array;
-
-    /** @return array{ok:bool,mensaje:string} conectividad real contra el proveedor */
-    public function probar(string $servicio, string $entorno): array;
-
-    public function rotarClaveMaestra(string $nuevaClave): void;
-}
-```
-
-Implementación: `openssl_encrypt($valor, 'aes-256-gcm', $clave, OPENSSL_RAW_DATA,
-$nonce, $tag)`. Nada casero. La clave maestra se lee de `MASTER_KEY` en el entorno,
-32 bytes en base64. **Si no está definida, la aplicación no arranca.** Jamás se
-persiste en base de datos. `obtener()` nunca se expone por HTTP: la API del panel
-devuelve solo `mascara`.
-
-**Formato del blob (ADR-011).** Un solo layout para todo campo cifrado del sistema:
-
-```
-v1 ‖ nonce(12) ‖ tag(16) ‖ ciphertext
-```
-
-Lo produce y lo consume `App\Soporte\Cifrado`. Aplica a `credenciales.valor_cifrado`,
-`contactos.nit_cifrado` y `usuarios.totp_secret_cifrado`. Por eso `credenciales` ya
-no tiene columnas `nonce` ni `tag`: eran un segundo camino para lo mismo.
-
-`key_version` sobrevive y es otra cosa: dice **qué clave maestra** cifró el dato y lo
-mueve `rotarClaveMaestra()`. El byte `v1` dice **qué layout** tiene el blob. Rotan
-por razones distintas.
 
 ---
 
@@ -443,73 +75,6 @@ worker) tocando `storage/config.sentinel`, cuyo `mtime` se compara al leer.
 
 ---
 
-## `App\Repositorios\*`
-
-Un repositorio por agregado. Reciben y devuelven DTOs, nunca arrays crudos de PDO.
-Todo el SQL vive aquí y solo aquí, siempre con sentencias preparadas.
-
-| Repositorio | Métodos |
-|---|---|
-| `ContactoRepo` | `crear` · `porId` · `porTelefono` · `actualizarNombre` · `actualizarTipoPersona` |
-| `CasoRepo` | `crear` · `actualizar` · `porId` · `porContacto` · `actualizarEstado` · `actualizarPuntaje` · `listarParaPanel` |
-| `ConsultaRepo` | `reservar` · `porId` · `activasPorContacto` · `cambiarEstado` · `reagendar` · `expirarVencidas` |
-| `ConversacionEstadoRepo` | `buscarOCrear` · `porCasoId` · `actualizar` · `acumularBuffer` · `reactivarIA` |
-| `ConsentimientoRepo` | `registrar` · `vigentePorContacto` · `revocar` |
-| `UsuarioRepo` | `crear` · `autenticar` · `porEmail` · `registrarAcceso` |
-
-**`reservar()` — punto crítico.** Dos defensas, en este orden (ADR-015):
-
-```php
-$pdo->beginTransaction();
-
-// 1ª línea: solapamiento REAL, no solo coincidencia de hora de inicio.
-$vivas = $pdo->prepare(
-    'SELECT hora_inicio, hora_fin FROM consultas
-      WHERE fecha = ? AND estado IN (\'reservada\',\'pagada\',\'realizada\')
-      FOR UPDATE'
-);
-$vivas->execute([$fecha]);
-foreach ($vivas->fetchAll() as $v) {
-    if ($horaInicio < $v['hora_fin'] && $v['hora_inicio'] < $horaFin) {
-        $pdo->rollBack();
-        throw new SlotOcupadoException();
-    }
-}
-
-// 2ª línea: el índice único sobre `slot_unico`, por si algo se saltó la primera.
-try {
-    $stmt->execute($params);
-} catch (\PDOException $e) {
-    $pdo->rollBack();
-    if ($e->errorInfo[1] === 1062) {
-        throw new SlotOcupadoException();
-    }
-    throw $e;
-}
-$pdo->commit();
-```
-
-Ese `1062` es el equivalente MySQL del `23505` de Postgres. El motor traduce
-`SlotOcupadoException` a "ese horario se acaba de tomar".
-
-Por qué no basta el índice: `slot_unico` es `CONCAT(fecha,'T',hora_inicio)`, así que
-solo bloquea horas de inicio idénticas. Con una modalidad de 30 minutos creada
-desde el panel, 14:00–15:00 y 14:30–15:30 conviven sin violarlo. La comparación
-`(inicio_a < fin_b) AND (inicio_b < fin_a)` bajo `FOR UPDATE` es la que realmente
-protege; el índice es la red debajo.
-
-**`crear()` de `CasoRepo` — radicado (ADR-014).** Asigna `PA-YYYY-NNNNNN` dentro de
-la misma transacción que inserta el caso, tomando el consecutivo de
-`secuencias (anio, ultimo)` con `SELECT … FOR UPDATE`. Nunca `MAX(id)+1`: con dos
-mensajes concurrentes entrega el mismo radicado dos veces y el `UNIQUE` de
-`casos.radicado_interno` revienta la creación en plena conversación.
-
-**`crear()` de `ContactoRepo` — hash (ADR-012).** `telefono_hash` se calcula con
-`Cifrado::hashTelefono()`, que es `HMAC-SHA256` con `PEPPER_TELEFONO`. Nunca con
-`sha256()` a secas.
-
----
-
 ## `App\Soporte\Cifrado`
 
 ```php
@@ -521,18 +86,20 @@ final class Cifrado
     /** @throws CifradoException si el tag no valida (dato alterado o clave errónea) */
     public function descifrar(string $blob): string;
 
-    /** HMAC-SHA256 con PEPPER_TELEFONO. Determinista: sirve para buscar. */
-    public function hashTelefono(string $telefonoE164): string;
-
     /** '…123' — los últimos 3 caracteres. Lo único que puede salir por HTTP. */
     public static function mascara(string $valor): string;
 }
 ```
 
-Se construye con `MASTER_KEY` y `PEPPER_TELEFONO` ya decodificadas. Si cualquiera
-de las dos falta o no mide 32 bytes, el constructor lanza
-`ConfiguracionFatalException` y la aplicación no arranca. Es deliberado: arrancar
-sin ellas significaría escribir datos que nadie podrá volver a leer.
+Se construye con `MASTER_KEY` ya decodificada. Si falta o no mide 32 bytes, el
+constructor lanza `ConfiguracionFatalException` y la aplicación no arranca. Es
+deliberado: arrancar sin ella significaría escribir segundos factores que nadie
+podrá volver a validar.
+
+Hoy su único cliente es `usuarios.totp_secret_cifrado`. Cifraba también las
+credenciales de proveedores y el NIT de los contactos, y traía un
+`hashTelefono()` con su propio pepper (ADR-012); las tres cosas se fueron con
+el motor y la pasarela, y con ellas la variable `PEPPER_TELEFONO`.
 
 ---
 
@@ -550,8 +117,8 @@ final class Fechas
 }
 ```
 
-Locale `es_CO`. **Nunca** `date()` o `new DateTime()` desnudos para lógica de
-agenda: siempre por esta clase. Los meses y días se escriben a mano en un array,
+Locale `es_CO`. **Nunca** `date()` o `new DateTime()` desnudos: siempre por
+esta clase. Los meses y días se escriben a mano en un array,
 no con `IntlDateFormatter`, para no depender de que la extensión `intl` esté
 compilada en el servidor.
 
@@ -560,34 +127,35 @@ compilada en el servidor.
 ## Errores que NO se deben cometer
 
 1. SQL fuera de `src/Repositorios/`.
-2. Devolver el valor descifrado de una credencial en cualquier respuesta HTTP.
-3. Llamar a Evolution directamente para responderle a un contacto — va por Chatwoot.
-4. Escribir en las tablas de Chatwoot por SQL.
-5. Hacer llamadas HTTP externas dentro de una transacción — para eso está el outbox.
-6. Leer parámetros operativos de `.env` en vez de `configuraciones`.
-7. Registrar en logs contenido de mensajes, NIT o credenciales.
-8. Capturar `23505` en vez de `1062`: esto es MySQL, no Postgres.
-9. Usar un ORM o un framework completo. PDO y clases propias.
-10. Concatenar variables en SQL. Sentencias preparadas, siempre.
-11. Multiplicar o dividir por 100 fuera de `Pagos::crearLink()`. Los pesos son
-    pesos en todo el sistema menos en `pagos.monto_centavos` (ADR-010).
-12. Hashear el teléfono con `sha256()` a secas, o derivar `PEPPER_TELEFONO` de
-    `MASTER_KEY`. Rotar la clave maestra dejaría todos los hashes huérfanos y la
-    búsqueda por hash fallaría en silencio (ADR-012).
-13. Confiar solo en el índice `slot_unico` para evitar la doble reserva. Es la
-    segunda línea; la primera es la validación de solapamiento (ADR-015).
-14. **Escribir sintaxis de MariaDB creyendo que es de MySQL.** La que más
+2. Escribir en las tablas huérfanas del motor (`casos`, `consultas`, `pagos`,
+   `contactos`, `prompts`, `kb_*`, `eventos_outbox`). Están ahí por el
+   ADR-013, no para reutilizarlas: si hace falta guardar algo, tabla nueva.
+3. Guardar cualquier cosa que el visitante responda en `/perfil`. Cero
+   persistencia es lo que mantiene esa página fuera de la ley de datos
+   personales, y es la primera tentación que alguien va a querer romper.
+4. Leer parámetros operativos de `.env` en vez de `configuraciones`.
+5. Registrar en logs cualquier dato personal.
+6. Capturar `23505` en vez de `1062`: esto es MySQL, no Postgres.
+7. Usar un ORM o un framework completo. PDO y clases propias.
+8. Concatenar variables en SQL. Sentencias preparadas, siempre.
+9. Multiplicar o dividir por 100 en ninguna parte. Los pesos son pesos en
+   todo el sistema; la única conversión que existía murió con la pasarela
+   (ADR-010).
+10. Hacer que la conversión dependa de un script. El sitio entero tiene que
+    seguir funcionando con JavaScript apagado, y hay que **comprobarlo con el
+    navegador**, no razonarlo (CLAUDE.md §4.5).
+11. **Escribir sintaxis de MariaDB creyendo que es de MySQL.** La que más
     engaña es `ALTER TABLE … ADD COLUMN IF NOT EXISTS`: existe en MariaDB, y
     MySQL la rechaza con un error de sintaxis. Para una migración idempotente
     hay que consultar `information_schema` y preparar la sentencia solo si
     hace falta — el patrón está en `db/migraciones/0005_totp_endurecido.sql`.
     Otras de la misma familia: `DROP INDEX IF EXISTS`, `RENAME COLUMN` en
     versiones viejas, `SEQUENCE` y `RETURNING`.
-15. Devolver un booleano donde el estándar exige más información. `Totp`
+12. Devolver un booleano donde el estándar exige más información. `Totp`
     devuelve el contador con el que casó, no un `true`: sin ese dato no se
     puede aplicar el antirreplay del RFC 6238 §5.2, y el fallo es silencioso
     — todo parece funcionar y un código robado sirve treinta segundos.
-16. Detectar columnas generadas con `EXTRA NOT LIKE '%GENERATED%'`. MySQL
+13. Detectar columnas generadas con `EXTRA NOT LIKE '%GENERATED%'`. MySQL
     también pone `DEFAULT_GENERATED` en `EXTRA` para toda columna con
     `DEFAULT (UUID())` o `DEFAULT CURRENT_TIMESTAMP` — es decir, casi todas
     las claves primarias de este esquema. El filtro correcto es
@@ -596,7 +164,7 @@ compilada en el servidor.
     semillas se restauran con UUID nuevos y lo que se rompe son las foráneas
     de otras pruebas, por motivos aparentemente inconexos. Pasó en
     `CasoBaseBd::restaurarSemillas()`.
-17. Comparar un `DATETIME` de la base con el reloj de PHP usando
+14. Comparar un `DATETIME` de la base con el reloj de PHP usando
     `strtotime()`. La conexión fija `time_zone = '+00:00'`: **la base guarda
     UTC** y la aplicación convierte a Bogotá al presentar. `strtotime()` lee
     la cadena en la zona por defecto de PHP, así que el resultado se desvía
@@ -620,17 +188,7 @@ compilada en el servidor.
     orden de ejecución se declara «flaky», alguien con prisa lo marca para
     saltarlo y el defecto vuelve invisible. Por eso la zona se fija en
     `tests/arranque.php` y no solo en `Aplicacion`.
-18. Meter un campo cifrado dentro de un DTO. **Los DTOs viajan al prompt del
-    LLM, a los registros y a las vistas.** Un campo cifrado no entra en un
-    DTO: se lee por su propio camino, con auditoría. `Contacto` expone
-    `tieneNit` —que es lo que casi siempre se necesita saber— y el valor sale
-    por `ContactoRepo::nit($id, $actor)`, que descifra bajo petición explícita
-    y deja fila en `auditoria`.
-
-    Es la misma disciplina que `Credenciales::obtener()`, que no se expone por
-    HTTP jamás. La diferencia entre ambos casos es solo el destino de la fuga:
-    allí el navegador, aquí el proveedor del LLM (regla 13).
-19. Añadir una variable a una plantilla del panel sin ponerla en la lista
+18. Añadir una variable a una plantilla del panel sin ponerla en la lista
     `use` de su clausura `$contenido`. Dentro vale «indefinido», y el `?? 0`
     o el `?? []` de la línea que la usa la convierte en un valor **creíble y
     falso**, sin error, sin aviso y sin página en blanco.
@@ -645,27 +203,3 @@ compilada en el servidor.
     hay que tocarla cada vez que llega un dato nuevo, y olvidarla no rompe
     nada visible. El patrón invita al defecto; por eso lleva cinturón.
 
-20. Abortar un descubrimiento de modelos porque no hay credencial guardada.
-    **Decide el proveedor, no nosotros.** OpenRouter lista su catálogo sin
-    autenticar y Ollama tampoco pide nada: negarse a preguntar dejaba «No hay
-    credencial» en pantalla para un endpoint que habría contestado con 336
-    modelos.
-
-    Y cuando la llave sí hace falta, el 401 del proveedor distingue «no
-    mandaste llave» de «la llave no vale», que es justo lo que uno necesita
-    saber en ese momento. El nuestro no distinguía.
-
-    La regla general: **un guardia propio que se adelanta al servicio remoto
-    solo puede dar peor diagnóstico que él.** Adelantarse se justifica para
-    no gastar dinero o no filtrar datos; para no gastar una petición GET a un
-    catálogo público, no.
-
-21. Consultar solo los proveedores activos al sincronizar desde el panel. Un
-    proveedor nace inactivo a propósito (ADR-016), así que lo primero que uno
-    hace tras darlo de alta —ver qué modelos ofrece— no funcionaba nunca, y
-    sin explicación. Descubrir es una lectura: no enciende nada y los modelos
-    siguen entrando inactivos y sin costo.
-
-    El cron sí salta los apagados (`sincronizarTodo(soloActivos: true)`):
-    corre a diario y ahí la petición contra un proveedor que nadie usa sí
-    sobra. Quien pulsa en el panel está esperando el resultado; el cron no.

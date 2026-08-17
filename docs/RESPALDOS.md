@@ -7,18 +7,19 @@
 
 ## 1. Qué hay que respaldar
 
-Son **cinco** cosas distintas, en tres sistemas distintos. Perder cualquiera duele
-de forma diferente.
+Son **tres** cosas distintas. Perder cualquiera duele de forma diferente.
+
+Eran cinco: el Postgres de Chatwoot con todo el historial de conversaciones y
+el volumen de sesión de Evolution se fueron con la bandeja y la pasarela de
+WhatsApp. Ya no hay nada que respaldar fuera de este VPS.
 
 | # | Qué | Dónde vive | Si se pierde |
 |---|---|---|---|
-| 1 | MySQL `pedro_aduanero` | MySQL propio | Casos, consultas, pagos, configuración, contenido. El negocio. |
-| 2 | Postgres de Chatwoot | Docker `/opt/chatwoot` | Todo el historial de conversaciones con clientes. |
-| 3 | Sesión de Evolution | Volumen `/opt/evolution/instances` | Hay que reescanear el QR. Recuperable, pero deja WhatsApp caído mientras tanto. |
-| 4 | `/public/img` y adjuntos | Sistema de archivos | Fotos de Pedro y documentos subidos. |
-| 5 | **`MASTER_KEY`, `PEPPER_TELEFONO` y `.env`** | Variable de entorno | **Irrecuperable.** Se pierden todas las credenciales cifradas y la búsqueda de contactos por hash de teléfono. |
+| 1 | MySQL `pedro_aduanero` | MySQL propio | Configuración, contenido de las páginas, usuarios del panel y bitácora. |
+| 2 | `/public/img` | Sistema de archivos | Las fotos de Pedro. |
+| 3 | **`MASTER_KEY` y el `.env`** | Variable de entorno | **Irrecuperable.** Se pierden los segundos factores: nadie vuelve a entrar al panel. |
 
-El punto 5 es el único que no se arregla con un restore, y por eso viaja por un
+El punto 3 es el único que no se arregla con un restore, y por eso viaja por un
 camino separado (§4).
 
 ---
@@ -27,11 +28,12 @@ camino separado (§4).
 
 | Métrica | Objetivo | Traducción |
 |---|---|---|
-| **RPO** (pérdida máxima aceptable) | 24 h para bases · 1 h para pagos | Un día de casos se puede reconstruir desde Chatwoot. Un pago perdido, no. |
+| **RPO** (pérdida máxima aceptable) | 24 h | Lo que se pierde es, como mucho, un día de ediciones de contenido y de eventos de la landing. Nada de eso es irreemplazable. |
 | **RTO** (tiempo máximo de recuperación) | 4 h | Medio día hábil sin atender es tolerable; un día completo, no. |
 
-Para cumplir el RPO de una hora en pagos: MySQL con `binlog` activo y respaldo
-incremental horario del binlog, además del volcado diario completo.
+El volcado diario completo basta. El `binlog` con respaldo incremental horario
+se montó para el RPO de una hora que exigían los pagos; sin pasarela, no hay
+nada tan caro de perder como para justificarlo.
 
 ```ini
 # my.cnf
@@ -76,26 +78,33 @@ age -r "$AGE_CLAVE_PUBLICA" -o respaldo.tar.age respaldo.tar
 La clave **privada** de `age` no vive en el servidor. Vive donde tú puedas
 alcanzarla y el atacante no.
 
-### La MASTER_KEY y el PEPPER_TELEFONO
+### La MASTER_KEY
 
-Ninguna de las dos va en el respaldo automático. Nunca. Van por su propio camino,
-y son las mismas tres copias para ambas:
+No va en el respaldo automático. Nunca. Va por su propio camino, en tres copias:
 
 1. Copia en un gestor de contraseñas (1Password, Bitwarden, KeePass).
 2. Copia impresa en papel, en sobre cerrado, fuera de la oficina.
 3. Copia en poder de Pedro, no solo tuya. Si te pasa algo, el negocio no puede
    quedar sin acceso a sus propias credenciales.
 
-**Rotan distinto, y la diferencia importa:**
+**Rotación: cada 12 meses, y ahora cuesta más que antes.**
 
-| | `MASTER_KEY` | `PEPPER_TELEFONO` |
-|---|---|---|
-| Rotación | Cada 12 meses | **Nunca** |
-| Cómo | `Credenciales::rotarClaveMaestra()` re-cifra todo y sube `key_version` | No aplica |
-| Por qué | El cifrado es reversible: se puede descifrar con la vieja y re-cifrar con la nueva | Un hash no es reversible. Cambiarlo dejaría todos los `telefono_hash` huérfanos y la búsqueda por teléfono fallaría **en silencio** |
+Rotar era barato mientras existió `Credenciales::rotarClaveMaestra()`, que
+descifraba con la vieja, re-cifraba con la nueva y subía `key_version`. Esa
+clase se fue con el motor.
 
-Después de rotar la `MASTER_KEY`, actualizar las tres copias. El
-`PEPPER_TELEFONO` se guarda una vez y no se toca más.
+Hoy lo único cifrado con esta llave son los secretos TOTP de `usuarios`, y no
+hay rutina que los migre. Rotar significa **obligar a todos a volver a
+configurar su segundo factor**, uno por uno con `bin/restablecer-2fa.php`. Con
+tres o cuatro cuentas es asumible; conviene saberlo antes de empezar y no a
+mitad.
+
+Después de rotar, actualizar las tres copias.
+
+> Aquí había también un `PEPPER_TELEFONO`, que no rotaba nunca porque un hash
+> no es reversible y cambiarlo habría dejado huérfanos todos los
+> `telefono_hash`. Se retiró con `contactos`, su único cliente. Si vuelve el
+> motor, vuelve con la misma regla.
 
 ---
 
@@ -114,18 +123,20 @@ tar xf restauracion.tar
 
 # 3. Restaurar MySQL
 mysql -u root -p pedro_prueba < mysql/pedro_aduanero.sql
-
-# 4. Restaurar Postgres de Chatwoot
-docker exec -i chatwoot-postgres psql -U postgres chatwoot_prueba < chatwoot/dump.sql
 ```
 
 **Lista de verificación** — anotar el resultado en una bitácora, con fecha:
 
 - [ ] El volcado de MySQL importa sin errores.
-- [ ] `SELECT COUNT(*) FROM casos` coincide con producción del día del respaldo.
-- [ ] Las columnas generadas (`slot_unico`, `activo_key`, `primario_key`) existen.
-- [ ] Las credenciales se descifran con la `MASTER_KEY` guardada.
-- [ ] Chatwoot levanta y muestra conversaciones.
+- [ ] `SELECT COUNT(*) FROM landing_bloques` coincide con producción del día
+      del respaldo, y `configuraciones` también.
+- [ ] Las columnas generadas del esquema existen. Se comprueban con
+      `GENERATION_EXPRESSION`, no con `EXTRA` — MySQL marca
+      `DEFAULT_GENERATED` en casi todas las claves primarias de este esquema.
+- [ ] **Un usuario del panel entra con su segundo factor.** Es lo que prueba
+      que la `MASTER_KEY` guardada es la correcta: si no lo es, el TOTP no
+      valida y no hay otra forma de darse cuenta.
+- [ ] La landing responde 200 y pinta sus bloques.
 - [ ] Tiempo total de restauración **< 4 h** (RTO).
 
 Si algo falla, se arregla ese mes. No el siguiente.
