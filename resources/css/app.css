@@ -27,9 +27,9 @@
                          documento; la misma frase en sans de peso 800 dice
                          «startup». Solo tiene un peso (400): poner 700 la
                          engorda sintéticamente y se ve sucia.
-     · Geist             texto corrido.
+     · Geist             texto corrido. Variable, eje 100–900.
      · Geist Mono        rótulos, cifras y el índice de situaciones — todo
-                         lo que en este mundo va codificado.
+                         lo que en este mundo va codificado. También variable.
 
    El precio son 74 KB de woff2 y el riesgo de que el titular —que es la
    LCP— parpadee. Se paga así: `font-display: swap` en las tres para que
@@ -93,18 +93,28 @@
   src: url("/fonts/instrument-serif.woff2") format("woff2");
 }
 
-/* Los tres archivos son estáticos, no variables: se comprobó leyendo su
-   directorio de tablas —ninguno trae `fvar`—. Por eso el `font-weight` es
-   400 exacto y no un rango: declarar `400 700` sobre un archivo de un solo
-   peso no da negritas, da negrita SINTÉTICA, que es la misma letra engordada
-   por el motor y se ve sucia en pantallas de baja densidad.
-   Consecuencia asumida: donde el diseño pide semibold sobre Geist —botones y
-   rótulos, nada por encima de 1 rem— el navegador la sintetiza. A ese tamaño
-   no se distingue; en un titular sí, y por eso los titulares son serif. */
+/* Los dos Geist son VARIABLES y por eso declaran un rango.
+
+   Conviene decir cómo se comprobó, porque el primer intento se equivocó y el
+   error era invisible: se dedujo «estáticas» de un parseo del directorio de
+   tablas woff2 que no encontraba `fvar`, y el parseo estaba mal. Con
+   `font-weight: 400` declarado sobre una fuente variable, el navegador no
+   usa el eje: se queda en la instancia 400 y ENGORDA sintéticamente todo lo
+   que pida 500 o 600 — justo lo que el comentario anterior decía evitar.
+
+   La comprobación que sí vale es de renderizado, no de archivo: se pinta el
+   mismo texto a varios pesos con `font-synthesis: none` —que apaga la
+   síntesis— y se compara. Si la fuente no tuviera el peso, saldrían idénticos.
+   Geist da siete anchos distintos entre 100 y 900; Geist Mono, al ser de paso
+   fijo, no cambia de ancho nunca y hubo que comparar los píxeles: 400, 600 y
+   700 pintan distinto, luego el eje existe.
+
+   Instrument Serif sí es de un solo peso, y ahí el 400 exacto es correcto:
+   la familia solo se publica en Regular. */
 @font-face {
   font-family: "Geist";
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
   src: url("/fonts/geist.woff2") format("woff2");
 }
@@ -112,7 +122,7 @@
 @font-face {
   font-family: "Geist Mono";
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
   src: url("/fonts/geist-mono.woff2") format("woff2");
 }
