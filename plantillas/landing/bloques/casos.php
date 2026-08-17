@@ -23,31 +23,41 @@ $columnas = [
     'tributario' => ['Tributario', 'B'],
 ];
 ?>
-<section id="situaciones" class="bg-papel py-16 md:py-24">
-    <div class="mx-auto max-w-6xl px-5 md:px-8">
+<section id="situaciones" class="bg-tinta py-20 md:py-[5rem]">
+    <div class="mx-auto max-w-[78rem] px-6 md:px-20">
 
-        <p class="rotulo">Índice de situaciones</p>
+        <?php /* Esta sección va centrada y las demás no. Es deliberado: es la
+                 única que el lector no lee, sino que RECORRE buscándose. Un
+                 encabezado centrado sobre dos columnas simétricas dice
+                 «catálogo»; alineado a la izquierda diría «argumento», y
+                 entonces se leería en vez de buscarse. */ ?>
+        <div class="text-center">
+            <p class="rotulo rotulo-capsula">
+                <span class="punto" aria-hidden="true"></span>
+                Índice de situaciones
+            </p>
 
-        <h2 class="titular-seccion mt-4 max-w-2xl text-[1.75rem] md:text-4xl">
-            <?= $e($bloque->titulo) ?>
-        </h2>
+            <h2 class="titular-seccion mx-auto mt-8 max-w-2xl">
+                <?= $e($bloque->titulo) ?>
+            </h2>
 
-        <?php if ($bloque->subtitulo !== null): ?>
-        <p class="mt-4 max-w-xl text-acero"><?= $e($bloque->subtitulo) ?></p>
-        <?php endif; ?>
+            <?php if ($bloque->subtitulo !== null): ?>
+            <p class="cuerpo mx-auto mt-5 max-w-xl"><?= $e($bloque->subtitulo) ?></p>
+            <?php endif; ?>
+        </div>
 
-        <div class="mt-12 grid gap-x-14 gap-y-10 md:grid-cols-2">
+        <div class="mt-16 grid gap-6 md:mt-20 md:grid-cols-2">
             <?php foreach ($columnas as $clave => [$encabezado, $letra]): ?>
                 <?php $items = $bloque->lista($clave); ?>
                 <?php if ($items === []) { continue; } ?>
 
-                <div>
-                    <h3 class="flex items-baseline gap-3 font-mono text-eyebrow font-medium uppercase tracking-[0.16em] text-acero">
-                        <span class="text-sello"><?= $e($letra) ?></span>
-                        <?= $e($encabezado) ?>
+                <div class="tarjeta p-8 md:p-10">
+                    <h3 class="flex items-center gap-3">
+                        <span class="indice-num"><?= $e($letra) ?></span>
+                        <span class="rotulo text-acero"><?= $e($encabezado) ?></span>
                     </h3>
 
-                    <ul class="mt-4 border-b border-acero/20">
+                    <ul class="mt-6">
                         <?php foreach ($items as $item): ?>
                         <li class="indice-fila"><?= $e(is_string($item) ? $item : '') ?></li>
                         <?php endforeach; ?>
@@ -56,8 +66,8 @@ $columnas = [
             <?php endforeach; ?>
         </div>
 
-        <div class="mt-12">
-            <?= \App\Soporte\Vista::botonWhatsapp($waBase, 'Cuénteme su caso por WhatsApp') ?>
+        <div class="mt-16 text-center">
+            <?= \App\Soporte\Vista::botonWhatsapp($waBase, 'Cuénteme su caso') ?>
         </div>
     </div>
 </section>

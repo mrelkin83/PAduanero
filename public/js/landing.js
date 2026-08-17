@@ -206,6 +206,63 @@
 
     revelar();
 
+    // ── Punto de oro bajo la sección en curso ───────────────────────────
+    //
+    // Adorno, y se comporta como tal: sin este archivo los enlaces del menú
+    // siguen llevando a su ancla, solo que ninguno queda marcado.
+    //
+    // Se marca la ÚLTIMA sección que cruzó la línea del 40 % de la pantalla,
+    // no la que más superficie ocupa. Con secciones de alturas muy dispares
+    // —el índice de situaciones mide el triple que la invitación al
+    // diagnóstico— el criterio de superficie deja la marca clavada en la más
+    // alta durante casi todo el recorrido, que es justo cuando el lector
+    // querría saber dónde está.
+    function menu() {
+        var nav = document.querySelector('[data-menu]');
+
+        if (!nav || !('IntersectionObserver' in window)) { return; }
+
+        var enlaces = [].slice.call(nav.querySelectorAll('.menu-enlace'));
+        var secciones = [];
+
+        enlaces.forEach(function (a) {
+            var destino = document.querySelector(a.getAttribute('href'));
+            if (destino) { secciones.push({ enlace: a, seccion: destino }); }
+        });
+
+        if (secciones.length === 0) { return; }
+
+        function marcar() {
+            var linea = window.innerHeight * 0.4;
+            var actual = null;
+
+            secciones.forEach(function (par) {
+                if (par.seccion.getBoundingClientRect().top <= linea) { actual = par; }
+            });
+
+            secciones.forEach(function (par) {
+                if (par === actual) {
+                    par.enlace.setAttribute('data-activo', '');
+                } else {
+                    par.enlace.removeAttribute('data-activo');
+                }
+            });
+        }
+
+        // El observador solo sirve de disparador barato: avisa cuando alguna
+        // sección entra o sale, y entonces se recalcula. Un listener de
+        // scroll haría lo mismo en cada cuadro y obligaría a recalcular la
+        // disposición, que es como se arruina el rendimiento en un móvil.
+        var observador = new IntersectionObserver(marcar, {
+            threshold: [0, 0.25, 0.5, 0.75, 1]
+        });
+
+        secciones.forEach(function (par) { observador.observe(par.seccion); });
+        marcar();
+    }
+
+    menu();
+
     // ── Lo que este archivo le presta a perfil.js ───────────────────────
     //
     // El diagnóstico necesita dos cosas que ya viven aquí: la referencia de

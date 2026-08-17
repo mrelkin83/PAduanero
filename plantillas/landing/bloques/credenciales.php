@@ -26,30 +26,33 @@ use App\Soporte\Vista;
 $imagen = $bloque->texto('imagen', '/img/pedro-perfil.jpg');
 $items = $bloque->lista('items');
 ?>
-<section class="border-t border-acero/15 bg-papel-puro py-20 md:py-28">
-    <div class="mx-auto grid max-w-6xl items-center gap-12 px-5 md:grid-cols-[19rem_1fr] md:gap-20 md:px-8">
+<section class="bg-tinta py-20 md:py-[5rem]">
+    <div class="mx-auto grid max-w-[78rem] items-center gap-12 px-6 md:grid-cols-[1fr_1.15fr] md:gap-20 md:px-20">
 
-        <div class="marco-retrato">
+        <?php /* El retrato va dentro de una tarjeta de grafito y no suelto
+                 sobre el fondo. Sobre negro puro, un JPEG recortado se ve
+                 pegado; con el escalón de grafito debajo, la foto se apoya
+                 en algo y el conjunto recupera profundidad sin una sola
+                 sombra. */ ?>
+        <div class="tarjeta overflow-hidden p-3">
             <?= Vista::imagen(
                 basename($imagen),
                 'Retrato de Pedro, abogado titular del despacho',
                 892,
                 1196,
-                'w-44 md:w-full h-auto rounded-sm',
-                sizes: '(min-width: 768px) 19rem, 11rem',
+                'w-full h-auto rounded-[0.125rem]',
+                sizes: '(min-width: 768px) 34rem, 100vw',
             ) ?>
         </div>
 
         <div>
             <p class="rotulo">Quién responde</p>
 
-            <h2 class="titular-seccion mt-5 text-[2rem] md:text-[2.75rem]">
+            <h2 class="titular-seccion mt-8">
                 <?= $e($bloque->titulo) ?>
             </h2>
 
-            <hr class="filete mt-7">
-
-            <ul class="mt-10">
+            <ul class="mt-12 space-y-4">
                 <?php foreach ($items as $i => $item): ?>
                     <?php
                     if (!is_array($item)) {
@@ -58,17 +61,15 @@ $items = $bloque->lista('items');
                     $titulo = is_string($item['titulo'] ?? null) ? $item['titulo'] : '';
                     $detalle = is_string($item['detalle'] ?? null) ? $item['detalle'] : '';
                     ?>
-                    <li class="grid grid-cols-[2.5rem_1fr] items-baseline gap-x-4 border-t border-acero/20 py-5">
-                        <span class="credencial-num" aria-hidden="true">
+                    <li class="tarjeta flex items-start gap-6 p-6 md:p-7">
+                        <span class="cifra-oro mt-0.5" aria-hidden="true">
                             <?= $e(str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT)) ?>
                         </span>
 
                         <div>
-                            <p class="titular-menor text-[1.1875rem] md:text-[1.375rem]">
-                                <?= $e($titulo) ?>
-                            </p>
+                            <p class="titular-menor"><?= $e($titulo) ?></p>
                             <?php if ($detalle !== ''): ?>
-                            <p class="mt-1.5 text-[0.9375rem] text-acero"><?= $e($detalle) ?></p>
+                            <p class="cuerpo mt-2 text-[0.9375rem]"><?= $e($detalle) ?></p>
                             <?php endif; ?>
                         </div>
                     </li>

@@ -24,31 +24,31 @@ use App\Soporte\Vista;
 $pasos = $bloque->lista('pasos');
 $imagen = $bloque->texto('imagen');
 ?>
-<section id="proceso" class="sobre-tinta bg-tinta py-20 text-papel md:py-28">
-    <div class="mx-auto grid max-w-6xl gap-12 px-5 md:grid-cols-[20rem_1fr] md:gap-20 md:px-8">
+<section id="proceso" class="bg-tinta py-20 md:py-[5rem]">
+    <div class="mx-auto grid max-w-[78rem] gap-12 px-6 md:grid-cols-[1fr_1.25fr] md:gap-20 md:px-20">
 
         <div>
-            <p class="rotulo">Cómo funciona</p>
+            <p class="rotulo">Metodología</p>
 
-            <h2 class="titular-seccion mt-5 text-[2rem] md:text-[2.75rem]">
+            <h2 class="titular-seccion mt-8">
                 <?= $e($bloque->titulo) ?>
             </h2>
 
             <?php if ($imagen !== ''): ?>
-            <div class="mt-10 hidden md:block">
+            <div class="tarjeta mt-12 hidden overflow-hidden p-3 md:block">
                 <?= Vista::imagen(
                     basename($imagen),
                     $bloque->texto('alt', 'El abogado revisando una declaración de importación'),
                     890,
                     1198,
-                    'w-full h-auto rounded-sm',
-                    sizes: '20rem',
+                    'w-full h-auto rounded-[0.125rem]',
+                    sizes: '(min-width: 768px) 28rem, 100vw',
                 ) ?>
             </div>
             <?php endif; ?>
         </div>
 
-        <ol class="md:pt-2">
+        <ol class="space-y-4 md:pt-2">
             <?php foreach ($pasos as $paso): ?>
                 <?php
                 if (!is_array($paso)) {
@@ -56,17 +56,17 @@ $imagen = $bloque->texto('imagen');
                 }
                 $n = is_int($paso['n'] ?? null) ? $paso['n'] : 0;
                 ?>
-                <li class="paso-fila">
-                    <span class="paso-cifra" aria-hidden="true">
+                <li class="tarjeta flex items-start gap-6 p-7 md:gap-8 md:p-8">
+                    <span class="cifra-oro mt-0.5" aria-hidden="true">
                         <?= $e(str_pad((string) $n, 2, '0', STR_PAD_LEFT)) ?>
                     </span>
 
                     <div>
-                        <h3 class="titular-menor text-[1.375rem] md:text-2xl">
+                        <h3 class="titular-menor">
                             <?= $e(is_string($paso['titulo'] ?? null) ? $paso['titulo'] : '') ?>
                         </h3>
 
-                        <p class="mt-2 text-[0.9375rem] leading-relaxed text-tinta-suave">
+                        <p class="cuerpo mt-2 text-[0.9375rem]">
                             <?= $e(is_string($paso['detalle'] ?? null) ? $paso['detalle'] : '') ?>
                         </p>
                     </div>

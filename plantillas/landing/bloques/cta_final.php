@@ -23,38 +23,51 @@ use App\Soporte\Vista;
 
 $imagen = $bloque->texto('imagen');
 ?>
-<section class="sobre-tinta relative isolate overflow-hidden bg-tinta py-20 text-papel md:py-28">
+<section class="bg-tinta py-20 md:py-[5rem]">
+    <div class="mx-auto max-w-[78rem] px-6 md:px-20">
 
-    <?php if ($imagen !== ''): ?>
-    <div class="hero-foto">
-        <?= Vista::imagen(
-            basename($imagen),
-            $bloque->texto('alt', 'Pedro, especialista en derecho aduanero y comercio exterior'),
-            886,
-            1176,
-            '',
-            sizes: '(min-width: 768px) 56vw, 100vw',
-        ) ?>
-    </div>
-    <?php endif; ?>
+    <?php /* El cierre es una pieza, no una franja: una sola tarjeta grande y
+             centrada, aislada por el vacío de arriba y de abajo. Es lo que la
+             especificación llama dejar la llamada a la acción «en
+             aislamiento», y aquí funciona porque es la última cosa que se lee.
 
-    <div class="relative z-10 mx-auto max-w-6xl px-5 md:px-8">
+             La foto vive DENTRO de la tarjeta y muy velada. En la maqueta esta
+             pieza no lleva imagen, pero el bloque trae una sembrada desde la
+             Etapa 1 y tirarla sería perder contenido; velada hace de textura,
+             que es justo lo que la maqueta pinta ahí. */ ?>
+    <div class="tarjeta relative isolate overflow-hidden px-6 py-20 text-center md:px-20 md:py-28">
 
-        <p class="rotulo">El tiempo</p>
+        <?php if ($imagen !== ''): ?>
+        <div class="hero-foto">
+            <?= Vista::imagen(
+                basename($imagen),
+                $bloque->texto('alt', 'Pedro, especialista en derecho aduanero y comercio exterior'),
+                886,
+                1176,
+                '',
+                sizes: '100vw',
+            ) ?>
+        </div>
+        <?php endif; ?>
 
-        <h2 class="titular-seccion mt-5 max-w-xl text-[2rem] md:text-[2.75rem]">
+        <div class="relative z-10">
+
+        <p class="rotulo rotulo-capsula">
+            <span class="punto" aria-hidden="true"></span>
+            El tiempo
+        </p>
+
+        <h2 class="titular-seccion mx-auto mt-8 max-w-2xl">
             <?= $e($bloque->titulo) ?>
         </h2>
 
-        <hr class="filete mt-7">
-
         <?php if ($bloque->subtitulo !== null): ?>
-        <p class="entrada mt-7 max-w-lg">
+        <p class="entrada mx-auto mt-7 max-w-xl">
             <?= $e($bloque->subtitulo) ?>
         </p>
         <?php endif; ?>
 
-        <div class="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-6">
+        <div class="mt-12 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center">
             <?= Vista::botonWhatsapp($waBase, $bloque->texto('cta_texto', 'Escribir por WhatsApp')) ?>
 
             <?php
@@ -67,11 +80,14 @@ $imagen = $bloque->texto('imagen');
             $secundario = $bloque->texto('cta_secundario', 'O diagnostique su caso primero');
             ?>
             <?php if ($secundario !== ''): ?>
-            <a href="/perfil" class="boton-fantasma self-start sm:self-auto">
+            <a href="/perfil" class="boton-fantasma justify-center">
                 <?= $e($secundario) ?>
                 <span aria-hidden="true">→</span>
             </a>
             <?php endif; ?>
         </div>
+
+        </div>
+    </div>
     </div>
 </section>

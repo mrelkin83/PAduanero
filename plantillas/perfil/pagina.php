@@ -19,8 +19,10 @@ use App\Soporte\Vista;
  *    duplicaría el peso y crearía dos redacciones que se separan con el
  *    tiempo; el script lee lo que necesita de los `data-*`.
  *
- * Composición: tarjetas de vidrio sobre tinta (bisel doble, como iOS), con
- * la serif de display para los titulares y monoespaciada para lo técnico.
+ * Composición: Lex Aeterna. Tarjetas de grafito sobre negro, oro reservado a
+ * la cifra y al estado elegido, y Geist para todo — la serif se retiró del
+ * sitio entero. Comparte hoja de estilos, cabecera y pie con la landing, así
+ * que lo único propio de aquí es la mecánica del cuestionario.
  *
  * @var list<array<string,mixed>> $pasos
  * @var array<string,int> $largos
@@ -66,10 +68,10 @@ $precio = $asesoria['precio'] !== null
 
 <?php /* Sin imágenes: la LCP es el titular de la primera pregunta. Esta
          página no necesita fotos y cargarlas costaría el presupuesto que ya
-         defiende bin/auditar-landing.mjs. La serif sí se precarga: es la del
-         elemento LCP. */ ?>
+         defiende bin/auditar-landing.mjs. Se precarga Geist, que es con la
+         que se compone ese titular. */ ?>
 <link rel="preload" as="font" type="font/woff2" crossorigin
-      href="/fonts/instrument-serif.woff2">
+      href="/fonts/geist.woff2">
 
 <style><?= $css ?></style>
 
@@ -94,24 +96,24 @@ window.__paRedRevelado = setTimeout(function () {
 <script type="application/ld+json"><?= Vista::json($meta['jsonLd']) ?></script>
 </head>
 
-<?php /* `sobre-tinta` es lo que activa la variante oscura de todo el sistema
-         —rótulo en ámbar, filete en ámbar, filetes del índice aclarados, el
-         `boton-fantasma` en papel y, sobre todo, el anillo de foco en ámbar
-         en vez de rojo de sello—. Sin esta clase la página se pinta con los
-         colores pensados para papel sobre un fondo casi negro: el enlace
-         «Inicio» quedaba tinta sobre tinta, invisible, siendo la única
-         salida de la página. No se nota al revisar el CSS porque cada regla
-         por separado es correcta; lo que falla es que ninguna aplica. */ ?>
-<body class="perfil-cuerpo sobre-tinta text-papel">
-<a href="#contenido" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-3 focus:bg-ambar focus:px-4 focus:py-2 focus:text-tinta">
+<?php /* Ya no hace falta marcar «superficie oscura»: en Lex Aeterna no hay
+         otra. Todo el sistema se define directamente sobre negro, así que la
+         variante clara —y con ella la clase que la conmutaba— desaparece.
+
+         Vale la pena recordar por qué existía: mientras hubo dos superficies,
+         olvidar esa clase dejaba esta página pintada con los colores del
+         papel sobre un fondo casi negro, y el enlace «Inicio» quedaba tinta
+         sobre tinta, invisible, siendo la única salida. No se veía revisando
+         el CSS, porque cada regla por separado era correcta; lo que fallaba
+         es que ninguna aplicaba. Una paleta sola no puede repetirlo. */ ?>
+<body class="perfil-cuerpo">
+<a href="#contenido" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-3 focus:bg-oro focus:px-4 focus:py-2 focus:text-tinta">
     Saltar al contenido
 </a>
 
-<div class="grano" aria-hidden="true"></div>
-
 <header class="barra-perfil">
     <div class="mx-auto flex max-w-4xl items-center gap-6 px-6 py-4 md:px-10">
-        <a href="/" class="boton-fantasma shrink-0 text-[0.8125rem]">
+        <a href="/" class="boton-fantasma compacto shrink-0">
             <span aria-hidden="true">&larr;</span> Inicio
         </a>
 
@@ -132,7 +134,7 @@ window.__paRedRevelado = setTimeout(function () {
 <section class="pt-16 md:pt-24" id="intro">
     <p class="rotulo revelar">Diagnóstico gratuito</p>
 
-    <h1 class="font-serif titular revelar mt-6 text-[2.25rem] md:text-[3.25rem]" style="--retardo:80ms">
+    <h1 class="titular revelar mt-6 text-[2.25rem] md:text-[3.25rem]" style="--retardo:80ms">
         <?= $e($intro?->titulo ?? 'Veamos qué tiene entre manos') ?>
     </h1>
 
@@ -146,7 +148,7 @@ window.__paRedRevelado = setTimeout(function () {
              tarda, que no se le piden datos y que al final no hay un cobro
              sorpresa. Sin esto, la primera pregunta se lee como el principio
              de un formulario de captura y se abandona. */ ?>
-    <ul class="revelar mt-12 grid gap-x-14 border-b border-papel/15 sm:grid-cols-2 sm:border-b-0"
+    <ul class="revelar mt-12 grid gap-x-14 border-b border-linea sm:grid-cols-2 sm:border-b-0"
         style="--retardo:210ms">
         <li class="indice-fila">Menos de dos minutos</li>
         <li class="indice-fila">Sin nombre, sin correo, sin teléfono</li>
@@ -186,7 +188,7 @@ window.__paRedRevelado = setTimeout(function () {
         <div class="doble-bisel">
             <div class="doble-bisel-interior p-6 md:p-10">
                 <div class="flex items-center justify-between gap-4">
-                    <span class="inline-flex items-center gap-2 rounded-full border border-ambar/25 bg-ambar/10 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-ambar">
+                    <span class="inline-flex items-center gap-2 rounded-full border border-oro/25 bg-oro/10 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-oro">
                         <?= $e((string) $paso['rotulo']) ?>
                     </span>
                     <span class="font-mono text-xs text-tinta-suave">Paso <?= $numero ?> de <?= count($pasos) ?></span>
@@ -195,7 +197,7 @@ window.__paRedRevelado = setTimeout(function () {
                 <?php /* tabindex −1: al cambiar de paso el foco viene aquí. Sin
                          esto, quien navega con teclado o lector de pantalla se queda
                          con el foco en un botón que acaba de desaparecer. */ ?>
-                <h2 class="font-serif text-2xl md:text-[2rem] text-papel mt-5" tabindex="-1" id="titulo-<?= $e($id) ?>">
+                <h2 class="text-2xl md:text-[2rem] text-papel mt-5" tabindex="-1" id="titulo-<?= $e($id) ?>">
                     <?= $e((string) $paso['pregunta']) ?>
                 </h2>
 
@@ -242,7 +244,7 @@ window.__paRedRevelado = setTimeout(function () {
                          imposible comparar las opciones—, así que ahí «Continuar»
                          es el único camino. Para quien usa el dedo es un botón que
                          nunca pulsa; a cambio, nadie queda atrapado. */ ?>
-                <div class="mt-8 pt-6 border-t border-papel/10 flex items-center justify-between gap-4 paso-pie">
+                <div class="mt-8 pt-6 border-t border-linea flex items-center justify-between gap-4 paso-pie">
                     <button type="button" class="inline-flex items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-wider text-tinta-suave hover:text-papel disabled:opacity-30 disabled:cursor-not-allowed transition-colors js-atras">
                         <span aria-hidden="true">&larr;</span> Anterior
                     </button>
@@ -260,14 +262,20 @@ window.__paRedRevelado = setTimeout(function () {
 
 <?php /* ── Salida crítica (regla 5) ────────────────────────────────── */ ?>
 <section id="salida-urgente" class="bloque-salida" hidden>
-    <div class="doble-bisel">
-        <div class="doble-bisel-interior p-8 md:p-10" style="border-color: rgba(196, 61, 38, 0.45);">
-            <span class="inline-flex items-center gap-2 rounded-full border border-sello/50 bg-sello/15 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-[#E8846B]">
-                <span class="w-1.5 h-1.5 rounded-full bg-sello animate-ping"></span>
-                Atención Urgente
+    <?php /* El filete superior es rojo y no oro: es el único sitio del sitio
+             entero donde eso está permitido. Aquí no se está señalando
+             autoridad sino urgencia —operativo, captura, allanamiento— y el
+             oro, que en esta paleta significa «esto manda», leería como una
+             sección destacada más. El distintivo vive en `.marca-urgente`
+             para que ese rojo tenga nombre y no se copie a otro sitio. */ ?>
+    <div class="doble-bisel" style="border-top-color: var(--color-alerta);">
+        <div class="doble-bisel-interior p-8 md:p-10">
+            <span class="marca-urgente">
+                <span class="pulso animate-ping" aria-hidden="true"></span>
+                Atención urgente
             </span>
 
-            <h2 class="font-serif text-3xl md:text-4xl text-papel mt-5" tabindex="-1">
+            <h2 class="titular-seccion mt-6" tabindex="-1">
                 Escriba ahora mismo.
             </h2>
 
@@ -293,11 +301,11 @@ window.__paRedRevelado = setTimeout(function () {
 <section id="salida-fuera" class="bloque-salida" hidden>
     <div class="doble-bisel">
         <div class="doble-bisel-interior p-8 md:p-10">
-            <span class="inline-flex items-center gap-2 rounded-full border border-papel/20 bg-papel/10 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-tinta-suave">
+            <span class="inline-flex items-center gap-2 rounded-full border border-linea bg-papel/10 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-tinta-suave">
                 Ámbito de Práctica
             </span>
 
-            <h2 class="font-serif text-2xl md:text-3xl text-papel mt-5" tabindex="-1">
+            <h2 class="text-2xl md:text-3xl text-papel mt-5" tabindex="-1">
                 <?= $e($fuera?->titulo ?? 'Este despacho entra cuando el problema ya existe') ?>
             </h2>
 
@@ -313,7 +321,7 @@ window.__paRedRevelado = setTimeout(function () {
                 empiece por aquí.
             </p>
 
-            <div class="mt-8 pt-6 border-t border-papel/10 flex flex-wrap items-center gap-x-8 gap-y-4">
+            <div class="mt-8 pt-6 border-t border-linea flex flex-wrap items-center gap-x-8 gap-y-4">
                 <button type="button" class="boton-fantasma js-reiniciar">
                     <span aria-hidden="true">&larr;</span> Volver a empezar
                 </button>
@@ -340,14 +348,14 @@ window.__paRedRevelado = setTimeout(function () {
     <div class="doble-bisel">
         <div class="doble-bisel-interior p-8 md:p-10">
             <div class="flex items-center justify-between gap-4">
-                <span class="inline-flex items-center gap-2 rounded-full border border-papel/20 bg-papel/10 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-papel">
-                    <span class="w-1.5 h-1.5 rounded-full bg-ambar"></span>
+                <span class="inline-flex items-center gap-2 rounded-full border border-linea bg-papel/10 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-papel">
+                    <span class="w-1.5 h-1.5 rounded-full bg-oro"></span>
                     Diagnóstico Completado
                 </span>
-                <span class="font-mono text-xs text-ambar">Resultado Técnico</span>
+                <span class="font-mono text-xs text-oro">Resultado Técnico</span>
             </div>
 
-            <h2 class="font-serif text-3xl md:text-4xl text-papel mt-5" tabindex="-1" id="resultado-titulo">
+            <h2 class="text-3xl md:text-4xl text-papel mt-5" tabindex="-1" id="resultado-titulo">
                 <?= $e($resultado?->titulo ?? 'Lo que usted tiene tiene nombre') ?>
             </h2>
 
@@ -356,10 +364,10 @@ window.__paRedRevelado = setTimeout(function () {
                      lee «Aprehensión de mercancía» y entiende que del otro lado hay
                      alguien que ya sabe de qué se trata. */ ?>
             <p id="resultado-tecnico"
-               class="mt-6 inline-flex items-center gap-2.5 rounded-full border border-ambar/40 bg-ambar/10 px-4 py-2 font-mono text-sm font-semibold tracking-wide text-ambar"
+               class="mt-6 inline-flex items-center gap-2.5 rounded-full border border-oro/40 bg-oro/10 px-4 py-2 font-mono text-sm font-semibold tracking-wide text-oro"
                hidden></p>
 
-            <div class="mt-8 pt-6 border-t border-papel/10">
+            <div class="mt-8 pt-6 border-t border-linea">
                 <h4 class="font-mono text-xs uppercase tracking-widest text-tinta-suave mb-4">Resumen de las respuestas:</h4>
                 <dl id="resumen" class="space-y-1"></dl>
             </div>
@@ -382,7 +390,7 @@ window.__paRedRevelado = setTimeout(function () {
 
                     <?php if ($precio !== null): ?>
                     <p class="flex items-baseline gap-3">
-                        <span class="font-serif text-2xl text-ambar"><?= $e($precio) ?></span>
+                        <span class="text-2xl text-oro"><?= $e($precio) ?></span>
                         <span class="dato">
                             <?= $asesoria['duracion'] !== null ? (int) $asesoria['duracion'] . ' min · ' : '' ?>virtual
                         </span>
@@ -410,7 +418,7 @@ window.__paRedRevelado = setTimeout(function () {
                 de enviarlo.
             </p>
 
-            <div class="mt-8 pt-6 border-t border-papel/10">
+            <div class="mt-8 pt-6 border-t border-linea">
                 <button type="button" class="boton-fantasma js-reiniciar">
                     <span aria-hidden="true">&larr;</span> Corregir una respuesta
                 </button>

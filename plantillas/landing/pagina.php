@@ -56,17 +56,17 @@ $waBase = 'https://wa.me/' . rawurlencode($whatsapp['numero'])
       imagesizes="(min-width: 768px) 56vw, 100vw"
       type="image/avif">
 
-<?php /* La serif de los titulares se precarga y las otras dos no. El titular
-         del hero ES la LCP: sin `preload` el navegador no descubre la fuente
-         hasta parsear el CSS, pinta con la de reserva y la cambia después —el
-         salto se ve y además cuenta como desplazamiento de diseño. Geist y
-         Geist Mono entran con el cuerpo, donde el intercambio no se nota.
+<?php /* Se precarga Geist y no Geist Mono. El titular del hero ES la LCP y
+         ahora se compone en Geist: sin `preload` el navegador no descubre la
+         fuente hasta parsear el CSS, pinta con la de reserva y la cambia
+         después —el salto se ve y cuenta como desplazamiento de diseño—. La
+         mono solo viste rótulos y cifras, donde el intercambio no se nota.
 
          `crossorigin` es obligatorio aunque la fuente sea del mismo origen:
          las peticiones de fuentes viajan en modo CORS, y sin el atributo el
          navegador descarga el archivo dos veces —una para la precarga y otra
          para usarlo—, que es peor que no precargar. */ ?>
-<link rel="preload" as="font" type="font/woff2" href="/fonts/instrument-serif.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="/fonts/geist.woff2" crossorigin>
 
 <?php /* CSS incrustado: son unos pocos KB y evita un viaje de ida y vuelta
          bloqueante justo en el camino crítico del render. */ ?>
@@ -119,18 +119,21 @@ window.__paRedRevelado = setTimeout(function () {
  * de distancia, un menú plegable resolvería un problema que no existe.
  */
 ?>
-<header class="barra-sitio sobre-tinta text-papel">
-    <div class="mx-auto flex max-w-6xl items-center gap-6 px-5 py-3 md:px-8">
+<header class="barra-sitio">
+    <div class="mx-auto flex max-w-[78rem] items-center gap-6 px-6 py-4 md:px-20">
         <a href="#contenido" class="marca" aria-label="Pedro, abogado aduanero y tributario">Pedro</a>
 
-        <nav aria-label="Secciones" class="ml-auto hidden items-center gap-8 md:flex">
+        <?php /* Los enlaces marcan la sección en curso con un punto de oro
+                 que pone `landing.js` con un observador. Es adorno: sin
+                 script los enlaces siguen llevando a su ancla. */ ?>
+        <nav aria-label="Secciones" class="ml-auto hidden items-center gap-10 md:flex" data-menu>
             <a href="#situaciones" class="menu-enlace">Situaciones</a>
             <a href="#diagnostico" class="menu-enlace">Diagnóstico</a>
-            <a href="#proceso" class="menu-enlace">Cómo funciona</a>
+            <a href="#proceso" class="menu-enlace">Metodología</a>
         </nav>
 
         <div class="ml-auto md:ml-0">
-            <?= Vista::botonWhatsapp($waBase, 'Escribir', 'compacto') ?>
+            <?= Vista::botonWhatsapp($waBase, 'Consultar', 'compacto') ?>
         </div>
     </div>
 </header>

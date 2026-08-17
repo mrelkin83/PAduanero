@@ -4,10 +4,23 @@
 
 /* =====================================================================
    Panel administrativo.
-   Hereda la paleta de la landing —tinta de sello sobre papel de oficio—
-   pero en registro de herramienta: densidad alta, cero adorno, todo
-   legible de un vistazo. Aquí no hay que convencer a nadie, hay que
-   trabajar.
+
+   Registro de herramienta: densidad alta, cero adorno, todo legible de un
+   vistazo. Aquí no hay que convencer a nadie, hay que trabajar.
+
+   La paleta de abajo es la que la landing tuvo hasta el rediseño «Lex
+   Aeterna» —tinta de sello sobre papel de oficio— y AQUÍ SE QUEDA. No es
+   inercia: son dos productos distintos con dos trabajos distintos, y un
+   panel de administración compuesto en negro y oro sería precioso y peor
+   de usar. Las tablas densas, los formularios largos y los avisos de
+   error se leen mejor sobre claro, y quien entra aquí lo hace para
+   trabajar horas, no para quedar impresionado treinta segundos.
+
+   Consecuencia práctica: este archivo es autónomo. Define su propio
+   `@theme` y su propio `@source`, así que un cambio de paleta en
+   `app.css` no lo toca — y por eso `text-sello` y `text-ambar` siguen
+   existiendo en las plantillas del panel aunque hayan desaparecido de la
+   landing.
    ===================================================================== */
 
 @theme {

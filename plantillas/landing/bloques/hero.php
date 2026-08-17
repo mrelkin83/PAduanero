@@ -46,11 +46,14 @@ if ($cifras === []) {
     ];
 }
 ?>
-<section class="sobre-tinta relative isolate overflow-hidden bg-tinta text-papel">
+<section class="relative isolate overflow-hidden bg-tinta">
 
     <?php
     /* La foto va de fondo, a sangre por la derecha. El degradado lo pone
-       `.hero-foto::after`, no un contenedor intermedio: ver el CSS. */
+       `.hero-foto::after`, no un contenedor intermedio: ver el CSS. Lleva
+       además un desaturado parcial, que no es un filtro de moda: la foto
+       es de un puerto al atardecer y sus naranjas compiten de frente con
+       el oro, que en este sistema es el único color que significa algo. */
     ?>
     <div class="hero-foto">
         <?= Vista::imagen(
@@ -60,41 +63,44 @@ if ($cifras === []) {
             1176,
             '',
             prioritaria: true,
-            sizes: '(min-width: 768px) 56vw, 100vw',
+            sizes: '(min-width: 768px) 54vw, 100vw',
         ) ?>
     </div>
 
-    <div class="relative z-10 mx-auto max-w-6xl px-5 pt-16 md:px-8 md:pt-28">
+    <div class="relative z-10 mx-auto max-w-[78rem] px-6 pt-24 md:px-20 md:pt-40">
 
-        <div class="max-w-2xl">
+        <div class="max-w-3xl">
             <p class="rotulo">Aduanero · Tributario · DIAN</p>
 
-            <h1 class="titular mt-6 text-[2.375rem] sm:text-[3.25rem] md:text-[4rem]">
+            <h1 class="titular mt-8">
                 <?= $e($bloque->titulo) ?>
             </h1>
 
-            <hr class="filete mt-8">
-
             <?php if ($bloque->subtitulo !== null): ?>
-            <p class="entrada mt-7 max-w-lg">
+            <p class="entrada mt-8 max-w-xl">
                 <?= $e($bloque->subtitulo) ?>
             </p>
             <?php endif; ?>
+        </div>
 
-            <div class="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-6">
-                <?= Vista::botonWhatsapp($waBase, $bloque->texto('cta_texto', 'Escribir por WhatsApp')) ?>
+        <?php /* La fila de acciones sale del `max-w-3xl` del titular. Ese
+                 ancho está puesto para que la pregunta rompa en tres líneas
+                 largas, que es como se lee mejor; aplicado también a los
+                 botones obligaría a partirlos en dos filas sin que haga
+                 falta. */ ?>
+        <div class="mt-12 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+            <?= Vista::botonWhatsapp($waBase, $bloque->texto('cta_texto', 'Analizar mi caso')) ?>
 
-                <?php if ($bloque->texto('cta_secundario') !== ''): ?>
-                <a href="#proceso" class="boton-fantasma self-center sm:self-auto">
-                    <?= $e($bloque->texto('cta_secundario')) ?>
-                    <span aria-hidden="true">↓</span>
-                </a>
-                <?php endif; ?>
-            </div>
+            <?php if ($bloque->texto('cta_secundario') !== ''): ?>
+            <a href="#proceso" class="boton-fantasma justify-center">
+                <?= $e($bloque->texto('cta_secundario')) ?>
+                <span aria-hidden="true">↓</span>
+            </a>
+            <?php endif; ?>
         </div>
 
         <?php if ($cifras !== []): ?>
-        <dl class="mt-16 grid border-t border-papel/15 sm:grid-cols-3 md:mt-24">
+        <dl class="mt-24 grid border-t border-linea sm:grid-cols-3 md:mt-40">
             <?php foreach ($cifras as $i => $dato): ?>
                 <?php
                 if (!is_array($dato)) {
@@ -103,9 +109,9 @@ if ($cifras === []) {
                 $valor = is_string($dato['cifra'] ?? null) ? $dato['cifra'] : '';
                 $nota = is_string($dato['nota'] ?? null) ? $dato['nota'] : '';
                 ?>
-                <div class="border-papel/15 py-5 sm:py-6 <?= $i > 0 ? 'border-t sm:border-t-0 sm:border-l sm:pl-8' : '' ?>">
-                    <dt class="cifra"><?= $e($valor) ?></dt>
-                    <dd class="cifra-nota mt-1.5"><?= $e($nota) ?></dd>
+                <div class="border-linea py-8 <?= $i > 0 ? 'border-t sm:border-t-0 sm:border-l sm:pl-10' : '' ?>">
+                    <dt class="contador"><?= $e($valor) ?></dt>
+                    <dd class="contador-nota mt-3"><?= $e($nota) ?></dd>
                 </div>
             <?php endforeach; ?>
         </dl>

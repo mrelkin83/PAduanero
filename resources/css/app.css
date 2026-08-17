@@ -4,113 +4,132 @@
 @source "../../src/Soporte/Vista.php";
 
 /* =====================================================================
-   Sistema visual — Pedro, abogado aduanero y tributario
+   Lex Aeterna — sistema visual de las páginas públicas
    ---------------------------------------------------------------------
-   El mundo de la aduana es un mundo de documentos: el acta de aprehensión,
-   la declaración de importación, la subpartida arancelaria, el radicado.
-   Todo va codificado, numerado y con casillas. De ahí sale la paleta —
-   tinta de sello sobre papel de oficio — y de ahí sale el uso de la
-   monoespaciada para todo lo que es administrativamente real: los tipos de
-   caso, el precio, la numeración de los pasos.
+   Especificación normativa: `stitch_customs_law_digital_experience/`
+   —`DESIGN.md` tiene la paleta, la escala tipográfica y las reglas de
+   componente; `screen.png` es la maqueta de la landing—. Donde este
+   archivo se separa de ella, lo dice y explica por qué.
 
-   Dos acentos, cada uno dueño de una superficie:
-     · rojo de sello sobre papel   (la almohadilla de tinta oficial)
-     · ámbar sobre tinta           (las lámparas de sodio del puerto,
-                                    que ya están en la foto del hero)
+   Sustituye al anterior («tinta de sello sobre papel de oficio»), que
+   componía la página como un acto administrativo: rojo de sello, fondo
+   crema, serif de display. Este va al lado contrario y conviene decir
+   cuál, porque la mitad de las decisiones de abajo solo se entienden
+   desde aquí.
 
-   Tres fuentes, servidas locales desde `/fonts`. La Etapa 1 dijo «cero
-   fuentes web» y esa regla se levanta aquí, así que conviene dejar por
-   escrito con qué se paga y qué se compra:
+   La idea es autoridad callada. Negro profundo como lienzo, superficies
+   de grafito que se separan por luminosidad y no por sombras, y un único
+   acento de oro metálico reservado a lo que manda: la cifra, la acción,
+   el borde que se enciende. Nada compite con nada. El vacío es el
+   material principal — de ahí los 160 px entre secciones, que en una
+   página normal serían un error de maquetación y aquí son el mensaje.
 
-     · Instrument Serif  titulares. Es la voz de la página. Una serif de
-                         display en un despacho de litigio dice oficio y
-                         documento; la misma frase en sans de peso 800 dice
-                         «startup». Solo tiene un peso (400): poner 700 la
-                         engorda sintéticamente y se ve sucia.
-     · Geist             texto corrido. Variable, eje 100–900.
-     · Geist Mono        rótulos, cifras y el índice de situaciones — todo
-                         lo que en este mundo va codificado. También variable.
+   Consecuencias que hay que asumir de frente:
 
-   El precio son 74 KB de woff2 y el riesgo de que el titular —que es la
-   LCP— parpadee. Se paga así: `font-display: swap` en las tres para que
-   ninguna bloquee el render, y `preload` SOLO de la serif, que es la única
-   que participa en la LCP. Las otras dos entran con el reflow del cuerpo,
-   donde no se nota. El presupuesto de 300 KB lo sigue midiendo
-   `bin/auditar-landing.mjs` en cada cierre de etapa.
+     · No hay superficies claras. Ni una. Eso simplifica el contraste
+       —todo es texto claro sobre oscuro— y obliga a que las fotos
+       lleven su propio velo, porque un JPEG luminoso rompe el conjunto
+       más que cualquier color.
+     · Desaparece el rojo de sello. El acento es uno solo, y dos acentos
+       en una paleta de lujo se leen como dos marcas.
+     · La serif se retira de la landing y del diagnóstico. La voz ahora
+       es Geist en peso 500–600 con tracking muy cerrado: la misma
+       autoridad, dicha por la vía técnica en vez de la documental.
+     · Nada de píldoras. Lo dice la especificación y tiene razón: el
+       radio completo es lenguaje de producto de consumo, y esto es un
+       despacho. 4 px en todo, 8 px solo en la acción principal.
    ===================================================================== */
 
 @theme {
-  --color-tinta: #0E1628;
-  --color-tinta-alta: #060A12;
-  --color-tinta-suave: #8392A8;
+  /* --- Lienzo y superficies ------------------------------------------
+     Tres escalones y no más. La profundidad sale de la luminosidad, así
+     que cada escalón tiene que distinguirse del anterior sin que se vea
+     un borde: si hicieran falta bordes para separarlos, el sistema no
+     funcionaría. */
+  --color-tinta: #0A0A0B;
+  --color-tinta-alta: #060607;
+  --color-grafito: #1C1C1E;
+  --color-grafito-alto: #282A2C;
+  --color-grafito-sup: #333537;
 
-  --color-papel: #F7F8F6;
-  --color-papel-puro: #FFFFFF;
+  /* --- Texto ----------------------------------------------------------
+     `papel` deja de ser un fondo y pasa a ser el color del texto. El
+     nombre se conserva porque el papel sigue siendo lo claro; lo que
+     cambió es de qué lado está. */
+  --color-papel: #E2E2E4;
+  --color-tinta-suave: #C7C6CA;
+  --color-acero: #919094;
 
-  --color-sello: #C43D26;
-  --color-ambar: #EFA83E;
-  --color-acero: #64748B;
+  /* --- El acento ------------------------------------------------------
+     Oro metálico, y uno solo. Se reserva a «momentos de autoridad»: la
+     cifra de un paso, el borde que se enciende al pasar por encima, la
+     acción principal. En cuanto se usa para decorar deja de significar. */
+  --color-oro: #C5A36A;
+  --color-oro-claro: #E6C185;
+  --color-oro-hondo: #5E4515;
 
-  /* Verde de WhatsApp, oscurecido. Se conserva el color porque la gente lo
-     reconoce y sabe qué aplicación va a abrir, y eso pesa más que la
-     coherencia cromática en el único botón que hay que pulsar.
+  /* --- Alerta ---------------------------------------------------------
+     El único color que se permite además del oro, y solo para una cosa: la
+     salida urgente del diagnóstico —POLFA en operativo, detención,
+     allanamiento (regla 5)—. No es decoración ni una tercera marca; es la
+     señal de que hay que dejar el cuestionario y escribir ya. Si aparece en
+     cualquier otro sitio, deja de significar eso. */
+  --color-alerta: #FFB4AB;
+  --color-alerta-fondo: #93000A;
 
-     AVISO — este par NO cumple la WCAG AA, y hasta hoy este comentario decía
-     que sí. Medido con la fórmula de luminancia relativa de la WCAG 2.1:
+  /* --- Líneas ---------------------------------------------------------
+     Blanco a muy baja opacidad y no un gris opaco: sobre tres superficies
+     de luminosidad distinta, un gris fijo se ve pesado en la más oscura y
+     desaparece en la más clara. */
+  --color-linea: rgb(255 255 255 / 0.07);
+  --color-linea-fuerte: rgb(255 255 255 / 0.14);
 
-         blanco sobre #059669 (base) .... 3.77:1   ← exige 4.5:1
-         blanco sobre #047857 (hover) ... 5.48:1   ✓
+  /* --- WhatsApp -------------------------------------------------------
+     El verde deja de pintar el botón principal, que ahora es oro por
+     especificación. Se conserva el token porque el glifo lo sigue usando
+     donde hace falta señalar el destino sin ocupar la acción principal.
 
-     La cifra de «5.2:1» que figuraba aquí era falsa; `bin/auditar-landing.mjs`
-     lo marca en cada corrida y por eso la Accesibilidad se queda en 96.
-
-     No se corrige por cuenta propia porque el tono de un botón de marca es
-     decisión del PO (CLAUDE.md §11) y no de quien pasa la auditoría. El
-     arreglo, si se aprueba, es de una línea: subir el actual `hover` a base
-     —ya cumple— y bajar el hover a #065F46, que da 7.68:1. */
+     Nota de accesibilidad: el par blanco sobre este verde daba 3.77:1 y
+     la WCAG AA pide 4.5:1 — era el defecto que arrastraba la landing
+     anterior. El botón de oro con texto casi negro lo resuelve de paso:
+     ver `.boton-wa`. */
   --color-whatsapp: #059669;
   --color-whatsapp-hover: #047857;
 
-  /* Las de sistema quedan detrás como reserva y no por cortesía: son las que
-     se ven durante el `swap` y si tienen métricas muy distintas el texto
-     salta al llegar la web. Geist es cercana a system-ui en ancho, así que
-     el salto es un matiz y no un reflow. */
+  /* --- Tipografía -----------------------------------------------------
+     Geist para todo. Es monolineal y técnica, y a peso 600 con tracking
+     muy cerrado da titulares que parecen grabados en vez de escritos.
+     Geist Mono queda para lo que es dato: cifras, rótulos y el índice.
+
+     Las dos son VARIABLES —comprobado por renderizado, no por el archivo:
+     ver el bloque `@font-face`—, así que el eje 100–900 está disponible y
+     no hay ni una negrita sintética en la página. */
   --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
 
-  --text-eyebrow: 0.6875rem;
-  
-  /* Curva de muelle Apple: salida larga, respuesta inmediata y física fluida */
+  --text-eyebrow: 0.75rem;
+
+  /* Curva de muelle: salida larga, respuesta inmediata. */
   --ease-fina: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Radio: 4 px estructural. El lenguaje de formas es «blando lo justo»
+     — suficiente para no ser hostil, insuficiente para ser simpático. */
+  --radius-pieza: 0.25rem;
+  --radius-accion: 0.5rem;
 }
 
-@font-face {
-  font-family: "Instrument Serif";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("/fonts/instrument-serif.woff2") format("woff2");
-}
+/* Las dos Geist son variables y por eso declaran un rango. Conviene decir
+   cómo se comprobó, porque el primer intento se equivocó y el error era
+   invisible: se dedujo «estáticas» de un parseo del directorio de tablas
+   woff2 que no encontraba `fvar`, y el parseo estaba mal. Con un peso fijo
+   declarado sobre una fuente variable el navegador no usa el eje: se queda
+   en la instancia declarada y engorda sintéticamente todo lo demás.
 
-/* Los dos Geist son VARIABLES y por eso declaran un rango.
-
-   Conviene decir cómo se comprobó, porque el primer intento se equivocó y el
-   error era invisible: se dedujo «estáticas» de un parseo del directorio de
-   tablas woff2 que no encontraba `fvar`, y el parseo estaba mal. Con
-   `font-weight: 400` declarado sobre una fuente variable, el navegador no
-   usa el eje: se queda en la instancia 400 y ENGORDA sintéticamente todo lo
-   que pida 500 o 600 — justo lo que el comentario anterior decía evitar.
-
-   La comprobación que sí vale es de renderizado, no de archivo: se pinta el
-   mismo texto a varios pesos con `font-synthesis: none` —que apaga la
-   síntesis— y se compara. Si la fuente no tuviera el peso, saldrían idénticos.
-   Geist da siete anchos distintos entre 100 y 900; Geist Mono, al ser de paso
-   fijo, no cambia de ancho nunca y hubo que comparar los píxeles: 400, 600 y
-   700 pintan distinto, luego el eje existe.
-
-   Instrument Serif sí es de un solo peso, y ahí el 400 exacto es correcto:
-   la familia solo se publica en Regular. */
+   La comprobación que vale es de renderizado: mismo texto a varios pesos
+   con `font-synthesis: none` —que apaga la síntesis— y comparar. Geist da
+   siete anchos distintos entre 100 y 900. Geist Mono, al ser de paso fijo,
+   no cambia de ancho nunca y hubo que comparar los píxeles: 400, 600 y 700
+   pintan distinto, luego el eje existe. */
 @font-face {
   font-family: "Geist";
   font-style: normal;
@@ -131,6 +150,7 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    background-color: var(--color-tinta);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -142,376 +162,444 @@
   }
 
   body {
-    background-color: var(--color-papel);
-    color: var(--color-tinta);
+    background-color: var(--color-tinta);
+    color: var(--color-papel);
     font-family: var(--font-sans);
-    line-height: 1.65;
+    font-size: 1rem;
+    line-height: 1.6;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* El foco tiene que verse sobre las dos superficies. */
+  /* Un solo color de foco porque ya solo hay una superficie. El oro es
+     además el único que se ve sobre las tres luminosidades. */
   :focus-visible {
-    outline: 2px solid var(--color-sello);
+    outline: 2px solid var(--color-oro);
     outline-offset: 3px;
   }
-  .sobre-tinta :focus-visible {
-    outline-color: var(--color-ambar);
-  }
 
-  /* La barra superior es pegajosa, así que un salto a `#situaciones` dejaría
-     el titular de la sección justo debajo de ella y tapado. Esto no es
-     cosmética: sin el margen, el enlace del menú parece llevar al sitio
-     equivocado. */
+  /* La barra superior es pegajosa: sin este margen, un salto a
+     `#situaciones` deja el titular de la sección debajo de ella y tapado,
+     y el enlace parece llevar al sitio equivocado. */
   :target,
   section[id],
   main[id] {
-    scroll-margin-top: 5rem;
+    scroll-margin-top: 6rem;
   }
 }
 
 @layer components {
-  /* --- Rótulo monoespaciado ------------------------------------------
-     El «eyebrow». Va en mono porque etiqueta, y en este mundo las
-     etiquetas son códigos. */
-  .rotulo {
-    font-family: var(--font-mono);
-    font-size: var(--text-eyebrow);
-    font-weight: 500;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--color-sello);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-  .rotulo::before {
-    content: "";
-    width: 1.5rem;
-    height: 1px;
-    background-color: currentColor;
-    opacity: 0.4;
-  }
-  .sobre-tinta .rotulo { color: var(--color-ambar); }
 
-  /* --- Titulares -----------------------------------------------------
-     Instrument Serif, peso 400 y nunca más: es un solo archivo estático y
-     pedirle 700 lo engorda sintéticamente.
+  /* =====================================================================
+     Tipografía
+     ---------------------------------------------------------------------
+     La escala es de la especificación: 80/48/20/16/12. Lo que no está en
+     ella y sí importa es el tracking negativo fuerte de los titulares
+     (-0.04em): a 80 px, el espaciado normal de una sans monolineal deja
+     los titulares sueltos y blandos. Cerrarlos es lo que los convierte en
+     un bloque compacto que se lee como una afirmación y no como una frase.
 
-     El tracking cambia de signo respecto a la versión en sans. Una sans de
-     peso 800 se compone con tracking negativo fuerte (-0.035em) porque a
-     tamaño grande sus contraformas se abren y el titular se ve suelto. Una
-     serif de display ya viene ajustada para tamaño grande: apretarla igual
-     le pega las serifas entre sí y ensucia justo lo que la hace legible. De
-     ahí -0.01em, casi nada, y un interlineado más corto (1.02) que sí se
-     puede permitir porque la letra tiene menos altura de x. */
-  .titular,
-  .titular-seccion,
-  .titular-menor {
-    font-family: var(--font-serif);
-    font-weight: 400;
-  }
-
-  /* Cada una trae tamaño por defecto, y eso no es comodidad: es que sin él
-     un titular al que se le olvide la utilidad de tamaño no se ve «un poco
-     más pequeño», se derrumba a 1 rem y queda indistinguible de un párrafo.
-     Pasó — el titular del bloque de diagnóstico salió a tamaño de texto
-     corrido y nada falló, simplemente la sección perdió su encabezado.
-
-     El `clamp` evita además el salto entre el móvil y el escritorio en los
-     dos anchos intermedios donde no hay punto de corte. Las plantillas
-     siguen pasando su tamaño explícito y ganan, porque las utilidades de
-     Tailwind van en una capa posterior a `components`. */
+     Cada clase trae tamaño por defecto. No es comodidad: sin él, un
+     titular al que se le olvide la utilidad de tamaño no se ve «un poco
+     más pequeño», se derrumba a 1 rem y queda indistinguible de un
+     párrafo — pasó una vez y la sección perdió su encabezado sin que nada
+     fallara. Las plantillas siguen ganando con su tamaño explícito porque
+     las utilidades de Tailwind van en una capa posterior a `components`.
+     ==================================================================== */
   .titular {
-    font-size: clamp(2.375rem, 4.5vw, 4rem);
-    letter-spacing: -0.01em;
-    line-height: 1.02;
+    font-size: clamp(2.75rem, 6.2vw, 5rem);
+    font-weight: 600;
+    line-height: 1.06;
+    letter-spacing: -0.04em;
     text-wrap: balance;
   }
 
   .titular-seccion {
-    font-size: clamp(2rem, 3vw, 2.75rem);
-    letter-spacing: -0.005em;
-    line-height: 1.08;
+    font-size: clamp(2rem, 3.6vw, 3rem);
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
     text-wrap: balance;
   }
 
   .titular-menor {
-    font-size: 1.375rem;
-    letter-spacing: 0;
-    line-height: 1.15;
+    font-size: 1.25rem;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: -0.015em;
   }
 
-  /* --- La regla de sello ---------------------------------------------
-     Doble filete, como la cabecera de un acto administrativo. Es el
-     elemento que se repite y cose la página. */
-  .filete {
-    border: 0;
-    height: 3px;
-    width: 3.5rem;
-    background-image: linear-gradient(
-      to bottom,
-      var(--color-sello) 0 1px,
-      transparent 1px 2px,
-      var(--color-sello) 2px 3px
-    );
-  }
-  .sobre-tinta .filete {
-    background-image: linear-gradient(
-      to bottom,
-      var(--color-ambar) 0 1px,
-      transparent 1px 2px,
-      var(--color-ambar) 2px 3px
-    );
+  /* Párrafo de lectura. 20 px y no 16: en una página con este vacío, el
+     cuerpo a 16 se ve pequeño y provisional. */
+  .entrada {
+    font-size: 1.25rem;
+    font-weight: 400;
+    line-height: 1.6;
+    color: var(--color-tinta-suave);
   }
 
-  /* --- Índice de situaciones (elemento distintivo) --------------------
-     Se lee como el índice de un arancel: filas monoespaciadas separadas
-     por filetes finos. El lector busca SU situación en la lista, y esa
-     búsqueda es justo el paso previo a escribir. */
-  .indice-fila {
-    display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
-    padding: 0.75rem 0 0.75rem 1rem;
-    border-top: 1px solid color-mix(in srgb, var(--color-acero) 18%, transparent);
+  .cuerpo {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--color-tinta-suave);
+  }
+
+  /* --- Label-caps ------------------------------------------------------
+     El rótulo de sección y toda la metadata. Va en mono y muy espaciado
+     porque imita el rotulado de un manifiesto de carga o una carátula de
+     expediente: en este mundo las etiquetas son códigos, no adjetivos. */
+  .rotulo {
     font-family: var(--font-mono);
-    font-size: 0.8125rem;
-    line-height: 1.5;
-    position: relative;
-    transition: padding-left 400ms var(--ease-fina);
+    font-size: var(--text-eyebrow);
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--color-oro);
   }
 
-  /* Marcador de sello: aparece a la izquierda, como quien va tachando la
-     lista hasta encontrarse. */
-  .indice-fila::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 1.1rem;
+  /* Variante en cápsula, para los rótulos que van centrados y solos: sin
+     el marco quedan flotando en mitad del vacío sin anclaje. */
+  .rotulo-capsula {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-linea-fuerte);
+    border-radius: var(--radius-pieza);
+    color: var(--color-tinta-suave);
+  }
+  .rotulo-capsula .punto {
     width: 0.3125rem;
     height: 0.3125rem;
-    background-color: var(--color-sello);
+    border-radius: 999px;
+    background-color: var(--color-oro);
+  }
+
+  /* =====================================================================
+     Superficies
+     ==================================================================== */
+
+  /* Tarjeta de grafito, sin borde. En el hover aparece un filete de oro
+     ARRIBA y no alrededor: el marco completo encierra y engorda la pieza;
+     el filete superior se lee como una pestaña de expediente que se
+     levanta, y además no desplaza nada porque sustituye a una línea que ya
+     estaba ahí en transparente. */
+  .tarjeta {
+    position: relative;
+    background-color: var(--color-grafito);
+    border-radius: var(--radius-pieza);
+    border-top: 1px solid transparent;
+    transition:
+      background-color 500ms var(--ease-fina),
+      border-top-color 500ms var(--ease-fina),
+      transform 500ms var(--ease-fina);
+  }
+  .tarjeta:hover {
+    background-color: var(--color-grafito-alto);
+    border-top-color: var(--color-oro);
+  }
+
+  /* Enlace-tarjeta: el mismo cuerpo, pero además se levanta. Solo para
+     las que llevan a alguna parte. */
+  .tarjeta-enlace:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Cristal de la cabecera. Grafito al 20 %, desenfoque de 32 px y un
+     filete de blanco al 10 %, tal cual la especificación. El desenfoque
+     es alto a propósito: con la foto del hero pasando por debajo, uno
+     menor deja ver formas reconocibles y la barra parece sucia. */
+  .barra-sitio,
+  .barra-perfil {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background-color: rgb(28 28 30 / 0.72);
+    backdrop-filter: blur(32px) saturate(140%);
+    -webkit-backdrop-filter: blur(32px) saturate(140%);
+    border-bottom: 1px solid rgb(255 255 255 / 0.10);
+  }
+
+  /* =====================================================================
+     La firma
+     ---------------------------------------------------------------------
+     No hay marca gráfica: el logotipo es el nombre compuesto. El punto en
+     oro es lo único que lo distingue de una palabra suelta, y por eso va
+     aparte y no dentro del texto — para que nadie lo borre al editar.
+     ==================================================================== */
+  .marca {
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    line-height: 1;
+    color: var(--color-papel);
+  }
+  .marca::after {
+    content: ".";
+    color: var(--color-oro);
+  }
+
+  /* =====================================================================
+     Navegación
+     ---------------------------------------------------------------------
+     El punto de oro debajo del enlace activo lo pone `landing.js` con un
+     observador de secciones; el hover lo hace el CSS solo. Los dos usan
+     la misma pieza para que no haya dos maneras de estar marcado.
+     ==================================================================== */
+  .menu-enlace {
+    position: relative;
+    font-family: var(--font-mono);
+    font-size: var(--text-eyebrow);
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--color-acero);
+    transition: color 400ms var(--ease-fina);
+  }
+  .menu-enlace::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -0.625rem;
+    width: 0.25rem;
+    height: 0.25rem;
+    margin-left: -0.125rem;
+    border-radius: 999px;
+    background-color: var(--color-oro);
     opacity: 0;
-    transform: scale(0.5);
+    transform: scale(0.4);
     transition: opacity 400ms var(--ease-fina), transform 400ms var(--ease-fina);
   }
-  .indice-fila:hover { padding-left: 1.5rem; }
-  .indice-fila:hover::before {
+  .menu-enlace:hover,
+  .menu-enlace[data-activo] {
+    color: var(--color-papel);
+  }
+  .menu-enlace:hover::after,
+  .menu-enlace[data-activo]::after {
     opacity: 1;
     transform: scale(1);
   }
 
-  .sobre-tinta .indice-fila { border-top-color: color-mix(in srgb, #8392A8 22%, transparent); }
-  .sobre-tinta .indice-fila::before { background-color: var(--color-ambar); }
+  /* =====================================================================
+     Acciones
+     ---------------------------------------------------------------------
+     La principal es de oro sólido con texto casi negro. Eso viene de la
+     especificación, pero además arregla algo: el botón anterior era verde
+     de WhatsApp con texto blanco, que da 3.77:1 y no llega al 4.5:1 de la
+     WCAG AA. Este par da muy por encima, así que la accesibilidad deja de
+     estar en tensión con el diseño.
 
-  /* --- Botón de WhatsApp ---------------------------------------------- */
+     Lo que se pierde es el reconocimiento inmediato del verde. Se
+     compensa dejando el glifo de WhatsApp dentro del botón: el destino lo
+     sigue diciendo la marca de la aplicación, que es lo que la gente
+     reconoce de verdad; el color solo lo acompañaba.
+     ==================================================================== */
   .boton-wa {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    background-color: var(--color-whatsapp);
-    color: #fff;
+    background-color: var(--color-oro);
+    color: #17140F;
+    font-size: 0.8125rem;
     font-weight: 600;
-    font-size: 1rem;
-    line-height: 1.2;
-    padding: 0.875rem 1.75rem;
-    border-radius: 999px; /* Botón píldora estilo Apple */
+    font-family: var(--font-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    line-height: 1;
+    padding: 1.0625rem 1.75rem;
+    border-radius: var(--radius-accion);
     text-align: center;
-    box-shadow: 0 4px 14px -4px rgba(5, 150, 105, 0.4), 0 1px 0 rgba(255, 255, 255, 0.2) inset;
-    transition: background-color 400ms var(--ease-fina), transform 400ms var(--ease-fina), box-shadow 400ms var(--ease-fina);
+    transition:
+      background-color 400ms var(--ease-fina),
+      transform 400ms var(--ease-fina),
+      box-shadow 400ms var(--ease-fina);
   }
-  .boton-wa:hover { 
-    background-color: var(--color-whatsapp-hover); 
+  .boton-wa:hover {
+    background-color: var(--color-oro-claro);
     transform: translateY(-1px);
-    box-shadow: 0 6px 20px -4px rgba(5, 150, 105, 0.5), 0 1px 0 rgba(255, 255, 255, 0.25) inset;
+    box-shadow: 0 10px 30px -12px rgb(197 163 106 / 0.55);
   }
-  .boton-wa:active { transform: translateY(1px) scale(0.98); }
+  .boton-wa:active { transform: translateY(0) scale(0.99); }
 
-  /* El glifo va en su propio disco al ras del borde interior. En el hover
-     el disco se desplaza en diagonal —la pieza se siente pulsable antes
-     de pulsarla. */
   .boton-wa .disco {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.875rem;
-    height: 1.875rem;
-    border-radius: 999px;
-    background-color: rgba(255, 255, 255, 0.18);
-    margin-left: 0.25rem;
     transition: transform 400ms var(--ease-fina);
   }
-  .boton-wa:hover .disco {
-    transform: translate(1px, -1px) rotate(-3deg);
+  .boton-wa:hover .disco { transform: translateX(2px); }
+
+  /* En versalitas y con tracking abierto, el copy real de estos botones
+     —«Hablar con el abogado por WhatsApp»— ocupa mucho más de lo que
+     sugiere en minúsculas, y partido en dos líneas el botón deja de leerse
+     como una pieza y parece un párrafo con fondo. A partir de `sm` se
+     fuerza una sola línea y es la FILA la que envuelve, que es la ruptura
+     que sí se ve intencionada.
+
+     Debajo de `sm` no se toca: ahí los botones ocupan el ancho completo,
+     apilados, y dos líneas dentro de una pieza ancha se leen bien. Forzar
+     `nowrap` en móvil sería lo peor de los dos mundos — desbordaría. */
+  @media (min-width: 640px) {
+    .boton-wa,
+    .boton-fantasma { white-space: nowrap; }
   }
 
+  /* Compacto, para la cabecera: ahí el trabajo del botón es estar
+     disponible, no llamar. */
+  .boton-wa.compacto {
+    padding: 0.75rem 1.125rem;
+    font-size: 0.6875rem;
+    gap: 0.5rem;
+  }
+  .boton-wa.compacto .disco svg { width: 14px; height: 14px; }
+
+  /* Secundaria: fantasma con filete de grafito que se vuelve oro. */
   .boton-fantasma {
     display: inline-flex;
     align-items: center;
     gap: 0.625rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
     font-weight: 600;
-    font-size: 0.9375rem;
-    padding: 0.5rem 0;
-    color: var(--color-tinta);
-    border-bottom: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-    transition: border-color 400ms var(--ease-fina);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    line-height: 1;
+    padding: 1.0625rem 1.75rem;
+    border: 1px solid var(--color-linea-fuerte);
+    border-radius: var(--radius-accion);
+    color: var(--color-tinta-suave);
+    transition:
+      border-color 400ms var(--ease-fina),
+      color 400ms var(--ease-fina),
+      background-color 400ms var(--ease-fina);
   }
-  .boton-fantasma:hover { border-bottom-color: currentColor; }
-  .sobre-tinta .boton-fantasma { color: var(--color-papel); }
-
+  .boton-fantasma:hover {
+    border-color: var(--color-oro);
+    color: var(--color-papel);
+  }
   .boton-fantasma span[aria-hidden] { transition: transform 400ms var(--ease-fina); }
   .boton-fantasma:hover span[aria-hidden] { transform: translateX(3px); }
 
-  /* --- Casilla numerada del proceso -----------------------------------
-     Numerada porque el contenido SÍ es una secuencia: primero escribe,
-     luego agenda, luego envía documentos, luego recibe la hoja de ruta.
-     Va con cero a la izquierda y filete superior, como las casillas de un
-     formulario. */
-  .casilla-num {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    color: var(--color-ambar);
+  /* Variante discreta, para el «Inicio» de la cabecera del diagnóstico.
+     Con el relleno completo, un enlace de vuelta pesa lo mismo que la
+     acción principal de la página y compite con ella; ahí su trabajo es
+     estar disponible para quien se arrepintió, no invitar a irse. */
+  .boton-fantasma.compacto {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.6875rem;
   }
 
-  /* --- Entrada: párrafo de lectura ------------------------------------ */
-  .entrada {
-    font-size: 1.0625rem;
-    line-height: 1.7;
+  /* =====================================================================
+     Listas
+     ---------------------------------------------------------------------
+     El índice de situaciones. Filas separadas por una línea de blanco al
+     5 % y nada más: ni fondo, ni viñeta, ni icono. El lector viene a
+     buscar SU situación en la lista, y encontrarla es el paso previo a
+     escribir; cualquier adorno estorba esa búsqueda.
+     ==================================================================== */
+  .indice-fila {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--color-linea);
+    font-size: 0.9375rem;
+    line-height: 1.5;
     color: var(--color-tinta-suave);
+    transition: color 400ms var(--ease-fina), padding-left 400ms var(--ease-fina);
   }
-  .sobre-tinta .entrada { color: #B8C4D6; }
+  .indice-fila:hover {
+    color: var(--color-papel);
+    padding-left: 0.5rem;
+  }
 
-  /* --- Dato: pequeño, mono -------------------------------------------- */
+  /* La numeración de las listas jurídicas: mono y en oro. */
+  .indice-num {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--color-oro);
+  }
+
+  /* Dato pequeño: duración, unidades, cualquier cosa que acompañe a una
+     cifra sin competir con ella. */
   .dato {
     font-family: var(--font-mono);
     font-size: 0.8125rem;
     color: var(--color-acero);
   }
 
-  /* --- Animación de revelado (entrada en viewport) --------------------- */
-  .revelar {
-    opacity: 0;
-    transform: translateY(16px);
-    transition: opacity 700ms var(--ease-fina), transform 700ms var(--ease-fina);
-    transition-delay: var(--retardo, 0ms);
+  /* Distintivo de la salida urgente. Va aquí y no suelto en la plantilla
+     porque es la única pieza del sistema que puede usar el rojo, y tenerla
+     con nombre propio es lo que impide que ese rojo se copie a otro sitio. */
+  .marca-urgente {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius-pieza);
+    border: 1px solid rgb(255 180 171 / 0.45);
+    background-color: rgb(147 0 10 / 0.28);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--color-alerta);
   }
-  .revelar[data-visible] {
-    opacity: 1;
-    transform: none;
-  }
-
-  /* Sin JavaScript no hay quien ponga `data-visible`, y `.revelar` arranca en
-     opacidad 0: la sección entera quedaría en blanco. Misma guarda que usa
-     `.paso` más abajo y por la misma razón — §13.5 dice que la conversión no
-     depende de un script, y en la landing lo que lleva `.revelar` es
-     justamente el bloque del diagnóstico completo.
-
-     Esto cubre «JavaScript desactivado». El otro caso —JavaScript activo
-     pero `landing.js` que no llega— no lo puede cubrir el CSS, porque el
-     atributo ya está puesto; de eso se encarga la red con temporizador que
-     arman las dos plantillas en su `<head>` y que `landing.js` desarma al
-     cargar. */
-  html:not([data-js]) .revelar {
-    opacity: 1;
-    transform: none;
+  .marca-urgente .pulso {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 999px;
+    background-color: var(--color-alerta);
   }
 
-  /* =====================================================================
-     Cabecera del sitio
-     ---------------------------------------------------------------------
-     Barra pegajosa de cristal oscuro, la misma receta que la de `/perfil`
-     (`.barra-perfil`, más abajo): las dos páginas comparten la cabecera y
-     por tanto comparten la declaración, no una copia.
-
-     Es opaca-translúcida SIEMPRE, no transparente-que-se-vuelve-cristal al
-     bajar. Ese efecto es más bonito sobre el hero oscuro y necesita
-     JavaScript para saber cuánto se ha bajado — y sin JavaScript la barra
-     quedaría con enlaces color papel flotando sobre las secciones claras,
-     ilegibles. La regla de esta landing es que nada dependa de un script
-     (§13.5), así que gana el cristal permanente.
-     ==================================================================== */
-  .barra-sitio,
-  .barra-perfil {
-    position: sticky;
-    top: 0;
-    z-index: 40;
-    background: color-mix(in srgb, var(--color-tinta) 78%, transparent);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border-bottom: 1px solid color-mix(in srgb, #FFFFFF 8%, transparent);
-  }
-
-  /* La firma. El punto va en ámbar y aparte del texto porque es lo único
-     que hace de logotipo en toda la página: no hay marca gráfica. */
-  .marca {
-    font-family: var(--font-serif);
-    font-size: 1.375rem;
+  /* Cifra grande de un paso o de una credencial. */
+  .cifra-oro {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    font-weight: 500;
     line-height: 1;
     letter-spacing: -0.01em;
-    color: var(--color-papel);
-  }
-  .marca::after {
-    content: ".";
-    color: var(--color-ambar);
+    color: var(--color-oro);
   }
 
-  /* Enlace del menú: el filete crece de izquierda a derecha, no aparece de
-     golpe. Con la curva de muelle la distancia se lee como un gesto. */
-  .menu-enlace {
-    position: relative;
-    font-size: 0.875rem;
-    color: color-mix(in srgb, var(--color-papel) 72%, transparent);
-    transition: color 400ms var(--ease-fina);
+  /* Contador del hero: la cifra grande y su nota. Es el otro sitio donde
+     el oro está permitido —«momento de autoridad»—, y funciona porque lo
+     que dice es verificable: años, especializaciones, cobertura. */
+  .contador {
+    font-size: 2.25rem;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--color-oro);
   }
-  .menu-enlace::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -0.375rem;
-    height: 1px;
-    background-color: var(--color-ambar);
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform 400ms var(--ease-fina);
-  }
-  .menu-enlace:hover { color: var(--color-papel); }
-  .menu-enlace:hover::after { transform: scaleX(1); }
-
-  /* El botón de WhatsApp de la barra. Mismo botón, menos aire: a tamaño
-     completo compite con el titular del hero, y en la cabecera su trabajo
-     es estar disponible, no llamar. */
-  .boton-wa.compacto {
-    padding: 0.4375rem 0.4375rem 0.4375rem 1.0625rem;
-    font-size: 0.875rem;
-    gap: 0.5rem;
-  }
-  .boton-wa.compacto .disco {
-    width: 1.625rem;
-    height: 1.625rem;
-    margin-left: 0;
-  }
-  .boton-wa.compacto .disco svg {
-    width: 15px;
-    height: 15px;
+  .contador-nota {
+    font-family: var(--font-mono);
+    font-size: var(--text-eyebrow);
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--color-acero);
   }
 
   /* =====================================================================
      Hero — la foto a sangre
      ---------------------------------------------------------------------
-     La foto no va en una columna al lado del texto: ocupa la mitad derecha
-     y sale por el borde, y el degradado la disuelve en la tinta del fondo.
-     Va sobre la imagen y no detrás porque una franja intermedia dejaría
-     costura visible justo donde el cielo de la foto y el fondo coinciden.
+     La foto ocupa la mitad derecha y sale por el borde. El degradado va
+     SOBRE ella y no detrás: una franja intermedia dejaría costura justo
+     donde la foto y el fondo se encuentran.
 
-     En móvil no hay mitad derecha: la foto pasa a ser fondo del bloque
-     entero con un velo muy cerrado, porque el texto tiene que ganar el
-     contraste de la WCAG contra la parte más clara del cielo.
+     En móvil no hay mitad derecha, así que la foto pasa a fondo del
+     bloque entero con un velo muy cerrado — el texto tiene que ganar el
+     contraste contra la parte más clara de la imagen, no contra su media.
      ==================================================================== */
   .hero-foto {
     position: absolute;
@@ -527,6 +615,7 @@
     object-position: 50% 18%;
     display: block;
     user-select: none;
+    filter: grayscale(0.35) contrast(1.05);
   }
   .hero-foto::after {
     content: "";
@@ -534,202 +623,131 @@
     inset: 0;
     background: linear-gradient(
       to bottom,
-      color-mix(in srgb, var(--color-tinta) 72%, transparent),
-      color-mix(in srgb, var(--color-tinta) 93%, transparent)
+      rgb(10 10 11 / 0.72),
+      rgb(10 10 11 / 0.94)
     );
   }
 
   @media (min-width: 768px) {
     .hero-foto {
       left: auto;
-      width: 56%;
+      width: 54%;
     }
     .hero-foto::after {
       background: linear-gradient(
         to right,
-        var(--color-tinta) 0%,
-        color-mix(in srgb, var(--color-tinta) 78%, transparent) 38%,
-        transparent 72%
+        rgb(10 10 11 / 1) 0%,
+        rgb(10 10 11 / 0.82) 34%,
+        rgb(10 10 11 / 0.15) 78%,
+        rgb(10 10 11 / 0.35) 100%
       );
     }
   }
 
-  /* --- Franja de cifras ------------------------------------------------
-     Cierra el hero por abajo. Las cifras van en mono porque son datos, no
-     adjetivos: «15+ años ante la DIAN» es verificable y por eso puede ir
-     grande; «el mejor abogado» no cabría en esta página ni en la Ley 1123. */
-  .cifra {
-    font-family: var(--font-mono);
-    font-size: 1.5rem;
-    line-height: 1.1;
-    color: var(--color-ambar);
-    letter-spacing: -0.02em;
+  /* =====================================================================
+     Revelado al entrar en cuadro
+     ==================================================================== */
+  .revelar {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 800ms var(--ease-fina), transform 800ms var(--ease-fina);
+    transition-delay: var(--retardo, 0ms);
   }
-  .cifra-nota {
-    font-family: var(--font-mono);
-    font-size: var(--text-eyebrow);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: color-mix(in srgb, var(--color-tinta-suave) 88%, transparent);
+  .revelar[data-visible] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Sin JavaScript no hay quien ponga `data-visible`, y `.revelar` arranca
+     en opacidad 0: la sección entera quedaría en blanco. Misma guarda que
+     usa `.paso` y por la misma razón — la conversión no depende de un
+     script (§13.5).
+
+     Esto cubre «JavaScript desactivado». El otro caso —JavaScript activo
+     pero el archivo que no llega— no lo puede cubrir el CSS, porque el
+     atributo ya está puesto; de eso se encarga la red con temporizador
+     que arman las plantillas en su `<head>`. */
+  html:not([data-js]) .revelar {
+    opacity: 1;
+    transform: none;
   }
 
   /* =====================================================================
-     Proceso — la lista editorial
+     Diagnóstico (`/perfil`)
      ---------------------------------------------------------------------
-     Cuatro filas, no una rejilla de dos por dos. El contenido es una
-     secuencia y una rejilla la rompe: en 2×2 el ojo puede leer 01→02
-     bajando o cruzando, y aquí el orden es la información. Una columna
-     única solo se recorre en un sentido.
+     Comparte lienzo con la landing, así que hereda tarjeta, oro y
+     label-caps. Lo propio de aquí es la mecánica del cuestionario.
      ==================================================================== */
-  .paso-fila {
-    display: grid;
-    grid-template-columns: 3rem 1fr;
-    gap: 1.25rem;
-    align-items: baseline;
-    padding: 1.5rem 0;
-    border-top: 1px solid color-mix(in srgb, #8392A8 22%, transparent);
-  }
-  .paso-cifra {
-    font-family: var(--font-serif);
-    font-size: 2rem;
-    line-height: 1;
-    color: var(--color-ambar);
-  }
-
-  @media (min-width: 768px) {
-    .paso-fila {
-      grid-template-columns: 4.5rem 1fr;
-      gap: 1.75rem;
-      padding: 1.875rem 0;
-    }
-    .paso-cifra { font-size: 2.5rem; }
-  }
-
-  /* --- Credencial numerada --------------------------------------------
-     El número va en mono y diminuto, y el título en serif: el orden no es
-     jerarquía —ninguna especialización vale más que otra—, es solo un
-     índice que permite referirse a ellas. */
-  .credencial-num {
-    font-family: var(--font-mono);
-    font-size: var(--text-eyebrow);
-    font-weight: 500;
-    letter-spacing: 0.16em;
-    color: var(--color-sello);
-  }
-
-  /* El filete de sello al costado del retrato: la misma marca que abre cada
-     sección, girada. Cose la foto al sistema en vez de dejarla flotando. */
-  .marco-retrato {
-    position: relative;
-    padding-left: 1rem;
-  }
-  .marco-retrato::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background-color: color-mix(in srgb, var(--color-sello) 55%, transparent);
-  }
-
-  /* =====================================================================
-     Perfil — tarjetas de vidrio (glass) sobre tinta
-     ---------------------------------------------------------------------
-     El diagnóstico `/perfil` es oscuro: fondo de tinta y superficies de
-     cristal con bisel doble, como las tarjetas de iOS. La serif de display
-     (Instrument Serif) solo se precarga en esa página.
-     ==================================================================== */
-
-  /* Fondo y encuadre del perfil: el cuerpo azul noche sobre el que
-     flotan las tarjetas. */
   .perfil-cuerpo {
-    background:
-      radial-gradient(1200px 600px at 80% -10%, rgba(239, 168, 62, 0.09), transparent 60%),
-      radial-gradient(900px 500px at 10% 110%, rgba(196, 61, 38, 0.10), transparent 60%),
-      var(--color-tinta);
+    background-color: var(--color-tinta);
     min-height: 100vh;
   }
 
-  /* La barra superior de `/perfil` se declara junto a la de la landing, en
-     «Cabecera del sitio»: es la misma pieza y una copia aquí se desincroniza
-     en cuanto alguien ajuste el desenfoque en un solo sitio. */
-
-  /* Tarjeta de vidrio con bisel doble: borde exterior de luz en la cara
-     superior y sombra profunda abajo, como un cristal iluminado desde
-     arriba. */
+  /* La tarjeta que contiene el paso en curso. */
   .doble-bisel {
     position: relative;
-    border-radius: 1.75rem;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03) 55%);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.14) inset,
-      0 -1px 0 rgba(0, 0, 0, 0.35) inset,
-      0 24px 60px -24px rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(24px) saturate(160%);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    background-color: var(--color-grafito);
+    border-radius: var(--radius-pieza);
+    border-top: 1px solid var(--color-linea-fuerte);
   }
   .doble-bisel-interior {
-    border-radius: 1.75rem;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02) 60%);
+    border-radius: var(--radius-pieza);
   }
 
-  /* Paso activo: la tarjeta del paso en curso se ilumina un poco más. */
-  .paso {
-    display: none;
-  }
+  .paso { display: none; }
   .paso[data-activo] {
     display: block;
     animation: paso-entra 600ms var(--ease-fina);
   }
   @keyframes paso-entra {
-    from {
-      opacity: 0;
-      transform: translateY(14px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
   }
-  /* Sin JavaScript todo se ve: el atributo data-js solo se pone en el
-     head cuando hay script disponible. */
-  html:not([data-js]) .paso {
-    display: block;
-  }
+  /* Sin JavaScript se ven los seis: es exactamente lo que debe leer quien
+     no tiene script. */
+  html:not([data-js]) .paso { display: block; }
 
-  /* Opción del cuestionario: fila de cristal con marca circular. */
+  /* --- Opción del cuestionario ----------------------------------------
+     Fila sobre grafito con la letra en su casilla. El estado elegido se
+     marca con el filete de oro a la izquierda y la letra invertida: dos
+     señales y no una, porque el color por sí solo no vale como única
+     indicación de estado. */
+  /* Sube un escalón sobre la tarjeta que la contiene, y no por gusto: la
+     tarjeta del paso ya es grafito, así que una opción del mismo grafito
+     desaparece dentro de ella —quedan cuatro filas de texto flotando, no
+     cuatro piezas pulsables—. Con la profundidad hecha de luminosidad y no
+     de sombras, cada nivel de anidamiento tiene que subir un escalón o
+     deja de existir. */
   .opcion {
     display: flex;
     align-items: center;
     gap: 1.125rem;
-    padding: 1rem 1.125rem;
-    border-radius: 1.125rem;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    background: rgba(255, 255, 255, 0.04);
+    padding: 1.125rem 1.25rem;
+    border-radius: var(--radius-pieza);
+    border-left: 2px solid transparent;
+    background-color: var(--color-grafito-alto);
     cursor: pointer;
     position: relative;
-    transition: background-color 400ms var(--ease-fina), border-color 400ms var(--ease-fina), transform 200ms var(--ease-fina);
+    transition:
+      background-color 400ms var(--ease-fina),
+      border-left-color 400ms var(--ease-fina),
+      transform 200ms var(--ease-fina);
   }
-  .opcion:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(239, 168, 62, 0.45);
-  }
-  .opcion:active { transform: scale(0.99); }
+  .opcion:hover { background-color: var(--color-grafito-sup); }
+  .opcion:active { transform: scale(0.995); }
   .opcion > input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .opcion:has(> input:checked) {
+    border-left-color: var(--color-oro);
+    background-color: var(--color-grafito-sup);
+  }
   .opcion > input:checked + .opcion-marca {
-    background-color: var(--color-ambar);
-    color: var(--color-tinta);
-    border-color: var(--color-ambar);
+    background-color: var(--color-oro);
+    color: #17140F;
+    border-color: var(--color-oro);
   }
-  .opcion > input:checked ~ span .opcion-etiqueta {
-    color: var(--color-ambar);
-  }
+  .opcion > input:checked ~ span .opcion-etiqueta { color: var(--color-oro); }
   .opcion > input:focus-visible + .opcion-marca {
-    outline: 2px solid var(--color-ambar);
+    outline: 2px solid var(--color-oro);
     outline-offset: 3px;
   }
 
@@ -738,12 +756,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.125rem;
-    height: 2.125rem;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-pieza);
+    border: 1px solid var(--color-linea-fuerte);
     font-family: var(--font-mono);
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: var(--color-papel);
     transition: background-color 400ms var(--ease-fina), color 400ms var(--ease-fina), border-color 400ms var(--ease-fina);
@@ -751,91 +769,76 @@
   .opcion-etiqueta {
     display: block;
     font-size: 1rem;
-    font-weight: 550;
+    font-weight: 500;
     color: var(--color-papel);
-    line-height: 1.3;
+    line-height: 1.35;
     transition: color 400ms var(--ease-fina);
   }
   .opcion-detalle {
     display: block;
-    margin-top: 0.25rem;
+    margin-top: 0.3125rem;
     font-size: 0.875rem;
-    color: #9AA7BC;
-    line-height: 1.4;
+    color: var(--color-acero);
+    line-height: 1.45;
   }
   .opcion-flecha {
     flex-shrink: 0;
     margin-left: auto;
-    color: #5C6B82;
-    font-size: 1.0625rem;
+    color: var(--color-acero);
+    font-size: 1rem;
     transition: transform 400ms var(--ease-fina), color 400ms var(--ease-fina);
   }
   .opcion:hover .opcion-flecha {
-    color: var(--color-ambar);
+    color: var(--color-oro);
     transform: translateX(3px);
   }
 
-  /* Barra de progreso: un hilo ámbar que se llena. */
+  /* Barra de progreso: un hilo de oro que se llena. */
   .progreso {
     width: 8rem;
-    height: 4px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
+    height: 2px;
+    background-color: var(--color-linea-fuerte);
     overflow: hidden;
   }
   .progreso > span {
     display: block;
     height: 100%;
     width: 0;
-    border-radius: 999px;
-    background: linear-gradient(to right, var(--color-ambar), #F6C36B);
+    background-color: var(--color-oro);
     transition: width 600ms var(--ease-fina);
   }
 
-  /* Ficha de la asesoría en el resultado: la tarjeta que cierra. */
+  /* Ficha de la asesoría en el resultado. */
   .ficha-asesoria {
     padding: 1.75rem;
-    border-radius: 1.25rem;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(239, 168, 62, 0.22);
+    border-radius: var(--radius-pieza);
+    background-color: var(--color-grafito);
+    border-top: 1px solid var(--color-oro);
   }
 
-  /* Tarjeta del diagnóstico (invitación en la landing): cristal sobre
-     tinta con la numeración «01 → 06» como casilla de orden. */
+  /* Invitación al diagnóstico desde la landing. */
   .tarjeta-diagnostico {
     display: block;
-    padding: 1.5rem 1.75rem;
-    border-radius: 1.5rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.10) inset,
-      0 20px 50px -20px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    transition: transform 500ms var(--ease-fina), border-color 500ms var(--ease-fina), box-shadow 500ms var(--ease-fina);
+    padding: 2rem;
+    background-color: var(--color-grafito);
+    border-radius: var(--radius-pieza);
+    border-top: 1px solid transparent;
+    transition:
+      background-color 500ms var(--ease-fina),
+      border-top-color 500ms var(--ease-fina),
+      transform 500ms var(--ease-fina);
   }
   .tarjeta-diagnostico:hover {
-    transform: translateY(-3px);
-    border-color: rgba(239, 168, 62, 0.40);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.12) inset,
-      0 30px 60px -20px rgba(0, 0, 0, 0.6);
+    background-color: var(--color-grafito-alto);
+    border-top-color: var(--color-oro);
+    transform: translateY(-2px);
   }
 
-  /* Salidas (urgente, fuera de alcance, resultado): bloque sobre tinta. */
-  .bloque-salida {
-    margin-top: 4rem;
-  }
+  .bloque-salida { margin-top: 4rem; }
 
-  /* Textura de grano sutil sobre la tinta, para que el vidrio no se vea
-     plano. */
-  .grano {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 1;
-    opacity: 0.04;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' /%3E%3C/svg%3E");
-  }
+  /* El grano deja de tener sentido sobre superficies planas: no hay
+     cristal al que quitarle la planitud, y sobre negro puro se ve como
+     ruido de compresión. Se conserva la clase vacía para no romper la
+     plantilla que la emite. */
+  .grano { display: none; }
 }

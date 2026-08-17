@@ -15,27 +15,37 @@ declare(strict_types=1);
  * solo una de ellas prepare. Hoy no usa ninguna: todo su texto es fijo.
  */
 ?>
-<footer class="sobre-tinta bg-tinta-alta py-14 text-tinta-suave">
-    <div class="mx-auto max-w-6xl px-5 md:px-8">
-        <hr class="border-papel/10">
+<footer class="bg-tinta-alta py-16 md:py-20">
+    <div class="mx-auto max-w-[78rem] px-6 md:px-20">
+        <hr class="border-linea">
 
-        <div class="mt-10 grid gap-8 md:grid-cols-[1fr_2fr] md:gap-16">
+        <div class="mt-12 grid gap-12 md:grid-cols-[1.4fr_1fr] md:gap-20">
             <div>
                 <p class="marca">Pedro</p>
-                <p class="mt-2 font-mono text-[0.75rem] tracking-[0.14em] uppercase">
+                <p class="rotulo mt-4 text-acero">
                     Abogado aduanero y tributario
                 </p>
-            </div>
-
-            <div class="text-[0.8125rem] leading-relaxed">
-                <p>
+                <p class="cuerpo mt-8 max-w-md text-[0.8125rem]">
                     Esta página informa sobre los servicios del despacho. No constituye
                     asesoría jurídica ni crea una relación abogado&#8209;cliente.
                 </p>
-                <p class="mt-3 font-mono text-[0.75rem] tracking-wide">
-                    © <?= date('Y') ?> · Colombia
-                </p>
             </div>
+
+            <?php /* Las anclas van con `/` delante y no sueltas: este pie lo
+                     comparten la landing y `/perfil`, y `#situaciones` desde el
+                     diagnóstico no llevaría a ninguna parte — esa sección no
+                     existe en esa página. */ ?>
+            <nav aria-label="Secciones del sitio" class="md:justify-self-end">
+                <ul class="space-y-4">
+                    <li><a href="/#situaciones" class="menu-enlace">Situaciones</a></li>
+                    <li><a href="/#diagnostico" class="menu-enlace">Diagnóstico</a></li>
+                    <li><a href="/#proceso" class="menu-enlace">Metodología</a></li>
+                </ul>
+            </nav>
         </div>
+
+        <p class="rotulo mt-16 text-acero">
+            © <?= date('Y') ?> · Colombia
+        </p>
     </div>
 </footer>
