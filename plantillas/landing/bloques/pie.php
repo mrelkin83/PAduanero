@@ -15,7 +15,7 @@ declare(strict_types=1);
  * solo una de ellas prepare. Hoy no usa ninguna: todo su texto es fijo.
  */
 ?>
-<footer class="bg-tinta-alta py-16 md:py-20">
+<footer class="border-t border-linea py-16 md:py-20">
     <div class="mx-auto max-w-[78rem] px-6 md:px-20">
         <hr class="border-linea">
 

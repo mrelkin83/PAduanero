@@ -23,7 +23,7 @@ $columnas = [
     'tributario' => ['Tributario', 'B'],
 ];
 ?>
-<section id="situaciones" class="bg-tinta py-20 md:py-[5rem]">
+<section id="situaciones" class="py-20 md:py-[5rem]">
     <div class="mx-auto max-w-[78rem] px-6 md:px-20">
 
         <?php /* Esta sección va centrada y las demás no. Es deliberado: es la

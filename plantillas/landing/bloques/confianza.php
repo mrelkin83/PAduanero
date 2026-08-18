@@ -52,7 +52,7 @@ if ($verificables === [] && $sedes === []) {
 
 $invitacion = $bloque->texto('invitacion');
 ?>
-<section id="confianza" class="bg-tinta py-20 md:py-[5rem]">
+<section id="confianza" class="py-20 md:py-[5rem]">
     <div class="mx-auto max-w-[78rem] px-6 md:px-20">
 
         <p class="rotulo">Quién responde por esto</p>

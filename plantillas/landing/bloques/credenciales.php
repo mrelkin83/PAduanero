@@ -26,7 +26,7 @@ use App\Soporte\Vista;
 $imagen = $bloque->texto('imagen', '/img/pedro-perfil.jpg');
 $items = $bloque->lista('items');
 ?>
-<section class="bg-tinta py-20 md:py-[5rem]">
+<section class="py-20 md:py-[5rem]">
     <div class="mx-auto grid max-w-[78rem] items-center gap-12 px-6 md:grid-cols-[1fr_1.15fr] md:gap-20 md:px-20">
 
         <?php /* El retrato va dentro de una tarjeta de grafito y no suelto

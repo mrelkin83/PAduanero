@@ -21,7 +21,7 @@ if ($promesas === []) {
     ];
 }
 ?>
-<section id="diagnostico" class="bg-tinta py-20 md:py-[5rem]">
+<section id="diagnostico" class="py-20 md:py-[5rem]">
     <div class="mx-auto max-w-[78rem] px-6 md:px-20">
         <div class="grid gap-12 lg:grid-cols-12 lg:items-center lg:gap-20">
 

@@ -112,7 +112,7 @@ window.__paRedRevelado = setTimeout(function () {
 </a>
 
 <header class="barra-perfil">
-    <div class="mx-auto flex max-w-4xl items-center gap-6 px-6 py-4 md:px-10">
+    <div class="mx-auto flex items-center gap-6 px-5 py-3 md:px-7">
         <a href="/" class="boton-fantasma compacto shrink-0">
             <span aria-hidden="true">&larr;</span> Inicio
         </a>

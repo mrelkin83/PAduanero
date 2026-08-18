@@ -190,7 +190,7 @@ $menu = array_values(array_filter(
  */
 ?>
 <header class="barra-sitio">
-    <div class="mx-auto flex max-w-[78rem] items-center gap-6 px-6 py-4 md:px-20">
+    <div class="mx-auto flex items-center gap-6 px-5 py-3 md:px-7">
         <a href="#contenido" class="marca" aria-label="Pedro, abogado aduanero y tributario">Pedro</a>
 
         <?php if ($menu !== []): ?>

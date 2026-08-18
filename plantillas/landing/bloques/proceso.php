@@ -24,7 +24,7 @@ use App\Soporte\Vista;
 $pasos = $bloque->lista('pasos');
 $imagen = $bloque->texto('imagen');
 ?>
-<section id="proceso" class="bg-tinta py-20 md:py-[5rem]">
+<section id="proceso" class="py-20 md:py-[5rem]">
     <div class="mx-auto grid max-w-[78rem] gap-12 px-6 md:grid-cols-[1fr_1.25fr] md:gap-20 md:px-20">
 
         <div>
