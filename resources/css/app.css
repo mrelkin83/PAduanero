@@ -17,14 +17,50 @@
    cuál, porque la mitad de las decisiones de abajo solo se entienden
    desde aquí.
 
-   La idea es autoridad callada. Negro profundo como lienzo, superficies
-   de grafito que se separan por luminosidad y no por sombras, y un único
-   acento de oro metálico reservado a lo que manda: la cifra, la acción,
-   el borde que se enciende. Nada compite con nada. El vacío es el
-   material principal — de ahí los 160 px entre secciones, que en una
-   página normal serían un error de maquetación y aquí son el mensaje.
+   La idea es autoridad callada. Negro profundo como lienzo, superficies de
+   grafito y un único acento de oro metálico reservado a lo que manda: la
+   cifra, la acción, el borde que se enciende. Nada compite con nada. El
+   vacío es el material principal — de ahí los 160 px entre secciones, que
+   en una página normal serían un error de maquetación y aquí son el
+   mensaje.
 
-   Consecuencias que hay que asumir de frente:
+   ---------------------------------------------------------------------
+   REVISIÓN 2 — PROFUNDIDAD Y REGISTRO DE INSTRUMENTO
+   ---------------------------------------------------------------------
+   La primera versión decía «la profundidad sale de la luminosidad y no de
+   las sombras», y con esa regla el sistema salió PLANO. Era un error de
+   premisa: se escribió invocando a Apple, y Apple nunca ha sido plano —
+   sus interfaces son vidrio, luz cenital, capas y sombra. Lo plano es la
+   otra escuela.
+
+   Lo que se añadió, y de dónde sale cada cosa:
+
+     · **Luz en el lienzo.** Dos halos muy tenues fijos al viewport. Un
+       negro liso no existe en ninguna superficie real.
+     · **Filo especular.** Un hilo de blanco en el canto superior de cada
+       pieza, que se apaga hacia los lados. Es donde la luz pega en el
+       borde de un material, y es el detalle que más separa «vidrio» de
+       «gris claro».
+     · **Sombra en dos capas.** Contacto (corta, opaca) y ambiente (larga,
+       difusa). Una sola sombra se lee como un adhesivo.
+     · **Radio de 20 px.** Contra los 4 px de la especificación: la esquina
+       apretada pertenece al lenguaje de un formulario, no al de un
+       material. Píldoras sigue sin haber.
+     · **Registro de instrumento.** Retícula de 72 px sobre el documento,
+       escuadras en las esquinas de cada tarjeta, halo en las cifras de
+       oro y un filete que se dibuja al entrar cada sección. Es lo que
+       pidió el PO como «futurista», leído en clave de panel de precisión
+       y no de neón — a $400.000 la hora, lo segundo abarataría.
+
+   **Y una lección que quedó cara:** el primer intento hizo TODAS las
+   superficies de vidrio con `backdrop-filter`. Costó tres puntos de
+   Performance y 0.2 s de LCP a cambio de nada, porque una tarjeta sobre
+   fondo plano desenfoca fondo plano. El desenfoque solo significa algo
+   donde hay algo detrás que atraviese: hoy queda únicamente en la
+   cabecera, que flota sobre la foto del hero. El resto de la profundidad
+   es luz y sombra, que son gratis.
+
+   Consecuencias que se mantienen:
 
      · No hay superficies claras. Ni una. Eso simplifica el contraste
        —todo es texto claro sobre oscuro— y obliga a que las fotos
@@ -33,11 +69,7 @@
      · Desaparece el rojo de sello. El acento es uno solo, y dos acentos
        en una paleta de lujo se leen como dos marcas.
      · La serif se retira de la landing y del diagnóstico. La voz ahora
-       es Geist en peso 500–600 con tracking muy cerrado: la misma
-       autoridad, dicha por la vía técnica en vez de la documental.
-     · Nada de píldoras. Lo dice la especificación y tiene razón: el
-       radio completo es lenguaje de producto de consumo, y esto es un
-       despacho. 4 px en todo, 8 px solo en la acción principal.
+       es Geist en peso 500–600 con tracking muy cerrado.
    ===================================================================== */
 
 @theme {
@@ -109,13 +141,49 @@
 
   --text-eyebrow: 0.75rem;
 
-  /* Curva de muelle: salida larga, respuesta inmediata. */
-  --ease-fina: cubic-bezier(0.32, 0.72, 0, 1);
+  /* --- Curvas ---------------------------------------------------------
+     Las de fábrica de CSS son demasiado débiles: les falta el empuje que
+     hace que una animación se lea como intencionada. Estas tres cubren
+     todo lo que hay aquí.
 
-  /* Radio: 4 px estructural. El lenguaje de formas es «blando lo justo»
-     — suficiente para no ser hostil, insuficiente para ser simpático. */
-  --radius-pieza: 0.25rem;
-  --radius-accion: 0.5rem;
+     `--ease-fina` es la de los muelles de iOS y gobierna lo que entra.
+     `--ease-salida` es más agresiva y sirve para el resto de la interfaz.
+     Ninguna es `ease-in`: empieza lenta justo en el instante que el usuario
+     está mirando, y por eso una animación con `ease-in` a 300 ms SE SIENTE
+     más lenta que una con `ease-out` a los mismos 300 ms. */
+  --ease-fina: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-salida: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-suave: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* --- Radio ----------------------------------------------------------
+     Sube de 4 px a 20 px, y esto se aparta a propósito de `DESIGN.md`.
+     La especificación pedía 4 px «para mantener el tono formal», y con esa
+     lógica el sistema salió plano — que es exactamente lo que no es Apple.
+     Sus superficies son vidrio con esquinas generosas y continuas; la
+     esquina apretada pertenece al lenguaje de un formulario, no al de un
+     material.
+
+     Sigue sin haber píldoras: el radio completo es lenguaje de producto de
+     consumo y ahí la especificación tiene razón. */
+  --radius-pieza: 1.25rem;
+  --radius-accion: 0.875rem;
+  --radius-chip: 0.625rem;
+
+  /* --- Elevación ------------------------------------------------------
+     Dos capas por sombra, siempre: una de contacto —corta y opaca, la que
+     dice que la pieza se apoya en algo— y una ambiental —larga y difusa, la
+     que dice a qué altura está—. Una sola sombra se lee como un adhesivo.
+
+     Las superficies grandes van más gruesas: más desenfoque y sombra más
+     profunda que un chip pequeño. Es lo que las hace leerse como material
+     y no como un rectángulo más oscuro. */
+  --sombra-pieza:
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 12px 32px -12px rgb(0 0 0 / 0.7);
+  --sombra-alta:
+    0 2px 4px rgb(0 0 0 / 0.45),
+    0 28px 64px -20px rgb(0 0 0 / 0.85);
+  --sombra-oro: 0 16px 44px -16px rgb(197 163 106 / 0.42);
 }
 
 /* Las dos Geist son variables y por eso declaran un rango. Conviene decir
@@ -153,16 +221,74 @@
     background-color: var(--color-tinta);
   }
 
+  /* Movimiento reducido no significa «sin respuesta»: significa que la
+     respuesta no puede desplazar cosas por la pantalla. Se conservan el
+     color y la opacidad, que ayudan a entender; se van el desplazamiento,
+     la escala y el desenfoque, que son los que marean. */
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
+    .revelar {
+      transform: none !important;
+      filter: none !important;
+    }
   }
 
+  /* Transparencia reducida: el vidrio se vuelve sólido.
+     Quien activa esta preferencia suele tener dificultad para separar capas
+     translúcidas del fondo. El desenfoque desaparece y las superficies
+     suben a opacas — se pierde la profundidad, que es exactamente el
+     intercambio que esa persona pidió. */
+  @media (prefers-reduced-transparency: reduce) {
+    .tarjeta,
+    .tarjeta-diagnostico,
+    .doble-bisel,
+    .opcion,
+    .boton-fantasma {
+      background-color: var(--color-grafito) !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+    .barra-sitio,
+    .barra-perfil {
+      background-color: var(--color-tinta-alta) !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+  }
+
+  /* Más contraste: bordes definidos donde antes solo había un cambio de
+     luminosidad. La profundidad por luz sola no basta si la persona no
+     distingue esos escalones. */
+  @media (prefers-contrast: more) {
+    .tarjeta,
+    .tarjeta-diagnostico,
+    .opcion,
+    .doble-bisel {
+      border: 1px solid var(--color-acero);
+    }
+    .cuerpo,
+    .entrada { color: var(--color-papel); }
+  }
+
+  /* El lienzo tiene luz, y esa es la diferencia entre «oscuro» y «negro
+     plano». Un negro liso no existe en ninguna superficie real: siempre hay
+     una fuente que lo desigualiza. Aquí son dos halos muy tenues —oro arriba
+     a la derecha, donde está la foto del hero; un rescoldo abajo a la
+     izquierda— que a esta opacidad no se ven como manchas, se ven como
+     profundidad.
+
+     Va `fixed` para que no se desplace con el scroll: es la iluminación de
+     la sala, no un elemento de la página. */
   body {
     background-color: var(--color-tinta);
+    background-image:
+      radial-gradient(90rem 55rem at 78% -12%, rgb(197 163 106 / 0.07), transparent 62%),
+      radial-gradient(70rem 45rem at 5% 108%, rgb(197 163 106 / 0.045), transparent 60%);
+    background-attachment: fixed;
     color: var(--color-papel);
     font-family: var(--font-sans);
     font-size: 1rem;
@@ -170,6 +296,38 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Fondo con luz ambiental también en el diagnóstico, que usa su propio
+     contenedor de página. */
+  .perfil-cuerpo {
+    background-image: inherit;
+  }
+
+  /* --- Retícula de instrumento ----------------------------------------
+     Una cuadrícula de 72 px sobre todo el documento, a opacidad tan baja
+     que no se ve: se PERCIBE. Es lo que separa un fondo negro de una
+     superficie de trabajo — la misma diferencia que hay entre una hoja en
+     blanco y papel milimetrado.
+
+     Está desvanecida por los bordes con una máscara radial para que no
+     termine en corte seco contra el viewport, que es lo que delata a una
+     textura y la convierte en decoración.
+
+     Va en `body::before`, fija, sin capturar eventos y detrás de todo
+     (`z-index: -1`): no participa en nada, solo está. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.028) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.028) 1px, transparent 1px);
+    background-size: 4.5rem 4.5rem;
+    -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, #000 25%, transparent 78%);
+    mask-image: radial-gradient(120% 90% at 50% 0%, #000 25%, transparent 78%);
   }
 
   /* Un solo color de foco porque ya solo hay una superficie. El oro es
@@ -249,7 +407,16 @@
      El rótulo de sección y toda la metadata. Va en mono y muy espaciado
      porque imita el rotulado de un manifiesto de carga o una carátula de
      expediente: en este mundo las etiquetas son códigos, no adjetivos. */
+  /* El rótulo abre con un filete que SE DIBUJA al entrar la sección, de
+     cero a su ancho. Es un gesto pequeño y hace un trabajo desproporcionado:
+     convierte el encabezado en algo que se enciende en vez de algo que
+     estaba ahí. Un panel que arranca, no una etiqueta impresa.
+     Se apoya en el mismo `data-visible` del revelado, así que no cuesta ni
+     un observador más. */
   .rotulo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
     font-family: var(--font-mono);
     font-size: var(--text-eyebrow);
     font-weight: 600;
@@ -258,6 +425,34 @@
     text-transform: uppercase;
     color: var(--color-oro);
   }
+  .rotulo::before {
+    content: "";
+    width: 1.75rem;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--color-oro));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 700ms var(--ease-salida) 120ms;
+  }
+  .rotulo[data-visible]::before,
+  [data-visible] .rotulo::before {
+    transform: scaleX(1);
+  }
+  /* Sin script el filete tiene que estar dibujado: si dependiera del
+     revelado, quien no ejecuta JavaScript vería el rótulo cojo. */
+  html:not([data-js]) .rotulo::before { transform: scaleX(1); }
+
+  /* El filete pertenece al rótulo que ABRE UNA SECCIÓN, no a cualquier
+     etiqueta pequeña. `.rotulo` hace los dos trabajos y se distinguen por
+     el color, que no es casualidad: el de oro es el acento que encabeza —
+     «Índice de situaciones», «Quién responde»— y el de acero es una
+     etiqueta secundaria dentro de una pieza: «Oficina», «2 min», el
+     descriptor del pie. Dibujarle un filete a esas segundas las deja
+     sangradas y sin motivo.
+
+     La cápsula ya viene enmarcada, así que ahí también sobra. */
+  .rotulo.text-acero::before,
+  .rotulo-capsula::before { display: none; }
 
   /* Variante en cápsula, para los rótulos que van centrados y solos: sin
      el marco quedan flotando en mitad del vacío sin anclaje. */
@@ -281,30 +476,149 @@
      Superficies
      ==================================================================== */
 
-  /* Tarjeta de grafito, sin borde. En el hover aparece un filete de oro
-     ARRIBA y no alrededor: el marco completo encierra y engorda la pieza;
-     el filete superior se lee como una pestaña de expediente que se
-     levanta, y además no desplaza nada porque sustituye a una línea que ya
-     estaba ahí en transparente. */
+  /* --- Tarjeta ---------------------------------------------------------
+     Deja de ser un rectángulo más claro y pasa a ser MATERIAL. Tres cosas
+     la construyen, y las tres son la misma idea vista desde ángulos
+     distintos: que haya una luz en la sala.
+
+     1. **El filo superior.** Un hilo de blanco al 9 % arriba, que se apaga
+        hacia los lados. Es el borde donde la luz cenital pega en el canto
+        de una superficie física. Es el detalle que más separa «vidrio» de
+        «gris claro», y casi nadie lo ve conscientemente.
+
+     2. **La sombra en dos capas.** Una de contacto —corta, opaca— y una
+        ambiental —larga, difusa—. Una sola sombra se lee como adhesivo
+        pegado al fondo; dos dicen a qué altura está la pieza.
+
+     3. **El gradiente de caída.** La superficie es un punto más clara arriba
+        que abajo. Es lo que hace una luz cenital sobre un plano, y es lo que
+        convierte un rectángulo de color en algo iluminado.
+
+     **Aquí NO hay `backdrop-filter`, y esa ausencia es una decisión.** El
+     primer intento las hizo de vidrio translúcido con desenfoque, como la
+     barra superior. Costó tres puntos de Performance y 0.2 s de LCP, y a
+     cambio no dio nada: estas tarjetas se apoyan sobre fondo plano, así que
+     el desenfoque estaba desenfocando negro liso para producir negro liso.
+     El vidrio solo significa algo cuando hay algo detrás que atraviesa —la
+     cabecera sobre la foto del hero—; en cualquier otro sitio es coste puro.
+
+     La profundidad de aquí sale de luz y sombra, que son gratis.
+
+     En el hover no cambia de color: **sube**. Gana altura de sombra y su
+     filo se enciende en oro. Es la diferencia entre «esto cambió de estado»
+     y «esto se acercó». */
   .tarjeta {
     position: relative;
-    background-color: var(--color-grafito);
+    isolation: isolate;
+    background-image: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-grafito-alto) 60%, var(--color-grafito)),
+      var(--color-grafito) 55%
+    );
     border-radius: var(--radius-pieza);
-    border-top: 1px solid transparent;
+    box-shadow: var(--sombra-pieza);
     transition:
-      background-color 500ms var(--ease-fina),
-      border-top-color 500ms var(--ease-fina),
-      transform 500ms var(--ease-fina);
-  }
-  .tarjeta:hover {
-    background-color: var(--color-grafito-alto);
-    border-top-color: var(--color-oro);
+      background-image 400ms var(--ease-salida),
+      box-shadow 400ms var(--ease-salida),
+      transform 400ms var(--ease-salida);
   }
 
-  /* Enlace-tarjeta: el mismo cuerpo, pero además se levanta. Solo para
-     las que llevan a alguna parte. */
-  .tarjeta-enlace:hover {
-    transform: translateY(-2px);
+  /* El filo de luz. Va en un pseudoelemento y no en `border-top` porque un
+     borde es de grosor uniforme y la luz no: se apaga hacia los extremos,
+     que es como se comporta un reflejo especular sobre un canto. */
+  /* --- Escuadras de esquina -------------------------------------------
+     Cuatro ángulos finos en las esquinas, como los de una retícula de
+     puntería o los cantos marcados de un panel de instrumentos. Es la
+     pieza que más empuja el conjunto hacia lo técnico sin gritar: no añade
+     color, no añade movimiento, solo dice que este rectángulo está
+     ENCUADRADO.
+
+     Encaja con el vocabulario que ya tenía la página —el rotulado
+     monoespaciado, la numeración con cero a la izquierda, el índice que
+     imita un arancel— y lo lleva del expediente en papel al instrumento.
+
+     Se hace con dos gradientes cónicos sobre un solo pseudoelemento, sin
+     un solo nodo extra en el DOM. */
+  .tarjeta::after {
+    content: "";
+    position: absolute;
+    inset: 0.875rem;
+    pointer-events: none;
+    background:
+      linear-gradient(to right, var(--color-oro) 0 0) 0 0 / 0.75rem 1px no-repeat,
+      linear-gradient(to bottom, var(--color-oro) 0 0) 0 0 / 1px 0.75rem no-repeat,
+      linear-gradient(to right, var(--color-oro) 0 0) 100% 0 / 0.75rem 1px no-repeat,
+      linear-gradient(to bottom, var(--color-oro) 0 0) 100% 0 / 1px 0.75rem no-repeat,
+      linear-gradient(to right, var(--color-oro) 0 0) 0 100% / 0.75rem 1px no-repeat,
+      linear-gradient(to bottom, var(--color-oro) 0 0) 0 100% / 1px 0.75rem no-repeat,
+      linear-gradient(to right, var(--color-oro) 0 0) 100% 100% / 0.75rem 1px no-repeat,
+      linear-gradient(to bottom, var(--color-oro) 0 0) 100% 100% / 1px 0.75rem no-repeat;
+    opacity: 0.16;
+    transition: opacity 400ms var(--ease-salida);
+  }
+
+  .tarjeta::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding-top: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      rgb(255 255 255 / 0.09) 22%,
+      rgb(255 255 255 / 0.14) 50%,
+      rgb(255 255 255 / 0.09) 78%,
+      transparent
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    transition: background 400ms var(--ease-salida);
+  }
+
+  /* El hover se declara solo donde hay puntero de verdad. En una pantalla
+     táctil, `:hover` se dispara al tocar y se queda pegado hasta que tocas
+     otra cosa: la tarjeta se queda encendida sin motivo. */
+  @media (hover: hover) and (pointer: fine) {
+    .tarjeta:hover {
+      background-image: linear-gradient(
+        to bottom,
+        var(--color-grafito-sup),
+        var(--color-grafito-alto) 60%
+      );
+      box-shadow: var(--sombra-alta);
+      transform: translateY(-2px);
+    }
+    .tarjeta:hover::after { opacity: 0.55; }
+    .tarjeta:hover::before {
+      background: linear-gradient(
+        to right,
+        transparent,
+        color-mix(in srgb, var(--color-oro) 55%, transparent) 20%,
+        var(--color-oro) 50%,
+        color-mix(in srgb, var(--color-oro) 55%, transparent) 80%,
+        transparent
+      );
+    }
+  }
+
+  /* Enlace-tarjeta: además responde al dedo. El `:active` es lo que
+     convierte una superficie en algo que se puede pulsar — sin él, la
+     pieza no acusa recibo y la interfaz parece no haber oído. */
+  .tarjeta-enlace {
+    display: block;
+    cursor: pointer;
+  }
+  .tarjeta-enlace:active {
+    transform: scale(0.985);
+    transition-duration: 140ms;
   }
 
   /* Cristal de la cabecera. Grafito al 20 %, desenfoque de 32 px y un
@@ -316,10 +630,43 @@
     position: sticky;
     top: 0;
     z-index: 40;
-    background-color: rgb(28 28 30 / 0.72);
-    backdrop-filter: blur(32px) saturate(140%);
-    -webkit-backdrop-filter: blur(32px) saturate(140%);
-    border-bottom: 1px solid rgb(255 255 255 / 0.10);
+    background-color: rgb(20 20 22 / 0.62);
+    backdrop-filter: blur(32px) saturate(150%);
+    -webkit-backdrop-filter: blur(32px) saturate(150%);
+  }
+
+  /* Borde de scroll en vez de línea de 1 px.
+     Una regla dura debajo de la barra la convierte en una franja pegada
+     encima del documento. Un degradado corto que se disuelve dice otra
+     cosa: que el contenido pasa POR DEBAJO de un material flotante, que es
+     lo que de verdad está ocurriendo. Se nota sobre todo al desplazar. */
+  .barra-sitio::after,
+  .barra-perfil::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 1.5rem;
+    background: linear-gradient(to bottom, rgb(10 10 11 / 0.55), transparent);
+    pointer-events: none;
+  }
+
+  /* El filo de luz también aquí: es la misma pieza de vidrio que las
+     tarjetas, solo que estirada a lo ancho. */
+  .barra-sitio::before,
+  .barra-perfil::before {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      rgb(255 255 255 / 0.12) 30%,
+      rgb(255 255 255 / 0.12) 70%,
+      transparent
+    );
   }
 
   /* =====================================================================
@@ -414,17 +761,37 @@
     padding: 1.0625rem 1.75rem;
     border-radius: var(--radius-accion);
     text-align: center;
+    box-shadow:
+      var(--sombra-oro),
+      inset 0 1px 0 rgb(255 255 255 / 0.28);
     transition:
-      background-color 400ms var(--ease-fina),
-      transform 400ms var(--ease-fina),
-      box-shadow 400ms var(--ease-fina);
+      background-color 200ms var(--ease-salida),
+      transform 160ms var(--ease-salida),
+      box-shadow 200ms var(--ease-salida);
   }
-  .boton-wa:hover {
-    background-color: var(--color-oro-claro);
-    transform: translateY(-1px);
-    box-shadow: 0 10px 30px -12px rgb(197 163 106 / 0.55);
+
+  /* El brillo interior de arriba es el mismo principio que el filo de las
+     tarjetas: una superficie sólida iluminada desde arriba tiene el canto
+     superior más claro. Sin él, el botón es un rectángulo de color; con él,
+     es una pieza. */
+  @media (hover: hover) and (pointer: fine) {
+    .boton-wa:hover {
+      background-color: var(--color-oro-claro);
+      transform: translateY(-1px);
+      box-shadow:
+        0 20px 52px -14px rgb(197 163 106 / 0.55),
+        inset 0 1px 0 rgb(255 255 255 / 0.36);
+    }
   }
-  .boton-wa:active { transform: translateY(0) scale(0.99); }
+
+  /* La respuesta al pulsar va en `:active`, que dispara en el pointer-DOWN
+     y no al soltar. Es la diferencia entre una interfaz que escucha y una
+     que espera: en el instante en que el dedo toca, algo tiene que moverse.
+     160 ms es el techo — por encima deja de leerse como causa y efecto. */
+  .boton-wa:active {
+    transform: scale(0.97);
+    transition-duration: 100ms;
+  }
 
   .boton-wa .disco {
     display: inline-flex;
@@ -473,14 +840,23 @@
     border: 1px solid var(--color-linea-fuerte);
     border-radius: var(--radius-accion);
     color: var(--color-tinta-suave);
+    background-color: rgb(255 255 255 / 0.03);
     transition:
-      border-color 400ms var(--ease-fina),
-      color 400ms var(--ease-fina),
-      background-color 400ms var(--ease-fina);
+      border-color 200ms var(--ease-salida),
+      color 200ms var(--ease-salida),
+      background-color 200ms var(--ease-salida),
+      transform 160ms var(--ease-salida);
   }
-  .boton-fantasma:hover {
-    border-color: var(--color-oro);
-    color: var(--color-papel);
+  @media (hover: hover) and (pointer: fine) {
+    .boton-fantasma:hover {
+      border-color: var(--color-oro);
+      color: var(--color-papel);
+      background-color: rgb(255 255 255 / 0.05);
+    }
+  }
+  .boton-fantasma:active {
+    transform: scale(0.97);
+    transition-duration: 100ms;
   }
   .boton-fantasma span[aria-hidden] { transition: transform 400ms var(--ease-fina); }
   .boton-fantasma:hover span[aria-hidden] { transform: translateX(3px); }
@@ -608,12 +984,24 @@
   /* Contador del hero: la cifra grande y su nota. Es el otro sitio donde
      el oro está permitido —«momento de autoridad»—, y funciona porque lo
      que dice es verificable: años, especializaciones, cobertura. */
+  /* El halo del oro. Una cifra en un panel de instrumentos no está pintada
+     de amarillo: está ENCENDIDA, y lo que la delata es que derrama un poco
+     de luz sobre lo que tiene alrededor. Dos sombras de texto muy abiertas
+     y casi transparentes bastan; con más, se convierte en neón y pierde el
+     registro. */
   .contador {
     font-size: 2.25rem;
     font-weight: 500;
     line-height: 1;
     letter-spacing: -0.03em;
     color: var(--color-oro);
+    text-shadow:
+      0 0 18px rgb(197 163 106 / 0.30),
+      0 0 48px rgb(197 163 106 / 0.14);
+  }
+
+  .cifra-oro {
+    text-shadow: 0 0 22px rgb(197 163 106 / 0.22);
   }
   .contador-nota {
     font-family: var(--font-mono);
@@ -681,15 +1069,31 @@
   /* =====================================================================
      Revelado al entrar en cuadro
      ==================================================================== */
+  /* Se MATERIALIZA, no aparece.
+     Un desvanecido de opacidad es un objeto que se vuelve visible; el
+     desenfoque que se resuelve al mismo tiempo que la escala es un objeto
+     que ENTRA EN FOCO, que es como se comporta algo que llega. El
+     desenfoque hace además otro trabajo, más sutil: tapa el instante en que
+     dos estados se solapan, y es lo que hace que la transición se lea como
+     una sola cosa moviéndose y no como dos imágenes cruzándose.
+
+     Nunca desde `scale(0)`: nada en el mundo real aparece de la nada. 0.98
+     es suficiente para que se note y poco para que no salte. */
   .revelar {
     opacity: 0;
-    transform: translateY(18px);
-    transition: opacity 800ms var(--ease-fina), transform 800ms var(--ease-fina);
+    transform: translateY(14px) scale(0.985);
+    filter: blur(6px);
+    transition:
+      opacity 700ms var(--ease-salida),
+      transform 700ms var(--ease-salida),
+      filter 700ms var(--ease-salida);
     transition-delay: var(--retardo, 0ms);
+    will-change: transform, opacity, filter;
   }
   .revelar[data-visible] {
     opacity: 1;
     transform: none;
+    filter: blur(0);
   }
 
   /* Sin JavaScript no hay quien ponga `data-visible`, y `.revelar` arranca
@@ -717,12 +1121,44 @@
     min-height: 100vh;
   }
 
-  /* La tarjeta que contiene el paso en curso. */
+  /* La tarjeta que contiene el paso en curso. Es la superficie más grande
+     de todo el sitio, así que va la más gruesa: más desenfoque y la sombra
+     alta. Una superficie grande con la sombra de un chip pequeño se lee
+     como una lámina de papel, no como un panel. */
   .doble-bisel {
     position: relative;
-    background-color: var(--color-grafito);
+    isolation: isolate;
+    background-image: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-grafito-alto) 70%, var(--color-grafito)),
+      var(--color-grafito) 45%
+    );
     border-radius: var(--radius-pieza);
-    border-top: 1px solid var(--color-linea-fuerte);
+    box-shadow: var(--sombra-alta);
+  }
+  .doble-bisel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding-top: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      rgb(255 255 255 / 0.10) 25%,
+      rgb(255 255 255 / 0.16) 50%,
+      rgb(255 255 255 / 0.10) 75%,
+      transparent
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
   }
   .doble-bisel-interior {
     border-radius: var(--radius-pieza);
@@ -757,18 +1193,24 @@
     align-items: center;
     gap: 1.125rem;
     padding: 1.125rem 1.25rem;
-    border-radius: var(--radius-pieza);
+    border-radius: var(--radius-accion);
     border-left: 2px solid transparent;
     background-color: var(--color-grafito-alto);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
     cursor: pointer;
     position: relative;
     transition:
-      background-color 400ms var(--ease-fina),
-      border-left-color 400ms var(--ease-fina),
-      transform 200ms var(--ease-fina);
+      background-color 200ms var(--ease-salida),
+      border-left-color 200ms var(--ease-salida),
+      transform 140ms var(--ease-salida);
   }
-  .opcion:hover { background-color: var(--color-grafito-sup); }
-  .opcion:active { transform: scale(0.995); }
+  @media (hover: hover) and (pointer: fine) {
+    .opcion:hover { background-color: var(--color-grafito-sup); }
+  }
+  .opcion:active {
+    transform: scale(0.985);
+    transition-duration: 100ms;
+  }
   .opcion > input { position: absolute; opacity: 0; width: 0; height: 0; }
   .opcion:has(> input:checked) {
     border-left-color: var(--color-oro);
@@ -851,21 +1293,63 @@
   }
 
   /* Invitación al diagnóstico desde la landing. */
+  /* La invitación al diagnóstico es la pieza que más tiene que apetecer
+     tocar de toda la página: es la única acción gratuita. Va un escalón por
+     encima del resto — sombra más profunda y un halo de oro que la separa
+     del fondo— sin llegar al peso del botón principal. */
   .tarjeta-diagnostico {
     display: block;
     padding: 2rem;
-    background-color: var(--color-grafito);
+    background-image: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-grafito-alto) 75%, var(--color-grafito)),
+      var(--color-grafito) 50%
+    );
     border-radius: var(--radius-pieza);
-    border-top: 1px solid transparent;
+    box-shadow: var(--sombra-alta);
     transition:
-      background-color 500ms var(--ease-fina),
-      border-top-color 500ms var(--ease-fina),
-      transform 500ms var(--ease-fina);
+      background-color 400ms var(--ease-salida),
+      box-shadow 400ms var(--ease-salida),
+      transform 400ms var(--ease-salida);
   }
-  .tarjeta-diagnostico:hover {
-    background-color: var(--color-grafito-alto);
-    border-top-color: var(--color-oro);
-    transform: translateY(-2px);
+  .tarjeta-diagnostico::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding-top: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      color-mix(in srgb, var(--color-oro) 45%, transparent) 25%,
+      color-mix(in srgb, var(--color-oro) 80%, transparent) 50%,
+      color-mix(in srgb, var(--color-oro) 45%, transparent) 75%,
+      transparent
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .tarjeta-diagnostico:hover {
+      background-image: linear-gradient(
+        to bottom,
+        var(--color-grafito-sup),
+        var(--color-grafito-alto) 55%
+      );
+      box-shadow: var(--sombra-alta), var(--sombra-oro);
+      transform: translateY(-3px);
+    }
+  }
+  .tarjeta-diagnostico:active {
+    transform: scale(0.985);
+    transition-duration: 140ms;
   }
 
   .bloque-salida { margin-top: 4rem; }
