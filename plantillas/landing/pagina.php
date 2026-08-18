@@ -53,7 +53,7 @@ $waBase = 'https://wa.me/' . rawurlencode($whatsapp['numero'])
 <link rel="preload" as="image" fetchpriority="high"
       href="/img/pedro-hero-400.avif"
       imagesrcset="/img/pedro-hero-400.avif 400w, /img/pedro-hero-640.avif 640w, /img/pedro-hero-890.avif 890w"
-      imagesizes="(min-width: 768px) 58vw, 100vw"
+      imagesizes="(min-width: 768px) 54vw, 100vw"
       type="image/avif">
 
 <?php /* Se precarga Geist y no Geist Mono. El titular del hero ES la LCP y

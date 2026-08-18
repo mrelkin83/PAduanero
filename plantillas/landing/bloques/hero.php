@@ -46,9 +46,7 @@ if ($cifras === []) {
     ];
 }
 ?>
-<section class="hero bg-tinta">
-    <div class="hero-luz" aria-hidden="true"></div>
-    <div class="hero-barrida" aria-hidden="true"></div>
+<section class="relative isolate overflow-hidden bg-tinta">
 
     <?php
     /* La foto va de fondo, a sangre por la derecha. El degradado lo pone
@@ -65,21 +63,21 @@ if ($cifras === []) {
             1176,
             '',
             prioritaria: true,
-            sizes: '(min-width: 768px) 58vw, 100vw',
+            sizes: '(min-width: 768px) 54vw, 100vw',
         ) ?>
     </div>
 
-    <div class="relative z-10 mx-auto w-full max-w-[78rem] px-6 pt-28 md:px-20 md:pt-24">
+    <div class="relative z-10 mx-auto max-w-[78rem] px-6 pt-24 md:px-20 md:pt-40">
 
-        <div class="max-w-4xl">
+        <div class="max-w-3xl">
             <p class="rotulo">Aduanero · Tributario · DIAN</p>
 
-            <h1 class="titular mt-7">
+            <h1 class="titular mt-8">
                 <?= $e($bloque->titulo) ?>
             </h1>
 
             <?php if ($bloque->subtitulo !== null): ?>
-            <p class="entrada mt-7 max-w-xl">
+            <p class="entrada mt-8 max-w-xl">
                 <?= $e($bloque->subtitulo) ?>
             </p>
             <?php endif; ?>
@@ -90,7 +88,7 @@ if ($cifras === []) {
                  largas, que es como se lee mejor; aplicado también a los
                  botones obligaría a partirlos en dos filas sin que haga
                  falta. */ ?>
-        <div class="mt-9 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+        <div class="mt-12 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center">
             <?= Vista::botonWhatsapp($waBase, $bloque->texto('cta_texto', 'Analizar mi caso')) ?>
 
             <?php if ($bloque->texto('cta_secundario') !== ''): ?>
@@ -102,12 +100,7 @@ if ($cifras === []) {
         </div>
 
         <?php if ($cifras !== []): ?>
-        <?php /* La franja va MONTADA sobre la foto, no debajo del texto. Es
-                 el único sitio de la página donde dos capas se solapan a
-                 propósito, y ese solape es lo que da la sensación de que hay
-                 planos a distintas distancias en vez de bloques apilados.
-                 Aquí el vidrio sí tiene detrás lo que necesita: la foto. */ ?>
-        <dl class="tira-cifras mt-12 grid sm:grid-cols-3 md:mt-14">
+        <dl class="mt-24 grid border-t border-linea sm:grid-cols-3 md:mt-40">
             <?php foreach ($cifras as $i => $dato): ?>
                 <?php
                 if (!is_array($dato)) {
@@ -116,7 +109,7 @@ if ($cifras === []) {
                 $valor = is_string($dato['cifra'] ?? null) ? $dato['cifra'] : '';
                 $nota = is_string($dato['nota'] ?? null) ? $dato['nota'] : '';
                 ?>
-                <div class="border-linea px-7 py-7 <?= $i > 0 ? 'border-t sm:border-t-0 sm:border-l' : '' ?>">
+                <div class="border-linea py-8 <?= $i > 0 ? 'border-t sm:border-t-0 sm:border-l sm:pl-10' : '' ?>">
                     <dt class="contador"><?= $e($valor) ?></dt>
                     <dd class="contador-nota mt-3"><?= $e($nota) ?></dd>
                 </div>
