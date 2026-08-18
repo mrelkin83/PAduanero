@@ -382,11 +382,19 @@
      fallara. Las plantillas siguen ganando con su tamaño explícito porque
      las utilidades de Tailwind van en una capa posterior a `components`.
      ==================================================================== */
+  /* Hasta 7.5 rem. El salto respecto a los 5 rem anteriores es el cambio
+     tipográfico que más se nota de todo el rediseño: el contraste extremo
+     de escala entre el titular y el resto es lo que separa una página
+     moderna de una corporativa, y quedarse en «grande pero prudente» es lo
+     que las deja a todas iguales.
+     El tracking se cierra a -0.045em porque a este tamaño el espaciado
+     normal deja el bloque suelto, y aquí el titular tiene que leerse como
+     una masa compacta. */
   .titular {
-    font-size: clamp(2.75rem, 6.2vw, 5rem);
+    font-size: clamp(2.625rem, 5.6vw, 5.75rem);
     font-weight: 600;
-    line-height: 1.06;
-    letter-spacing: -0.04em;
+    line-height: 1;
+    letter-spacing: -0.045em;
     text-wrap: balance;
   }
 
@@ -1031,6 +1039,19 @@
   .cifra-oro {
     text-shadow: 0 0 22px rgb(197 163 106 / 0.22);
   }
+  /* La tira de cifras del hero. Vidrio de verdad: aquí sí hay foto detrás,
+     que es la única condición para que el desenfoque signifique algo. */
+  .tira-cifras {
+    background-color: rgb(18 18 22 / 0.42);
+    backdrop-filter: blur(28px) saturate(190%);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    border: 1px solid rgb(255 255 255 / 0.10);
+    border-radius: var(--radius-pieza);
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.07) inset,
+      var(--sombra-alta);
+  }
+
   .contador-nota {
     font-family: var(--font-mono);
     font-size: var(--text-eyebrow);
@@ -1051,6 +1072,42 @@
      bloque entero con un velo muy cerrado — el texto tiene que ganar el
      contraste contra la parte más clara de la imagen, no contra su media.
      ==================================================================== */
+  /* --- El hero ---------------------------------------------------------
+     Se rehace entero. Lo que había era la maqueta de siempre —texto a la
+     izquierda, foto a la derecha, velo oscuro encima— y ninguna cantidad de
+     vidrio arregla una estructura convencional. Cuatro decisiones lo mueven
+     de sitio:
+
+     1. **Altura completa.** `100svh` (la unidad pequeña, la que descuenta la
+        barra del navegador móvil y no salta al desplazar). Un hero que ocupa
+        la pantalla entera obliga a decidir qué merece estar ahí.
+     2. **Tipografía enorme.** Hasta 7.5 rem. El contraste extremo de escala
+        entre el titular y todo lo demás es lo que más separa una página
+        moderna de una corporativa; el miedo a la tipografía grande es lo que
+        deja las páginas en «seguras».
+     3. **Duotono.** La foto se desatura del todo y se recolorea con el oro
+        de la paleta por mezcla. Deja de ser una fotografía de archivo
+        pegada al fondo y pasa a ser parte del sistema — es el tratamiento
+        que hace que una imagen no se lea como un elemento ajeno.
+     4. **Corte angular.** El borde inferior no es horizontal. Una diagonal
+        de 2.5° basta para romper la rejilla de rectángulos apilados sin que
+        se lea como un adorno.
+     ==================================================================== */
+  .hero {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    min-height: 100svh;
+    overflow: hidden;
+    /* El corte. `clip-path` en vez de un pseudoelemento girado: recorta de
+       verdad, así que el degradado y la foto terminan en la diagonal en vez
+       de quedar tapados por un triángulo del color del fondo — que es lo
+       que delata el truco cuando el fondo no es plano, y aquí no lo es. */
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 3.5rem), 0 100%);
+    padding-bottom: 4rem;
+  }
+
   .hero-foto {
     position: absolute;
     inset: 0;
@@ -1065,33 +1122,106 @@
     object-position: 50% 18%;
     display: block;
     user-select: none;
-    filter: grayscale(0.35) contrast(1.05);
+    /* Base del duotono: sin color propio y con las luces empujadas, para
+       que el recoloreado de arriba tenga rango donde agarrarse. */
+    filter: grayscale(1) contrast(1.25) brightness(0.82);
   }
+
+  /* Capa de color del duotono. `soft-light` y no `color`: mantiene el
+     contraste de la foto en vez de aplanarlo, que es la diferencia entre un
+     duotono y una foto teñida. */
+  .hero-foto::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(150deg, #E6C185, #7A5E2E 55%, #12213D);
+    mix-blend-mode: soft-light;
+    pointer-events: none;
+  }
+
   .hero-foto::after {
     content: "";
     position: absolute;
     inset: 0;
+    z-index: 2;
     background: linear-gradient(
       to bottom,
-      rgb(10 10 11 / 0.72),
-      rgb(10 10 11 / 0.94)
+      rgb(10 10 11 / 0.62),
+      rgb(10 10 11 / 0.90)
     );
   }
 
   @media (min-width: 768px) {
     .hero-foto {
       left: auto;
-      width: 54%;
+      width: 58%;
     }
     .hero-foto::after {
       background: linear-gradient(
         to right,
-        rgb(10 10 11 / 1) 0%,
-        rgb(10 10 11 / 0.82) 34%,
-        rgb(10 10 11 / 0.15) 78%,
-        rgb(10 10 11 / 0.35) 100%
+        rgb(10 10 11 / 1) 2%,
+        rgb(10 10 11 / 0.78) 32%,
+        rgb(10 10 11 / 0.08) 72%,
+        rgb(10 10 11 / 0.42) 100%
       );
     }
+  }
+
+  /* --- El resplandor del titular --------------------------------------
+     Una mancha de luz difusa detrás del texto. No se ve como un elemento:
+     se ve como que ahí hay algo encendido. Es lo que impide que el titular
+     flote sobre negro sin pertenecer a nada. */
+  .hero-luz {
+    position: absolute;
+    z-index: 0;
+    width: 46rem;
+    height: 34rem;
+    left: -12rem;
+    top: 18%;
+    pointer-events: none;
+    background: radial-gradient(closest-side, rgb(214 172 104 / 0.20), transparent 72%);
+    filter: blur(28px);
+  }
+
+  /* --- La barrida ------------------------------------------------------
+     Una línea de luz que recorre el hero de arriba abajo cada doce
+     segundos. Es el único elemento animado en bucle de toda la página y
+     está aquí a propósito: dice «este sistema está encendido» sin decir
+     nada, y doce segundos es lento de sobra para no competir con la
+     lectura.
+
+     Se retira entera con `prefers-reduced-motion`: una oscilación lenta a
+     pantalla completa es justo lo que provoca malestar vestibular. */
+  .hero-barrida {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .hero-barrida::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 22rem;
+    top: -22rem;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(230 193 133 / 0.055) 45%,
+      rgb(230 193 133 / 0.10) 50%,
+      rgb(230 193 133 / 0.055) 55%,
+      transparent
+    );
+    animation: barrida 12s linear infinite;
+  }
+  @keyframes barrida {
+    to { transform: translateY(calc(100svh + 22rem)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-barrida { display: none; }
   }
 
   /* =====================================================================
