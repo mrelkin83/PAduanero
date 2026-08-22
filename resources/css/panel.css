@@ -108,6 +108,15 @@
   }
   .boton-secundario:hover { background-color: var(--color-papel); }
 
+  /* Un formulario bloqueado (ver _disposicion.php) apaga también su botón de
+     guardar; sin esto seguiría pareciendo pulsable. */
+  .boton:disabled,
+  .boton-secundario:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
   /* Credenciales: el valor real nunca sale por HTTP, así que estos campos
      son de solo escritura. La máscara se muestra al lado, en mono. */
   .mascara {
