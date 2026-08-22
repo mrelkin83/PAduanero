@@ -68,6 +68,11 @@ final class Seo
             // las que este despacho quiere aparecer («me llegó un acta de
             // aprehensión»), y es la única URL del sitio que las contiene.
             ['loc' => $base . '/perfil', 'prioridad' => '0.9', 'cambio' => 'monthly'],
+            // Las legales, con la prioridad de lo que nadie busca pero debe
+            // poder encontrarse. La de privacidad además la valida Google
+            // para publicar la app OAuth del calendario.
+            ['loc' => $base . '/privacidad', 'prioridad' => '0.3', 'cambio' => 'yearly'],
+            ['loc' => $base . '/condiciones', 'prioridad' => '0.3', 'cambio' => 'yearly'],
         ];
 
         // Los artículos llegan en la Etapa 8; la consulta ya los recoge para

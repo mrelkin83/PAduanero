@@ -5,13 +5,14 @@ declare(strict_types=1);
 /**
  * Pie.
  *
- * El aviso de tratamiento de datos todavía no existe: `texto_aviso_habeas_data`
- * y la política están pendientes de redacción de Pedro (CLAUDE.md §11). El
- * enlace se emitirá cuando la haya; poner ahora un «Política de privacidad»
- * que lleve a una página vacía sería peor que no ponerlo.
+ * Los enlaces legales llevan a `/privacidad` y `/condiciones` (2026-08-22).
+ * El de privacidad no es cortesía: Google exige que la página principal
+ * enlace la política para publicar la app OAuth del calendario, y el texto
+ * mismo es requisito para encender el motor de WhatsApp. Ambos documentos
+ * están pendientes de la aprobación de Pedro (ver sus plantillas).
  *
- * Lo requieren las dos páginas públicas —`landing/pagina.php` y
- * `perfil/pagina.php`—, así que no puede depender de ninguna variable que
+ * Lo requieren las páginas públicas —`landing/pagina.php`, `perfil/pagina.php`
+ * y las de `legal/`—, así que no puede depender de ninguna variable que
  * solo una de ellas prepare. Hoy no usa ninguna: todo su texto es fijo.
  */
 ?>
@@ -40,6 +41,8 @@ declare(strict_types=1);
                     <li><a href="/#situaciones" class="menu-enlace">Situaciones</a></li>
                     <li><a href="/#diagnostico" class="menu-enlace">Diagnóstico</a></li>
                     <li><a href="/#proceso" class="menu-enlace">Metodología</a></li>
+                    <li><a href="/privacidad" class="menu-enlace">Tratamiento de datos</a></li>
+                    <li><a href="/condiciones" class="menu-enlace">Condiciones del servicio</a></li>
                 </ul>
             </nav>
         </div>

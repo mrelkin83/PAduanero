@@ -67,6 +67,15 @@ final class SeoTest extends CasoBaseBd
     }
 
     #[Test]
+    public function elSitemapListaLasPaginasLegales(): void
+    {
+        $cuerpo = $this->seo->sitemap()->cuerpo;
+
+        self::assertStringContainsString('<loc>' . self::URL . '/privacidad</loc>', $cuerpo);
+        self::assertStringContainsString('<loc>' . self::URL . '/condiciones</loc>', $cuerpo);
+    }
+
+    #[Test]
     public function elSitemapNoListaArticulosSinRevisionDelAbogado(): void
     {
         // El gate de `revisado_por_abogado` no es decorativo: publicar un

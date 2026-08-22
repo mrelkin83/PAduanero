@@ -178,6 +178,14 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Servicios\PaginaLegal::class,
+            static fn (Contenedor $c): \App\Servicios\PaginaLegal => new \App\Servicios\PaginaLegal(
+                $c->obtener(Config::class),
+                $urlBase,
+            ),
+        );
+
+        $this->contenedor->registrar(
             MetricasLanding::class,
             static fn (Contenedor $c): MetricasLanding => new MetricasLanding(
                 $c->obtener(BD::class),
@@ -208,6 +216,17 @@ final class Aplicacion
 
         $this->router->get('/perfil', function (): Respuesta {
             return $this->contenedor->obtener(\App\Servicios\Perfil::class)->responder();
+        });
+
+        // Las páginas legales. Las exige el propio proyecto (el motor de
+        // WhatsApp trata datos personales) y además Google, que solo publica
+        // la app OAuth del calendario si hay una política enlazada.
+        $this->router->get('/privacidad', function (): Respuesta {
+            return $this->contenedor->obtener(\App\Servicios\PaginaLegal::class)->privacidad();
+        });
+
+        $this->router->get('/condiciones', function (): Respuesta {
+            return $this->contenedor->obtener(\App\Servicios\PaginaLegal::class)->condiciones();
         });
 
         $this->router->get('/robots.txt', function (): Respuesta {
