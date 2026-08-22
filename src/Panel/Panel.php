@@ -132,6 +132,10 @@ final class Panel
             'POST /inversion' => $modulos['tablero']->anotarInversion($ctx),
             'POST /salir' => $autenticacion->salir($ctx),
 
+            'GET /contenido' => $modulos['contenido']->listar($ctx),
+            'GET /contenido/editar' => $modulos['contenido']->editar($ctx),
+            'POST /contenido/guardar' => $modulos['contenido']->guardar($ctx),
+
             'GET /configuracion' => $modulos['configuracion']->listar($ctx),
             'POST /configuracion' => $modulos['configuracion']->guardar($ctx),
 
@@ -146,6 +150,25 @@ final class Panel
             'POST /seguridad/totp/confirmar' => $modulos['usuarios']->confirmarTotp($ctx),
 
             'GET /auditoria' => $modulos['auditoria']->listar($ctx),
+
+            'GET /whatsapp' => $modulos['whatsapp']->ver($ctx),
+            'GET /whatsapp/modelos' => $modulos['whatsapp']->modelos($ctx),
+            'POST /whatsapp/modelos/sincronizar' => $modulos['whatsapp']->sincronizarModelos($ctx),
+            'POST /whatsapp/conexion' => $modulos['whatsapp']->guardarConexion($ctx),
+            'POST /whatsapp/ia' => $modulos['whatsapp']->guardarIa($ctx),
+            'POST /whatsapp/encender' => $modulos['whatsapp']->encender($ctx),
+            'POST /whatsapp/apagar' => $modulos['whatsapp']->apagar($ctx),
+            'POST /whatsapp/token' => $modulos['whatsapp']->regenerarToken($ctx),
+            'POST /whatsapp/qr' => $modulos['whatsapp']->conectarQr($ctx),
+            'POST /whatsapp/cobro' => $modulos['whatsapp']->guardarCobro($ctx),
+            'POST /whatsapp/wompi' => $modulos['whatsapp']->guardarWompi($ctx),
+            'POST /whatsapp/horario' => $modulos['whatsapp']->guardarHorario($ctx),
+            'POST /whatsapp/agente' => $modulos['whatsapp']->guardarAgente($ctx),
+            'POST /whatsapp/google' => $modulos['whatsapp']->guardarGoogle($ctx),
+            'POST /whatsapp/google/codigo' => $modulos['whatsapp']->canjearGoogle($ctx),
+            'GET /whatsapp/citas' => $modulos['whatsapp']->citas($ctx),
+            'GET /whatsapp/conversaciones' => $modulos['whatsapp']->conversaciones($ctx),
+            'POST /whatsapp/conversaciones/reanudar' => $modulos['whatsapp']->reanudarIa($ctx),
 
             default => $this->vista('panel/error', [
                 'ctx' => $ctx,
@@ -179,6 +202,17 @@ final class Panel
                 $this->c->obtener(Logger::class),
             ),
             'auditoria' => new AuditoriaControlador(
+                $this->c->obtener(AuditoriaRepo::class),
+            ),
+            'contenido' => new ContenidoControlador(
+                $this->c->obtener(BD::class),
+                $this->c->obtener(AuditoriaRepo::class),
+                $this->c->obtener(\App\Servicios\Landing::class),
+            ),
+            'whatsapp' => new WhatsappControlador(
+                $this->c->obtener(BD::class),
+                $this->c->obtener(\App\Soporte\Cifrado::class),
+                $this->c->obtener(Logger::class),
                 $this->c->obtener(AuditoriaRepo::class),
             ),
         ];

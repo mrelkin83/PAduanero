@@ -25,7 +25,11 @@ $rutaActual = $ctx->peticion->ruta;
 // la tarifa.
 $menu = [
     ['/panel', 'Tablero', 'tablero.ver'],
+    ['/panel/contenido', 'Contenido', 'contenido.editar'],
     ['/panel/tarifas', 'Tarifas', 'agenda.ver'],
+    ['/panel/whatsapp', 'WhatsApp', 'ia.proveedores.ver'],
+    ['/panel/whatsapp/citas', 'Citas', 'agenda.ver'],
+    ['/panel/whatsapp/conversaciones', 'Conversaciones', 'casos.ver'],
     ['/panel/configuracion', 'Configuración', 'config.ver'],
     ['/panel/usuarios', 'Usuarios', 'usuarios.ver'],
     ['/panel/auditoria', 'Bitácora', 'auditoria.ver'],
