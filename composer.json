@@ -10,7 +10,8 @@
     "ext-openssl": "*",
     "ext-mbstring": "*",
     "ext-json": "*",
-    "ext-curl": "*"
+    "ext-curl": "*",
+    "ext-xmlwriter": "*"
   },
   "suggest": {
     "ext-apcu": "Caché de configuración en producción. Sin ella, Config cae a caché de archivo, pensada para desarrollo."
