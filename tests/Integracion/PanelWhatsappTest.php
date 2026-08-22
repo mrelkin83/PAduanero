@@ -326,6 +326,36 @@ final class PanelWhatsappTest extends CasoBaseBd
     }
 
     #[Test]
+    public function laAtencion24x7AbreElChatSinRegalarleLasFranjasALaAgenda(): void
+    {
+        $this->ctrl()->guardarHorario($this->ctx('abogado', [
+            'siempre' => '1',
+            'desde_1' => '08:00', 'hasta_1' => '18:00',
+        ]));
+
+        $json = (string) $this->bd->pdo()
+            ->query('SELECT horario_atencion FROM wa_config WHERE id = 1')->fetchColumn();
+        $h = json_decode($json, true);
+
+        self::assertTrue($h['siempre']);
+        self::assertSame(
+            ['desde' => '08:00', 'hasta' => '18:00'],
+            $h['1'],
+            'las franjas sobreviven: son el horario de la AGENDA, no del chat',
+        );
+
+        // Con «siempre», el motor responde a cualquier hora…
+        self::assertTrue(WaConfig::abiertoAhora(['horario_atencion' => $json]));
+
+        // …y sin «siempre», un día sin franja sigue cerrado aunque otra
+        // exista en la semana (franja en un día que no es hoy → cerrado hoy).
+        $otroDia = (string) ((((int) date('w')) + 1) % 7);
+        self::assertFalse(WaConfig::abiertoAhora([
+            'horario_atencion' => json_encode([$otroDia => ['desde' => '08:00', 'hasta' => '18:00']]),
+        ]));
+    }
+
+    #[Test]
     public function elNumeroDeGuardiaSeGuardaNormalizadoYElInvalidoSeRechaza(): void
     {
         // Con espacios, «+» y guiones: se normaliza a dígitos pelados, que es

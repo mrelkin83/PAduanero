@@ -449,6 +449,13 @@ final class WhatsappControlador extends ControladorBase
             $horario[(string) $d] = ['desde' => $desde, 'hasta' => $hasta];
         }
 
+        // Atención 24/7: el bot responde a cualquier hora. Las franjas de la
+        // tabla no se borran — siguen siendo el horario de la AGENDA, que es
+        // la disponibilidad real de Pedro para las citas.
+        if ($ctx->campo('siempre') === '1') {
+            $horario['siempre'] = true;
+        }
+
         // El número de guardia viaja en el mismo formulario: es parte de la
         // atención. E.164 sin «+» — el mismo formato que ALERTA_WHATSAPP.
         $guardia = preg_replace('/[\s+\-().]/', '', $ctx->campo('handoff_numero'));
@@ -463,8 +470,15 @@ final class WhatsappControlador extends ControladorBase
         ]);
         $this->auditar($ctx, 'horario', $horario + ['handoff_numero' => $guardia]);
 
-        return $this->redirigirCon('/panel/whatsapp', 'ok',
-            $horario === [] ? 'Horario vacío: el bot atiende y agenda a cualquier hora — ojo.' : 'Horario guardado.');
+        $franjas = array_filter(array_keys($horario), is_numeric(...));
+        $aviso = match (true) {
+            $horario === [] => 'Horario vacío: el bot atiende y agenda a cualquier hora — ojo.',
+            !empty($horario['siempre']) && $franjas === [] => 'Atención 24/7 guardada — pero sin franjas no hay cupos de cita: el bot conversa a toda hora y no puede agendar nada.',
+            !empty($horario['siempre']) => 'Guardado: el bot atiende 24/7 y las citas salen de las franjas de la tabla.',
+            default => 'Horario guardado.',
+        };
+
+        return $this->redirigirCon('/panel/whatsapp', 'ok', $aviso);
     }
 
     /* ── El agente (la ruta de conversación) ──────────────────────────── */

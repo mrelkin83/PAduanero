@@ -494,6 +494,16 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
         <form method="post" action="/panel/whatsapp/horario" class="tarjeta mt-3 p-4">
             <?= $ctx->csrf->campoOculto() ?>
             <p class="text-sm text-acero">Un día sin horas queda cerrado. De este horario salen los cupos que el bot ofrece.</p>
+
+            <label class="mt-3 flex items-center gap-2 text-sm">
+                <input type="checkbox" name="siempre" value="1"
+                       <?= !empty($horario['siempre']) ? 'checked' : '' ?>
+                       <?= $puedeConfig ? '' : 'disabled' ?>>
+                <span><strong>Atención 24/7</strong> — el bot responde a cualquier hora.
+                Las franjas de abajo siguen mandando sobre la agenda: las citas
+                solo se ofrecen dentro de ellas.</span>
+            </label>
+
             <table class="tabla mt-3">
                 <thead><tr><th>Día</th><th>Desde</th><th>Hasta</th></tr></thead>
                 <tbody>

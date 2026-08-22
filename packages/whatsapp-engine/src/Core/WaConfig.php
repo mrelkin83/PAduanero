@@ -232,11 +232,16 @@ class WaConfig
     /**
      * ¿Está abierto AHORA? El agente nunca razona esto: lo consulta.
      * Formato esperado: {"1":{"desde":"08:00","hasta":"22:00"}, …} con 0=domingo.
+     * La clave "siempre" en true declara atención 24/7: el bot responde a
+     * cualquier hora aunque haya franjas — las franjas siguen existiendo para
+     * quien programe citas con ellas (el negocio atiende el chat siempre; la
+     * agenda solo dentro de su horario).
      */
     public static function abiertoAhora(?array $cfg): bool
     {
         $h = self::horario($cfg);
         if (!$h) return true;                       // sin horario configurado: siempre abierto
+        if (!empty($h['siempre'])) return true;     // atención 24/7 declarada
         $dia   = (string)(int)date('w');
         $franja = $h[$dia] ?? null;
         if (!$franja || empty($franja['desde']) || empty($franja['hasta'])) return false;
