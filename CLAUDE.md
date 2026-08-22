@@ -4,8 +4,9 @@
 > antes de escribir código. Los cambios de esquema, dependencias, API o
 > seguridad requieren aprobación explícita del Product Owner.
 
-**Versión:** 2.0 · **Fecha:** 2026-08-17 · **Dominio:** pedroaduanero.com
-(confirmado por el PO el 2026-08-22; antes decía pedroabogadoaduanero.com)
+**Versión:** 2.0 · **Fecha:** 2026-08-17 · **Dominio:** pedroabogadoaduanero.com
+(verificado contra el registro el 2026-08-22: es el único registrado, con DNS en
+Cloudflare; una «corrección» de ese día hacia pedroaduanero.com resultó errónea)
 **Infraestructura:** VPS propio (169.58.220.204) · **Zona horaria:** America/Bogota
 
 ---
