@@ -48,10 +48,15 @@ echo "Base de datos"
 # (BD::pdo hace `SET time_zone = '+00:00'`). Sin esto, las consultas de abajo
 # comparan columnas escritas en UTC contra un NOW() en la zona del servidor, y
 # los conteos por ventana de tiempo salen desplazados sin que nada falle.
-MYSQL="mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASS} ${DB_NAME} -N -B \
-  --init-command=SET time_zone='+00:00' -e"
+# Función y no variable: un comando guardado en un string se parte por los
+# espacios al expandirse, y el espacio de `SET time_zone` dejaba a mysql
+# con opciones rotas — imprimía su ayuda y el chequeo fallaba siempre.
+consulta() {
+  mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" \
+    -N -B --init-command="SET time_zone='+00:00'" -e "$1"
+}
 
-if $MYSQL "SELECT 1" >/dev/null 2>&1; then ok "MySQL responde"
+if consulta "SELECT 1" >/dev/null 2>&1; then ok "MySQL responde"
 else mal "MySQL no responde"; fi
 
 # Migraciones aplicadas contra migraciones en disco. Un despliegue que copia
@@ -59,7 +64,7 @@ else mal "MySQL no responde"; fi
 # MySQL columnas que no existen, y eso se manifiesta como un 500 en una
 # pantalla concreta, no como una caída — puede tardar días en notarse.
 EN_DISCO=$(find "${RAIZ}/db/migraciones" -name '*.sql' 2>/dev/null | wc -l)
-APLICADAS=$($MYSQL "SELECT COUNT(*) FROM migraciones" 2>/dev/null || echo '?')
+APLICADAS=$(consulta "SELECT COUNT(*) FROM migraciones" 2>/dev/null || echo '?')
 if [[ "$APLICADAS" == "$EN_DISCO" ]]; then ok "las ${EN_DISCO} migraciones están aplicadas"
 else mal "migraciones: ${APLICADAS} aplicadas de ${EN_DISCO} en disco — correr bin/migrar.php"; fi
 
@@ -69,7 +74,7 @@ else mal "migraciones: ${APLICADAS} aplicadas de ${EN_DISCO} en disco — correr
 # se rompe, solo se acumulan datos que no deberían estar ahí.
 echo
 echo "Retención de datos"
-PURGA=$($MYSQL "SELECT COUNT(*) FROM auditoria
+PURGA=$(consulta "SELECT COUNT(*) FROM auditoria
   WHERE entidad='sistema' AND accion='purga'
     AND creado_en > NOW() - INTERVAL 24 HOUR" 2>/dev/null || echo "?")
 
