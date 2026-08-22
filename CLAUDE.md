@@ -4,8 +4,9 @@
 > antes de escribir código. Los cambios de esquema, dependencias, API o
 > seguridad requieren aprobación explícita del Product Owner.
 
-**Versión:** 2.0 · **Fecha:** 2026-08-17 · **Dominio:** pedroabogadoaduanero.com
-**Infraestructura:** VPS propio · **Zona horaria:** America/Bogota
+**Versión:** 2.0 · **Fecha:** 2026-08-17 · **Dominio:** pedroaduanero.com
+(confirmado por el PO el 2026-08-22; antes decía pedroabogadoaduanero.com)
+**Infraestructura:** VPS propio (169.58.220.204) · **Zona horaria:** America/Bogota
 
 ---
 
