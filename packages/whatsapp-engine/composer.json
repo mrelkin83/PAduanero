@@ -1,0 +1,22 @@
+{
+    "name": "elkinlinan/whatsapp-ai-engine",
+    "description": "Motor conversacional de WhatsApp con IA: pedidos, cobro, voz e imágenes. Independiente del negocio que lo use.",
+    "type": "library",
+    "license": "proprietary",
+    "authors": [
+        { "name": "Elkin Liñán" }
+    ],
+    "require": {
+        "php": ">=8.0",
+        "ext-json": "*",
+        "ext-curl": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "ElkinLinan\\WhatsappAiEngine\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

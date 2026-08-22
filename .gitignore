@@ -12,6 +12,17 @@
 /vendor/
 /node_modules/
 
+# Respaldos locales en la raíz. El dump trae datos reales (usuarios, bitácora,
+# sesiones) y el zip pesa 52 MB: jamás al repositorio. Las migraciones de
+# db/migraciones/ NO caen aquí: el patrón solo cubre la raíz.
+/*.sql
+/*.zip
+
+# La media de WhatsApp (notas de voz, fotos, comprobantes) son datos
+# personales de los clientes. El QR de vinculación es efímero.
+/storage/wa/
+/storage/qr-whatsapp.png
+
 # storage/ se reconstruye; solo se versionan los directorios vacíos.
 /storage/logs/*
 /storage/cache/*

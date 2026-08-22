@@ -184,6 +184,19 @@ final class Aplicacion
                 $c->obtener(Config::class),
             ),
         );
+
+        // ── Motor de WhatsApp (2026-08-22) ───────────────────────────────
+        // El motor vendorizado en packages/whatsapp-engine, conectado por los
+        // puertos de src/Wa. Solo se instancia si un webhook llega.
+        $this->contenedor->registrar(
+            \App\Wa\WebhookControlador::class,
+            static fn (Contenedor $c): \App\Wa\WebhookControlador => new \App\Wa\WebhookControlador(
+                $c->obtener(BD::class),
+                $c->obtener(Cifrado::class),
+                $c->obtener(Logger::class),
+                $raiz,
+            ),
+        );
     }
 
     /** El panel llega en la Etapa 3; hasta entonces solo landing y salud. */
@@ -214,6 +227,17 @@ final class Aplicacion
             $this->router->get($patron, fn (Peticion $p): Respuesta => $this->panel($p));
             $this->router->post($patron, fn (Peticion $p): Respuesta => $this->panel($p));
         }
+
+        // Webhooks del motor de WhatsApp. El token de 256 bits de la URL es
+        // la autenticación (se valida contra su hash en wa_config); un token
+        // que no case recibe 404 seco.
+        $this->router->post('/api/wa/webhook/{token}', function (Peticion $p): Respuesta {
+            return $this->contenedor->obtener(\App\Wa\WebhookControlador::class)->entrada($p);
+        });
+
+        $this->router->post('/api/wa/pago/{token}', function (Peticion $p): Respuesta {
+            return $this->contenedor->obtener(\App\Wa\WebhookControlador::class)->pago($p);
+        });
 
         $this->router->post('/api/evento', function (Peticion $peticion): Respuesta {
             // Endpoint público y de escritura. Se responde 204 pase lo que

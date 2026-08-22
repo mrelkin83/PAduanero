@@ -30,6 +30,7 @@ Lo que queda:
 | `/` | La landing. Contenido editable desde el panel |
 | `/perfil` | El diagnóstico: seis preguntas, cero persistencia (§4) |
 | `/panel` | Entrar con 2FA, usuarios, configuración, tarifas, bitácora, métricas |
+| `/api/wa/webhook/{token}`, `/api/wa/pago/{token}` | El motor de WhatsApp v2 (§0.2): mensajes de Evolution y eventos de Wompi |
 | `/salud`, `/robots.txt`, `/sitemap.xml` | Operación y SEO |
 
 **El embudo termina en un enlace de WhatsApp.** La landing y el diagnóstico
@@ -53,6 +54,42 @@ No todo lo del motor se borró, y las excepciones no son descuido:
   guardar algo, tabla nueva.
 - **`modalidades_asesoria`.** El precio sigue alimentando el copy de la
   landing y del diagnóstico, así que la pantalla de tarifas sobrevivió.
+
+### 0.2 El motor de WhatsApp, versión 2 — 2026-08-22
+
+El PO decidió volver a tener bot, pero **no el de antes**: se conectó el motor
+conversacional extraído de ControlBarMax, vendorizado en
+`packages/whatsapp-engine` (PHP puro, cero dependencias, arquitectura de
+puertos; sus 49 pruebas propias corren con `php packages/whatsapp-engine/tests/prueba.php`).
+Su trabajo aquí es distinto al del motor de 2026-08: **vender la asesoría y
+agendarla**, no hacer triage jurídico por chat.
+
+- **La integración vive en `src/Wa/`**: `MotorWa` (arranque),
+  `DbMotor`/`SecretoMotor`/`ArchivosMotor` (puertos), `AdaptadorDespacho`
+  (el dominio: catálogo = `modalidades_asesoria`, transacción = cita),
+  `GoogleCalendar` (OAuth de la cuenta de Pedro, free/busy, evento con Meet)
+  y `WebhookControlador` (el borde).
+- **La cita es la transacción del motor**: `crearTransaccion` reserva la
+  franja en `wa_citas` (atómico por índice único `inicio+slot_activo`);
+  `confirmarTransaccion` crea el evento en el Google Calendar de Pedro con
+  invitación al correo del cliente — y el motor solo la llama con el pago
+  verificado, salvo que `wa_config.pago_modo = 'contra_entrega'` (el
+  interruptor «agendar sin cobrar»).
+- **Tablas nuevas `wa_*`** (migración 0016). Las huérfanas del motor viejo
+  siguen huérfanas.
+- **Las reglas jurídicas del bot NO están en el prompt editable**: van en
+  `AdaptadorDespacho::reglasDeDominio()`, capa no editable del prompt
+  (interfaz `SoportaReglasDeDominio` del paquete), y las defiende
+  `ReglasDelBotTest`. La ruta de conversación SÍ es editable
+  (`wa_agentes.instrucciones`).
+- **Configuración**: `php bin/wa-configurar.php --estado` dice qué falta.
+  El motor está **apagado** hasta que se resuelva el pendiente de datos
+  personales (abajo) y Pedro apruebe el prompt.
+- **OJO**: el bot **sí persiste datos personales** (teléfono, nombre, correo,
+  motivo de consulta) en `wa_conversaciones`/`wa_citas`. El «cero
+  persistencia» del §4 sigue siendo cierto **para `/perfil`**, pero el sitio
+  como un todo ya no está fuera de la ley de datos: la política de
+  tratamiento es requisito para encender (`wa_config.activo = 1`).
 
 ---
 
@@ -315,8 +352,18 @@ técnico antes de nombrar el precio, nunca al revés.
 - [ ] Revisión del copy de landing y diagnóstico bajo el marco de publicidad
       del abogado (Ley 1123 de 2007).
 - [ ] Confirmación del catálogo tributario (§5).
-- [ ] Política de tratamiento de datos, si algún día el sitio llega a
-      recoger alguno. Hoy no recoge ninguno.
+- [ ] **Política de tratamiento de datos — ya no es hipotética.** El motor de
+      WhatsApp (§0.2) persiste teléfono, nombre, correo y motivo de consulta.
+      Es requisito para poner `wa_config.activo = 1`.
+- [ ] Revisión de Pedro del prompt del bot (`wa_agentes` y
+      `AdaptadorDespacho::reglasDeDominio()`) bajo la Ley 1123.
+- [x] Pantallas del panel para el motor (2026-08-22): `/panel/whatsapp`
+      (conexión, QR, token, IA, cobro, horario, agente, Google Calendar),
+      `/panel/whatsapp/citas` y `/panel/whatsapp/conversaciones`.
+      `bin/wa-configurar.php` queda como vía alternativa por consola.
+      Pruebas en `PanelWhatsappTest`.
+- [ ] Credenciales reales: Evolution API, proveedor de IA, Wompi y el
+      cliente OAuth de Google (pasos en `bin/wa-configurar.php`).
 
 ---
 
