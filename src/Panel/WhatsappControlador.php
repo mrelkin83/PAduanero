@@ -417,10 +417,19 @@ final class WhatsappControlador extends ControladorBase
             $horario[(string) $d] = ['desde' => $desde, 'hasta' => $hasta];
         }
 
+        // El número de guardia viaja en el mismo formulario: es parte de la
+        // atención. E.164 sin «+» — el mismo formato que ALERTA_WHATSAPP.
+        $guardia = preg_replace('/[\s+\-().]/', '', $ctx->campo('handoff_numero'));
+        if ($guardia !== '' && !preg_match('/^\d{10,15}$/', $guardia)) {
+            return $this->redirigirCon('/panel/whatsapp', 'error',
+                'Número de guardia inválido: solo dígitos con indicativo de país y sin «+», ej. 573001234567.');
+        }
+
         WaConfig::guardar($this->db(), [
             'horario_atencion' => json_encode($horario, JSON_UNESCAPED_UNICODE),
+            'handoff_numero' => $guardia,
         ]);
-        $this->auditar($ctx, 'horario', $horario);
+        $this->auditar($ctx, 'horario', $horario + ['handoff_numero' => $guardia]);
 
         return $this->redirigirCon('/panel/whatsapp', 'ok',
             $horario === [] ? 'Horario vacío: el bot atiende y agenda a cualquier hora — ojo.' : 'Horario guardado.');

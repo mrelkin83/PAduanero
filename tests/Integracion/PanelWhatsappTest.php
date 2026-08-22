@@ -326,6 +326,30 @@ final class PanelWhatsappTest extends CasoBaseBd
     }
 
     #[Test]
+    public function elNumeroDeGuardiaSeGuardaNormalizadoYElInvalidoSeRechaza(): void
+    {
+        // Con espacios, «+» y guiones: se normaliza a dígitos pelados, que es
+        // lo que HumanHandoff le pasa al canal al avisar.
+        $this->ctrl()->guardarHorario($this->ctx('abogado', [
+            'desde_1' => '08:00', 'hasta_1' => '18:00',
+            'handoff_numero' => '+57 300 123-4567',
+        ]));
+        $n = (string) $this->bd->pdo()
+            ->query('SELECT handoff_numero FROM wa_config WHERE id = 1')->fetchColumn();
+        self::assertSame('573001234567', $n);
+
+        // Un número sin indicativo (muy corto) se rechaza y no pisa el guardado.
+        $r = $this->ctrl()->guardarHorario($this->ctx('abogado', [
+            'desde_1' => '08:00', 'hasta_1' => '18:00',
+            'handoff_numero' => '12345',
+        ]));
+        self::assertStringContainsString('inválido', urldecode($r->cabeceras['Location']));
+        $n = (string) $this->bd->pdo()
+            ->query('SELECT handoff_numero FROM wa_config WHERE id = 1')->fetchColumn();
+        self::assertSame('573001234567', $n);
+    }
+
+    #[Test]
     public function laRutaDeConversacionLaEditaElAbogado(): void
     {
         $this->ctrl()->guardarAgente($this->ctx('abogado', [

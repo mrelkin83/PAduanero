@@ -388,6 +388,17 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                 <?php endforeach; ?>
                 </tbody>
             </table>
+            <div class="mt-4">
+                <label class="rotulo">Número de guardia — atención humana</label>
+                <p class="mt-1 text-sm text-acero">
+                    Cuando un cliente pida hablar con una persona, el bot deja la
+                    conversación esperando en «Conversaciones» y avisa por WhatsApp
+                    a este número con el nombre, el teléfono y el motivo. Vacío:
+                    queda solo el aviso del panel. E.164 sin «+», ej. 573001234567.
+                </p>
+                <input name="handoff_numero" value="<?= $e((string) ($cfg['handoff_numero'] ?? '')) ?>"
+                       placeholder="573001234567" class="campo mt-1 font-mono" <?= $puedeConfig ? '' : 'disabled' ?>>
+            </div>
             <?php if ($puedeConfig): ?>
                 <button type="submit" class="boton mt-4">Guardar horario</button>
             <?php endif; ?>
