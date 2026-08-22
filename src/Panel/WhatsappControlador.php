@@ -501,10 +501,17 @@ final class WhatsappControlador extends ControladorBase
     {
         $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
 
-        $id = $ctx->campo('client_id');
+        $id = trim($ctx->campo('client_id'));
         $secreto = $ctx->campo('client_secret');
         if ($id === '') {
             return $this->redirigirCon('/panel/whatsapp', 'error', 'Falta el client_id de Google.');
+        }
+        // Ya pasó: alguien puso aquí un correo y pisó el client_id bueno —
+        // Google respondía «invalid_client» al autorizar. Un Client ID real
+        // siempre termina en .apps.googleusercontent.com; lo demás no entra.
+        if (!str_ends_with($id, '.apps.googleusercontent.com')) {
+            return $this->redirigirCon('/panel/whatsapp', 'error',
+                'Eso no es un Client ID de Google (termina en .apps.googleusercontent.com). No es el correo de la cuenta: se crea en Google Cloud → Credenciales.');
         }
         $google = new GoogleCalendar($this->bd, $this->cifrado, $this->log);
         if ($secreto !== '') {

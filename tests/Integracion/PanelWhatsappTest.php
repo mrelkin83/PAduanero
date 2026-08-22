@@ -376,6 +376,21 @@ final class PanelWhatsappTest extends CasoBaseBd
     }
 
     #[Test]
+    public function unCorreoEnElCampoDelClientIdDeGoogleSeRechaza(): void
+    {
+        // Pasó en producción: un correo pisó el client_id bueno y Google
+        // devolvía «invalid_client» al autorizar.
+        $r = $this->ctrl()->guardarGoogle($this->ctx('super_admin', [
+            'client_id' => 'mr.elkin@hotmail.com',
+            'client_secret' => 'GOCSPX-lo-que-sea',
+        ]));
+
+        self::assertStringContainsString('No es el correo', urldecode($r->cabeceras['Location']));
+        $fila = $this->bd->pdo()->query('SELECT client_id FROM wa_google WHERE id = 1')->fetch();
+        self::assertNotSame('mr.elkin@hotmail.com', (string) ($fila['client_id'] ?? ''));
+    }
+
+    #[Test]
     public function laRutaDeConversacionLaEditaElAbogado(): void
     {
         $this->ctrl()->guardarAgente($this->ctx('abogado', [
