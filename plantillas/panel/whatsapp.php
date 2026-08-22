@@ -39,7 +39,7 @@ $modosPago = [
     'contra_entrega' => 'Agendar sin cobrar — el pago se maneja por fuera',
 ];
 
-$contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleConectado, $urlAutorizacion, $horario, $citasProximas, $tokenNuevo, $qr, $dias, $proveedores, $modosPago): void {
+$contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleConectado, $urlAutorizacion, $horario, $citasProximas, $tokenNuevo, $qr, $dias, $proveedores, $sttProveedores, $modosPago): void {
     $puedeConexion = $ctx->puede('ia.proveedores.escribir');
     $puedeSwitch = $ctx->puede('motor.killswitch');
     $puedePrompt = $ctx->puede('ia.prompts.editar');
@@ -245,6 +245,126 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
             </div>
             <?php if ($puedeConexion): ?>
                 <button type="submit" class="boton mt-4">Guardar IA</button>
+            <?php endif; ?>
+        </form>
+    </section>
+
+    <!-- ── Voz e imágenes ─────────────────────────────────────────── -->
+    <section class="mt-8">
+        <h2 class="rotulo">Voz e imágenes</h2>
+        <p class="mt-2 text-sm text-acero">
+            Sin configurar nada: las fotos las lee el proveedor de IA principal
+            (si es uno que ve imágenes), a las notas de voz el bot responde
+            pidiendo que escriban, y las respuestas son siempre de texto.
+        </p>
+        <form method="post" action="/panel/whatsapp/media" class="tarjeta mt-3 p-4">
+            <?= $ctx->csrf->campoOculto() ?>
+
+            <h3 class="rotulo">Lector de imágenes (visión)</h3>
+            <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="rotulo">Proveedor</label>
+                    <select name="vision_proveedor" class="campo mt-1" <?= $puedeConexion ? '' : 'disabled' ?>>
+                        <option value="">El de la IA principal (recomendado)</option>
+                        <?php foreach (['anthropic' => 'Anthropic', 'openai' => 'OpenAI', 'gemini' => 'Google Gemini', 'local' => 'Servidor propio (URL, sin API key)'] as $v => $n): ?>
+                            <option value="<?= $e($v) ?>" <?= ($cfg['vision_proveedor'] ?? '') === $v ? 'selected' : '' ?>><?= $e($n) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="rotulo">Modelo <span class="text-acero">· vacío = el de la IA principal</span></label>
+                    <input name="vision_modelo" value="<?= $e((string) ($cfg['vision_modelo'] ?? '')) ?>"
+                           placeholder="moondream" class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                </div>
+                <div>
+                    <label class="rotulo">
+                        API Key <?= !empty($cfg['vision_api_key_configurado']) ? '· hay una guardada; escriba solo para reemplazarla' : '· vacía = la de la IA principal' ?>
+                    </label>
+                    <input name="vision_api_key" type="password" autocomplete="off"
+                           class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                </div>
+                <div>
+                    <label class="rotulo">URL <span class="text-acero">· solo servidor propio</span></label>
+                    <input name="vision_url" value="<?= $e((string) ($cfg['vision_url'] ?? '')) ?>"
+                           placeholder="http://127.0.0.1:11434/v1" class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                </div>
+            </div>
+
+            <h3 class="rotulo mt-6">Escuchar notas de voz (transcripción)</h3>
+            <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="rotulo">Proveedor</label>
+                    <select name="stt_proveedor" class="campo mt-1" <?= $puedeConexion ? '' : 'disabled' ?>>
+                        <option value="">Desactivado — el bot pide que escriban</option>
+                        <?php foreach ($sttProveedores as $v => $n): ?>
+                            <option value="<?= $e($v) ?>" <?= ($cfg['stt_proveedor'] ?? '') === $v ? 'selected' : '' ?>><?= $e($n) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="rotulo">Modelo</label>
+                    <input name="stt_modelo" value="<?= $e((string) ($cfg['stt_modelo'] ?? '')) ?>"
+                           placeholder="whisper-large-v3" class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                </div>
+                <div>
+                    <label class="rotulo">
+                        API Key <?= !empty($cfg['stt_api_key_configurado']) ? '· hay una guardada; escriba solo para reemplazarla' : '' ?>
+                    </label>
+                    <input name="stt_api_key" type="password" autocomplete="off"
+                           class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                </div>
+                <div>
+                    <label class="rotulo">URL <span class="text-acero">· solo servidor propio</span></label>
+                    <input name="stt_url" value="<?= $e((string) ($cfg['stt_url'] ?? '')) ?>"
+                           placeholder="http://127.0.0.1:8000/v1" class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                </div>
+            </div>
+
+            <h3 class="rotulo mt-6">Responder con voz</h3>
+            <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="rotulo">Cuándo</label>
+                    <select name="tts_modo" class="campo mt-1" <?= $puedeConexion ? '' : 'disabled' ?>>
+                        <?php foreach (['espejo' => 'Espejo — voz si el cliente mandó voz (recomendado)', 'nunca' => 'Nunca — siempre texto', 'siempre' => 'Siempre — todo con voz', 'texto_y_audio' => 'Texto y audio, las dos cosas'] as $v => $n): ?>
+                            <option value="<?= $e($v) ?>" <?= ($cfg['tts_modo'] ?? 'espejo') === $v ? 'selected' : '' ?>><?= $e($n) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="rotulo">Proveedor de voz</label>
+                    <select name="tts_proveedor" class="campo mt-1" <?= $puedeConexion ? '' : 'disabled' ?>>
+                        <option value="">Sin voz — solo texto</option>
+                        <?php foreach (['elevenlabs' => 'ElevenLabs (la mejor calidad)', 'openai' => 'OpenAI', 'piper' => 'Piper — servidor propio, sin API key'] as $v => $n): ?>
+                            <option value="<?= $e($v) ?>" <?= ($cfg['tts_proveedor'] ?? '') === $v ? 'selected' : '' ?>><?= $e($n) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="rotulo">Voz (voice id)</label>
+                    <input name="tts_voice_id" value="<?= $e((string) ($cfg['tts_voice_id'] ?? '')) ?>"
+                           class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                </div>
+                <div>
+                    <label class="rotulo">Modelo</label>
+                    <input name="tts_modelo" value="<?= $e((string) ($cfg['tts_modelo'] ?? '')) ?>"
+                           class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                </div>
+                <div>
+                    <label class="rotulo">
+                        API Key <?= !empty($cfg['tts_api_key_configurado']) ? '· hay una guardada; escriba solo para reemplazarla' : '' ?>
+                    </label>
+                    <input name="tts_api_key" type="password" autocomplete="off"
+                           class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                </div>
+                <div>
+                    <label class="rotulo">URL <span class="text-acero">· solo Piper</span></label>
+                    <input name="tts_url" value="<?= $e((string) ($cfg['tts_url'] ?? '')) ?>"
+                           placeholder="http://127.0.0.1:5000" class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                </div>
+            </div>
+
+            <?php if ($puedeConexion): ?>
+                <button type="submit" class="boton mt-4">Guardar voz e imágenes</button>
             <?php endif; ?>
         </form>
     </section>

@@ -156,6 +156,7 @@ final class Panel
             'POST /whatsapp/modelos/sincronizar' => $modulos['whatsapp']->sincronizarModelos($ctx),
             'POST /whatsapp/conexion' => $modulos['whatsapp']->guardarConexion($ctx),
             'POST /whatsapp/ia' => $modulos['whatsapp']->guardarIa($ctx),
+            'POST /whatsapp/media' => $modulos['whatsapp']->guardarMedia($ctx),
             'POST /whatsapp/encender' => $modulos['whatsapp']->encender($ctx),
             'POST /whatsapp/apagar' => $modulos['whatsapp']->apagar($ctx),
             'POST /whatsapp/token' => $modulos['whatsapp']->regenerarToken($ctx),

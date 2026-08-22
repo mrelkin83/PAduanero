@@ -96,6 +96,7 @@ final class WhatsappControlador extends ControladorBase
             // La lista del motor, no una copia: un proveedor que no esté aquí
             // se vería en el desplegable pero estaría muerto al usarlo.
             'proveedores' => \ElkinLinan\WhatsappAiEngine\Providers\LlmProviderManager::PROVEEDORES,
+            'sttProveedores' => \ElkinLinan\WhatsappAiEngine\Media\SttManager::PROVEEDORES,
             'estado' => $estado,
             'googleConectado' => $google->conectado(),
             'urlAutorizacion' => $this->urlAutorizacionSiHayCliente($google),
@@ -142,6 +143,37 @@ final class WhatsappControlador extends ControladorBase
         $this->auditar($ctx, 'conexion');
 
         return $this->redirigirCon('/panel/whatsapp', 'ok', 'Conexión guardada.');
+    }
+
+    public function guardarMedia(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+
+        // Un valor fuera del catálogo se guarda como vacío (visión: heredar de
+        // la IA principal; STT/TTS: desactivado) — nunca un proveedor inventado.
+        $en = static fn (string $v, array $validos): string => in_array($v, $validos, true) ? $v : '';
+        $modo = $ctx->campo('tts_modo');
+
+        WaConfig::guardar($this->db(), [
+            'vision_proveedor' => $en($ctx->campo('vision_proveedor'), ['anthropic', 'openai', 'gemini', 'local']),
+            'vision_modelo' => $ctx->campo('vision_modelo'),
+            'vision_url' => rtrim($ctx->campo('vision_url'), '/'),
+            'vision_api_key' => $ctx->campo('vision_api_key'),
+            'stt_proveedor' => $en($ctx->campo('stt_proveedor'), array_keys(\ElkinLinan\WhatsappAiEngine\Media\SttManager::PROVEEDORES)),
+            'stt_modelo' => $ctx->campo('stt_modelo'),
+            'stt_url' => rtrim($ctx->campo('stt_url'), '/'),
+            'stt_api_key' => $ctx->campo('stt_api_key'),
+            // El modo es un enum NOT NULL: lo no reconocido cae al recomendado.
+            'tts_modo' => in_array($modo, ['nunca', 'siempre', 'espejo', 'texto_y_audio'], true) ? $modo : 'espejo',
+            'tts_proveedor' => $en($ctx->campo('tts_proveedor'), ['elevenlabs', 'openai', 'piper']),
+            'tts_voice_id' => $ctx->campo('tts_voice_id'),
+            'tts_modelo' => $ctx->campo('tts_modelo'),
+            'tts_url' => rtrim($ctx->campo('tts_url'), '/'),
+            'tts_api_key' => $ctx->campo('tts_api_key'),
+        ]);
+        $this->auditar($ctx, 'media');
+
+        return $this->redirigirCon('/panel/whatsapp', 'ok', 'Voz e imágenes guardadas.');
     }
 
     public function guardarIa(Contexto $ctx): Respuesta

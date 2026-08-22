@@ -350,6 +350,32 @@ final class PanelWhatsappTest extends CasoBaseBd
     }
 
     #[Test]
+    public function vozEImagenesSeGuardanYLoInventadoCaeALoSeguro(): void
+    {
+        $this->ctrl()->guardarMedia($this->ctx('super_admin', [
+            'vision_proveedor' => 'anthropic',
+            'vision_modelo' => 'claude-sonnet-5',
+            'stt_proveedor' => 'groq',
+            'stt_modelo' => 'whisper-large-v3',
+            'stt_api_key' => 'clave-stt-secreta',
+            'tts_modo' => 'un-modo-que-no-existe',
+            'tts_proveedor' => 'un-proveedor-inventado',
+        ]));
+
+        $fila = $this->bd->pdo()->query(
+            'SELECT vision_proveedor, stt_proveedor, stt_api_key, tts_modo, tts_proveedor
+             FROM wa_config WHERE id = 1')->fetch();
+
+        self::assertSame('anthropic', $fila['vision_proveedor']);
+        self::assertSame('groq', $fila['stt_proveedor']);
+        // El secreto no está en claro en la base…
+        self::assertStringNotContainsString('clave-stt-secreta', (string) $fila['stt_api_key']);
+        // …y lo que no está en el catálogo cae a lo seguro, no a la base.
+        self::assertSame('espejo', $fila['tts_modo']);
+        self::assertSame('', $fila['tts_proveedor']);
+    }
+
+    #[Test]
     public function laRutaDeConversacionLaEditaElAbogado(): void
     {
         $this->ctrl()->guardarAgente($this->ctx('abogado', [
