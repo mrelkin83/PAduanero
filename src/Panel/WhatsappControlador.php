@@ -58,6 +58,18 @@ final class WhatsappControlador extends ControladorBase
         $db = $this->db();
 
         $cfg = WaConfig::paraFrontend($db);
+
+        // Mientras no se haya guardado nada, la conexión llega diligenciada
+        // con los valores del despliegue (Evolution corre en el mismo VPS):
+        // quien abre la pantalla solo pega la API Key, que sí es secreta.
+        // Prellenar no es guardar — persiste al pulsar «Guardar conexión».
+        if (empty($cfg['evolution_url'])) {
+            $cfg['evolution_url'] = rtrim((string) (Entorno::obtener('EVOLUTION_URL', 'http://127.0.0.1:8080') ?? ''), '/');
+        }
+        if (empty($cfg['evolution_instancia'])) {
+            $cfg['evolution_instancia'] = (string) (Entorno::obtener('EVOLUTION_INSTANCIA', 'pedro') ?? 'pedro');
+        }
+
         $agente = $db->fetch('SELECT * FROM wa_agentes WHERE id = 1') ?? [];
         $google = new GoogleCalendar($this->bd, $this->cifrado, $this->log);
 
