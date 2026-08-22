@@ -45,3 +45,6 @@
 .vscode/
 Thumbs.db
 desktop.ini
+
+# Credenciales OAuth descargadas de Google Cloud: jamas al repo
+client_secret_*.json
