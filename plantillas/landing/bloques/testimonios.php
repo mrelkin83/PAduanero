@@ -90,43 +90,54 @@ if ($items === []) {
     return;
 }
 ?>
-<section id="testimonios" class="py-20 md:py-[5rem]">
-    <div class="mx-auto max-w-[78rem] px-6 md:px-20">
+<section id="testimonios" class="py-20 md:py-[8rem] relative isolate">
+    <div class="absolute inset-0 bg-gradient-to-b from-transparent via-white/2 to-transparent pointer-events-none"></div>
+    <div class="mx-auto max-w-[84rem] px-6 md:px-12 relative z-10">
 
-        <p class="rotulo">Quienes ya pasaron por esto</p>
+        <div class="revelar text-center">
+            <p class="rotulo rotulo-capsula mb-4 md:mb-6 mx-auto">
+                <span class="punto" aria-hidden="true"></span>
+                Quienes ya pasaron por esto
+            </p>
 
-        <h2 class="titular-seccion mt-8 max-w-3xl">
-            <?= $e($bloque->titulo) ?>
-        </h2>
+            <h2 class="titular-seccion mt-6 md:mt-8 max-w-4xl mx-auto">
+                <?= $e($bloque->titulo) ?>
+            </h2>
 
-        <?php if ($bloque->subtitulo !== null): ?>
-        <p class="entrada mt-7 max-w-2xl"><?= $e($bloque->subtitulo) ?></p>
-        <?php endif; ?>
+            <?php if ($bloque->subtitulo !== null): ?>
+            <p class="mt-6 md:mt-8 text-[1.1rem] md:text-xl text-acero max-w-2xl mx-auto leading-relaxed font-light"><?= $e($bloque->subtitulo) ?></p>
+            <?php endif; ?>
+        </div>
 
-        <div class="mt-16 grid gap-6 md:mt-20 md:grid-cols-2">
-            <?php foreach ($items as $item): ?>
+        <div class="mt-16 md:mt-24 grid gap-6 md:gap-8 md:grid-cols-2">
+            <?php foreach ($items as $i => $item): ?>
                 <?php
                 $cargo = trim((string) ($item['cargo'] ?? ''));
                 $empresa = trim((string) ($item['empresa'] ?? ''));
                 $pie = implode(' · ', array_filter([$cargo, $empresa]));
+                $delay = 100 + ($i * 100);
                 ?>
                 <?php $pendiente = $item['pendiente'] === true; ?>
-                <figure class="tarjeta flex flex-col p-8 md:p-10">
+                <figure class="tarjeta flex flex-col p-6 md:p-12 relative overflow-hidden group revelar" style="--retardo: <?= $delay ?>ms">
+                    <div class="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+                    
                     <?php if ($pendiente): ?>
-                    <p class="mb-6"><span class="marca-pendiente ml-0">Ejemplo · sin publicar</span></p>
+                    <p class="mb-6 md:mb-8 relative z-10"><span class="marca-pendiente ml-0">Ejemplo · sin publicar</span></p>
                     <?php endif; ?>
 
-                    <blockquote class="entrada text-[1.0625rem] <?= $pendiente ? 'pendiente' : '' ?>">
+                    <span class="text-6xl md:text-7xl font-serif text-oro/10 absolute top-4 left-4 md:top-6 md:left-6 leading-none md:group-hover:text-oro/20 transition-colors duration-500 pointer-events-none">"</span>
+
+                    <blockquote class="relative z-10 text-[1.05rem] md:text-[1.2rem] leading-relaxed text-papel mt-4 <?= $pendiente ? 'pendiente' : '' ?>">
                         <?= $e($item['texto']) ?>
                     </blockquote>
 
-                    <figcaption class="mt-8 border-t border-linea pt-6">
-                        <p class="titular-menor text-[1.0625rem] <?= $pendiente ? 'pendiente' : '' ?>">
+                    <figcaption class="mt-8 md:mt-12 relative z-10 border-t border-linea/30 pt-6 md:pt-8 flex flex-col">
+                        <p class="text-[1.1rem] md:text-xl font-medium tracking-tight text-white md:group-hover:text-oro-claro transition-colors duration-500 <?= $pendiente ? 'pendiente' : '' ?>">
                             <?= $e($item['autor']) ?>
                         </p>
 
                         <?php if ($pie !== ''): ?>
-                        <p class="rotulo mt-2 text-acero"><?= $e($pie) ?></p>
+                        <p class="rotulo text-acero mt-3 md:mt-4"><?= $e($pie) ?></p>
                         <?php endif; ?>
                     </figcaption>
                 </figure>

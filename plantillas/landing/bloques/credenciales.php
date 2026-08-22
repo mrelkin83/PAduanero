@@ -26,55 +26,67 @@ use App\Soporte\Vista;
 $imagen = $bloque->texto('imagen', '/img/pedro-perfil.jpg');
 $items = $bloque->lista('items');
 ?>
-<section class="py-20 md:py-[5rem]">
-    <div class="mx-auto grid max-w-[78rem] items-center gap-12 px-6 md:grid-cols-[1fr_1.15fr] md:gap-20 md:px-20">
-
-        <?php /* El retrato va dentro de una tarjeta de grafito y no suelto
-                 sobre el fondo. Sobre negro puro, un JPEG recortado se ve
-                 pegado; con el escalón de grafito debajo, la foto se apoya
-                 en algo y el conjunto recupera profundidad sin una sola
-                 sombra. */ ?>
-        <div class="tarjeta overflow-hidden p-3">
-            <?= Vista::imagen(
-                basename($imagen),
-                'Retrato de Pedro, abogado titular del despacho',
-                892,
-                1196,
-                'w-full h-auto rounded-[0.125rem]',
-                sizes: '(min-width: 768px) 34rem, 100vw',
-            ) ?>
-        </div>
-
-        <div>
-            <p class="rotulo">Quién responde</p>
-
-            <h2 class="titular-seccion mt-8">
+<section class="py-20 md:py-[8rem] relative isolate">
+    <div class="mx-auto max-w-[84rem] px-6 md:px-12">
+        <div class="text-center mb-16 md:mb-20 max-w-3xl mx-auto revelar">
+            <p class="rotulo rotulo-capsula mx-auto mb-4 md:mb-6">
+                <span class="punto" aria-hidden="true"></span>
+                Quién responde
+            </p>
+            <h2 class="titular-seccion">
                 <?= $e($bloque->titulo) ?>
             </h2>
+        </div>
 
-            <ul class="mt-12 space-y-4">
-                <?php foreach ($items as $i => $item): ?>
-                    <?php
-                    if (!is_array($item)) {
-                        continue;
-                    }
-                    $titulo = is_string($item['titulo'] ?? null) ? $item['titulo'] : '';
-                    $detalle = is_string($item['detalle'] ?? null) ? $item['detalle'] : '';
-                    ?>
-                    <li class="tarjeta flex items-start gap-6 p-6 md:p-7">
-                        <span class="cifra-oro mt-0.5" aria-hidden="true">
-                            <?= $e(str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT)) ?>
-                        </span>
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 md:auto-rows-[24rem]">
 
-                        <div>
-                            <p class="titular-menor"><?= $e($titulo) ?></p>
-                            <?php if ($detalle !== ''): ?>
-                            <p class="cuerpo mt-2 text-[0.9375rem]"><?= $e($detalle) ?></p>
-                            <?php endif; ?>
-                        </div>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
+            <?php /* El retrato va como el bloque grande (Hero Bento). 
+                     En móvil tiene altura fija para no comerse la pantalla. */ ?>
+            <div class="tarjeta overflow-hidden md:col-span-5 md:row-span-2 relative group revelar h-[450px] md:h-auto" style="--retardo: 100ms">
+                <?= Vista::imagen(
+                    basename($imagen),
+                    'Retrato de Pedro, abogado titular del despacho',
+                    892,
+                    1196,
+                    'absolute inset-0 w-full h-full object-cover object-top transition-transform duration-[2s] md:group-hover:scale-105',
+                    sizes: '(min-width: 768px) 34rem, 100vw',
+                ) ?>
+                <div class="absolute inset-0 bg-gradient-to-t from-tinta via-tinta/40 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 p-6 md:p-8 w-full flex flex-col items-start">
+                    <p class="text-2xl md:text-3xl text-white font-medium mb-1 md:mb-2 tracking-tight">Pedro</p>
+                    <p class="text-acero text-xs md:text-sm uppercase tracking-widest font-mono">Abogado Titular</p>
+                </div>
+            </div>
+
+            <?php /* Los items se distribuyen asimétricamente en desktop, y apilan fluidos en móvil */ ?>
+            <?php 
+                $bentoClasses = [
+                    'md:col-span-7 md:row-span-1',
+                    'md:col-span-4 md:row-span-1',
+                    'md:col-span-3 md:row-span-1'
+                ];
+            ?>
+            <?php foreach ($items as $i => $item): ?>
+                <?php
+                if (!is_array($item)) { continue; }
+                $titulo = is_string($item['titulo'] ?? null) ? $item['titulo'] : '';
+                $detalle = is_string($item['detalle'] ?? null) ? $item['detalle'] : '';
+                $bentoClass = $bentoClasses[$i % count($bentoClasses)];
+                $delay = 200 + ($i * 100);
+                ?>
+                <div class="tarjeta flex flex-col p-6 md:p-10 relative overflow-hidden group revelar <?= $bentoClass ?>" style="--retardo: <?= $delay ?>ms">
+                    <div class="absolute -right-12 -top-12 w-48 h-48 bg-oro/5 rounded-full blur-3xl md:group-hover:bg-oro/15 transition-colors duration-700 pointer-events-none"></div>
+                    <span class="cifra-oro opacity-30 text-3xl md:text-4xl mb-6 md:mb-auto" aria-hidden="true">
+                        <?= $e(str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT)) ?>
+                    </span>
+                    <div class="mt-auto relative z-10">
+                        <p class="text-xl md:text-2xl font-medium tracking-tight text-white md:group-hover:text-oro-claro transition-colors duration-500 mb-2 md:mb-3 leading-tight"><?= $e($titulo) ?></p>
+                        <?php if ($detalle !== ''): ?>
+                        <p class="text-acero text-[0.95rem] md:text-[1rem] leading-relaxed md:line-clamp-3 md:group-hover:text-papel transition-colors duration-500"><?= $e($detalle) ?></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
     </div>
 </section>

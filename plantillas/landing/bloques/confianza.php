@@ -52,67 +52,62 @@ if ($verificables === [] && $sedes === []) {
 
 $invitacion = $bloque->texto('invitacion');
 ?>
-<section id="confianza" class="py-20 md:py-[5rem]">
-    <div class="mx-auto max-w-[78rem] px-6 md:px-20">
+<section id="confianza" class="py-20 md:py-[8rem] relative isolate">
+    <div class="mx-auto max-w-[84rem] px-6 md:px-12">
 
-        <p class="rotulo">Quién responde por esto</p>
+        <div class="revelar">
+            <p class="rotulo mb-4 md:mb-6">Quién responde por esto</p>
 
-        <h2 class="titular-seccion mt-8 max-w-3xl">
-            <?= $e($bloque->titulo) ?>
-        </h2>
+            <h2 class="titular-seccion max-w-4xl">
+                <?= $e($bloque->titulo) ?>
+            </h2>
 
-        <?php if ($bloque->subtitulo !== null): ?>
-        <p class="entrada mt-7 max-w-2xl">
-            <?= $e($bloque->subtitulo) ?>
-        </p>
-        <?php endif; ?>
+            <?php if ($bloque->subtitulo !== null): ?>
+            <p class="mt-6 md:mt-8 text-[1.1rem] md:text-xl text-acero max-w-2xl leading-relaxed font-light">
+                <?= $e($bloque->subtitulo) ?>
+            </p>
+            <?php endif; ?>
+        </div>
 
         <?php if ($verificables !== []): ?>
         <?php /* Cada dato con su camino de comprobación al lado. El enlace es
                  la mitad del mensaje: decirle a alguien dónde verificarte es
                  justo lo que un estafador nunca hace. */ ?>
-        <dl class="mt-16 grid gap-6 md:mt-20 md:grid-cols-2">
-            <?php foreach ($verificables as $dato): ?>
+        <dl class="mt-12 md:mt-24 grid gap-6 md:gap-8 md:grid-cols-2">
+            <?php foreach ($verificables as $i => $dato): ?>
                 <?php
                 $etiqueta = (string) ($dato['etiqueta'] ?? '');
                 $valor = (string) ($dato['valor'] ?? '');
                 $nota = (string) ($dato['nota'] ?? '');
                 $url = (string) ($dato['url'] ?? '');
                 $enlaceTexto = (string) ($dato['enlace_texto'] ?? '');
+                $delay = 100 + ($i * 100);
                 ?>
                 <?php $pendiente = ($dato['pendiente'] ?? null) === true; ?>
-                <?php /* La nota y el enlace van DENTRO del `<dd>`, no sueltos
-                         a su lado. Un `<div>` dentro de un `<dl>` solo admite
-                         `<dt>` y `<dd>`; con un `<p>` colgando ahí, el árbol
-                         de accesibilidad queda mal formado y el lector de
-                         pantalla pierde la relación entre el término y su
-                         valor. Lo detecta `bin/auditar-landing.mjs` — pasó, y
-                         costó cuatro puntos de accesibilidad. */ ?>
-                <div class="tarjeta p-8 md:p-10">
-                    <dt class="rotulo text-acero"><?= $e($etiqueta) ?></dt>
+                <div class="doble-bisel p-6 md:p-12 md:hover:bg-white/5 transition-colors duration-500 revelar group" style="--retardo: <?= $delay ?>ms">
+                    <div class="absolute inset-0 bg-gradient-to-tr from-oro/5 to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+                    <dt class="rotulo text-acero mb-4 md:mb-6 relative z-10"><?= $e($etiqueta) ?></dt>
 
-                    <dd class="mt-5">
-                        <span class="block break-words text-[1.375rem] md:text-[1.75rem] <?= $pendiente ? 'pendiente font-mono' : 'cifra-oro' ?>">
+                    <dd class="relative z-10 flex flex-col h-full">
+                        <span class="block break-words text-3xl md:text-5xl tracking-tight <?= $pendiente ? 'pendiente font-mono opacity-50' : 'text-transparent bg-clip-text bg-gradient-to-br from-white to-oro-claro drop-shadow-sm font-medium' ?>">
                             <?= $e($valor) ?>
                             <?php if ($pendiente): ?>
-                            <span class="marca-pendiente">Pendiente</span>
+                            <span class="marca-pendiente text-[0.6rem] md:text-xs relative -top-2 md:-top-4 ml-2 md:ml-4">Pendiente</span>
                             <?php endif; ?>
                         </span>
 
                         <?php if ($nota !== ''): ?>
-                        <span class="cuerpo mt-4 block text-[0.9375rem]"><?= $e($nota) ?></span>
+                        <span class="mt-4 md:mt-6 block text-[1rem] md:text-[1.1rem] text-acero leading-relaxed md:group-hover:text-papel transition-colors duration-500"><?= $e($nota) ?></span>
                         <?php endif; ?>
 
-                        <?php /* Sin enlace mientras el dato esté pendiente:
-                                 mandar a alguien a un registro donde no hay
-                                 nada que consultar es peor que no ofrecerle
-                                 el camino. */ ?>
                         <?php if (!$pendiente && $url !== '' && $enlaceTexto !== ''): ?>
-                        <a href="<?= $e($url) ?>" class="menu-enlace mt-6 inline-flex items-center gap-2"
-                           target="_blank" rel="noopener noreferrer">
-                            <?= $e($enlaceTexto) ?>
-                            <span aria-hidden="true">↗</span>
-                        </a>
+                        <div class="mt-auto pt-8">
+                            <a href="<?= $e($url) ?>" class="menu-enlace inline-flex items-center gap-3 text-oro-claro md:group-hover:text-oro transition-colors duration-500 font-bold"
+                               target="_blank" rel="noopener noreferrer">
+                                <?= $e($enlaceTexto) ?>
+                                <span aria-hidden="true" class="transform md:group-hover:translate-x-1 md:group-hover:-translate-y-1 transition-transform duration-300">↗</span>
+                            </a>
+                        </div>
                         <?php endif; ?>
                     </dd>
                 </div>
@@ -126,53 +121,55 @@ $invitacion = $bloque->texto('invitacion');
                  Franca dice además algo que ningún texto puede decir igual de
                  bien: nadie pone oficina ahí por casualidad, y quien tiene la
                  mercancía retenida en una lo sabe. */ ?>
-        <div class="mt-6 grid gap-6 md:grid-cols-2">
-            <?php foreach ($sedes as $sede): ?>
+        <div class="mt-6 md:mt-8 grid gap-6 md:gap-8 md:grid-cols-2">
+            <?php foreach ($sedes as $i => $sede): ?>
                 <?php
                 $nombre = (string) ($sede['nombre'] ?? '');
                 $direccion = (string) ($sede['direccion'] ?? '');
                 $detalle = (string) ($sede['detalle'] ?? '');
                 $horario = (string) ($sede['horario'] ?? '');
+                $delay = 200 + ($i * 100);
                 ?>
                 <?php $pendiente = ($sede['pendiente'] ?? null) === true; ?>
-                <div class="tarjeta p-8 md:p-10">
-                    <p class="rotulo text-acero">Oficina</p>
+                <div class="tarjeta p-6 md:p-12 md:hover:bg-white/5 transition-colors duration-500 flex flex-col justify-between revelar group" style="--retardo: <?= $delay ?>ms">
+                    <div class="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+                    <div class="relative z-10">
+                        <p class="rotulo text-acero mb-4 md:mb-6">Oficina</p>
+                        <p class="text-2xl md:text-3xl font-medium tracking-tight text-white mb-3 md:mb-4 md:group-hover:text-oro-claro transition-colors duration-500"><?= $e($nombre) ?></p>
 
-                    <p class="titular-menor mt-5"><?= $e($nombre) ?></p>
+                        <address class="not-italic <?= $pendiente ? 'pendiente font-mono text-[0.95rem] md:text-[1rem]' : 'text-[1rem] md:text-[1.1rem] text-acero leading-relaxed' ?>">
+                            <?= $e($direccion) ?>
+                            <?php if ($pendiente): ?>
+                            <span class="marca-pendiente text-xs ml-2 md:ml-3">Pendiente</span>
+                            <?php endif; ?>
+                        </address>
+                    </div>
 
-                    <address class="mt-3 not-italic <?= $pendiente ? 'pendiente font-mono text-[0.9375rem]' : 'cuerpo' ?>">
-                        <?= $e($direccion) ?>
-                        <?php if ($pendiente): ?>
-                        <span class="marca-pendiente">Pendiente</span>
+                    <div class="relative z-10 mt-6 md:mt-8">
+                        <?php if ($horario !== ''): ?>
+                        <p class="rotulo text-acero mb-4 md:mb-6"><?= $e($horario) ?></p>
                         <?php endif; ?>
-                    </address>
 
-                    <?php if ($horario !== ''): ?>
-                    <p class="rotulo mt-6 text-acero"><?= $e($horario) ?></p>
-                    <?php endif; ?>
-
-                    <?php if ($detalle !== ''): ?>
-                    <p class="cuerpo mt-5 border-t border-linea pt-5 text-[0.9375rem]">
-                        <?= $e($detalle) ?>
-                    </p>
-                    <?php endif; ?>
+                        <?php if ($detalle !== ''): ?>
+                        <p class="pt-5 md:pt-6 border-t border-linea/30 text-[0.95rem] md:text-[1rem] text-acero/80 md:group-hover:text-acero transition-colors duration-500">
+                            <?= $e($detalle) ?>
+                        </p>
+                        <?php endif; ?>
+                    </div>
                 </div>
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
 
         <?php
-        /* Solo se invita si hay a dónde ir DE VERDAD. Una dirección marcada
-           como pendiente no cuenta: «puede venir a comprobar que existimos»
-           bajo un renglón que dice «dirección pendiente» es justo la clase de
-           promesa vacía que esta sección vino a desmentir, y la única frase
-           de todo el bloque que un visitante podría llegar a intentar. */
         $sedesReales = array_filter($sedes, static fn (array $s): bool => ($s['pendiente'] ?? null) !== true);
         ?>
         <?php if ($invitacion !== '' && $sedesReales !== []): ?>
-        <p class="entrada mt-12 max-w-2xl border-l-2 border-oro pl-6">
-            <?= $e($invitacion) ?>
-        </p>
+        <div class="mt-12 md:mt-16 max-w-3xl p-6 md:p-8 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md revelar">
+            <p class="text-[1.05rem] md:text-[1.15rem] leading-relaxed text-papel border-l-2 border-oro pl-4 md:pl-6 font-medium">
+                <?= $e($invitacion) ?>
+            </p>
+        </div>
         <?php endif; ?>
     </div>
 </section>

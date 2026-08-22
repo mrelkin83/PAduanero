@@ -46,14 +46,12 @@ if ($cifras === []) {
     ];
 }
 ?>
-<section class="relative isolate overflow-hidden bg-tinta">
+<section class="relative isolate overflow-hidden bg-tinta flex flex-col md:block md:min-h-screen">
 
     <?php
-    /* La foto va de fondo, a sangre por la derecha. El degradado lo pone
-       `.hero-foto::after`, no un contenedor intermedio: ver el CSS. Lleva
-       además un desaturado parcial, que no es un filtro de moda: la foto
-       es de un puerto al atardecer y sus naranjas compiten de frente con
-       el oro, que en este sistema es el único color que significa algo. */
+    /* Ahora en móvil la foto es un bloque superior fijo (no absoluto),
+       mientras que en escritorio vuelve a ser absoluto al lado derecho.
+       Con esto GARANTIZAMOS que en móvil jamás el texto toque la cara. */
     ?>
     <div class="hero-foto">
         <?= Vista::imagen(
@@ -67,51 +65,46 @@ if ($cifras === []) {
         ) ?>
     </div>
 
-    <div class="relative z-10 mx-auto max-w-[78rem] px-6 pt-24 md:px-20 md:pt-40">
+    <?php /* El contenedor del texto. En móvil tiene margen negativo (-mt-12) para
+             montarse sobre el gradiente oscuro final de la imagen, sin llegar al rostro. */ ?>
+    <div class="relative z-10 w-full mx-auto max-w-[78rem] px-6 -mt-16 pb-16 md:mt-0 md:px-20 md:pt-40 md:pb-0">
 
         <div class="max-w-3xl">
-            <p class="rotulo">Aduanero · Tributario · DIAN</p>
+            <p class="rotulo mb-4 md:mb-6">Aduanero · Tributario · DIAN</p>
 
-            <h1 class="titular mt-8">
+            <h1 class="titular mt-2 md:mt-8">
                 <?= $e($bloque->titulo) ?>
             </h1>
 
             <?php if ($bloque->subtitulo !== null): ?>
-            <p class="entrada mt-8 max-w-xl">
+            <p class="entrada mt-6 md:mt-8 max-w-xl text-[1.15rem] leading-[1.6]">
                 <?= $e($bloque->subtitulo) ?>
             </p>
             <?php endif; ?>
         </div>
 
-        <?php /* La fila de acciones sale del `max-w-3xl` del titular. Ese
-                 ancho está puesto para que la pregunta rompa en tres líneas
-                 largas, que es como se lee mejor; aplicado también a los
-                 botones obligaría a partirlos en dos filas sin que haga
-                 falta. */ ?>
-        <div class="mt-12 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+        <div class="mt-8 md:mt-12 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center">
             <?= Vista::botonWhatsapp($waBase, $bloque->texto('cta_texto', 'Analizar mi caso')) ?>
 
             <?php if ($bloque->texto('cta_secundario') !== ''): ?>
             <a href="#proceso" class="boton-fantasma justify-center">
                 <?= $e($bloque->texto('cta_secundario')) ?>
-                <span aria-hidden="true">↓</span>
+                <span aria-hidden="true" class="ml-2">↓</span>
             </a>
             <?php endif; ?>
         </div>
 
         <?php if ($cifras !== []): ?>
-        <dl class="mt-24 grid border-t border-linea sm:grid-cols-3 md:mt-40">
+        <dl class="mt-16 md:mt-32 mb-4 md:mb-0 grid panel-os p-2 sm:grid-cols-3 max-w-3xl overflow-hidden divide-y sm:divide-y-0 sm:divide-x divide-white/5">
             <?php foreach ($cifras as $i => $dato): ?>
                 <?php
-                if (!is_array($dato)) {
-                    continue;
-                }
+                if (!is_array($dato)) { continue; }
                 $valor = is_string($dato['cifra'] ?? null) ? $dato['cifra'] : '';
                 $nota = is_string($dato['nota'] ?? null) ? $dato['nota'] : '';
                 ?>
-                <div class="border-linea py-8 <?= $i > 0 ? 'border-t sm:border-t-0 sm:border-l sm:pl-10' : '' ?>">
+                <div class="p-6 md:p-8 hover:bg-white/5 transition-colors duration-300 rounded-xl">
                     <dt class="contador"><?= $e($valor) ?></dt>
-                    <dd class="contador-nota mt-3"><?= $e($nota) ?></dd>
+                    <dd class="contador-nota mt-2 md:mt-3"><?= $e($nota) ?></dd>
                 </div>
             <?php endforeach; ?>
         </dl>
