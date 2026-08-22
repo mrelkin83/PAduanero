@@ -123,9 +123,11 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
             <?= $ctx->csrf->campoOculto() ?>
             <div class="grid gap-3 sm:grid-cols-2">
                 <div>
-                    <label class="rotulo">URL de Evolution</label>
-                    <input name="evolution_url" value="<?= $e((string) ($cfg['evolution_url'] ?? '')) ?>"
-                           placeholder="http://localhost:8080" class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                    <label class="rotulo">URL de Evolution · fija del despliegue</label>
+                    <!-- Sin name: no viaja en el POST. La tubería la pone el
+                         despliegue (EVOLUTION_URL); desde aquí solo se mira. -->
+                    <input value="<?= $e((string) ($cfg['evolution_url'] ?? '')) ?>"
+                           class="campo mt-1 font-mono" readonly>
                 </div>
                 <div>
                     <label class="rotulo">Nombre de la instancia</label>
@@ -133,12 +135,12 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                            class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
                 </div>
                 <div class="sm:col-span-2">
-                    <label class="rotulo">
-                        API Key de Evolution
-                        <?= !empty($cfg['evolution_apikey_configurado']) ? '· hay una guardada; escriba solo para reemplazarla' : '' ?>
-                    </label>
-                    <input name="evolution_apikey" type="password" autocomplete="off"
-                           class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                    <span class="rotulo">API Key de Evolution</span>
+                    <p class="mt-1 text-sm text-acero">
+                        <?= !empty($cfg['evolution_apikey_configurado'])
+                            ? 'Configurada · generada en el despliegue y guardada cifrada. Se cambia por consola: <code class="font-mono">php bin/wa-configurar.php --poner evolution_apikey=…</code>'
+                            : 'SIN configurar · se siembra en el despliegue o por consola: <code class="font-mono">php bin/wa-configurar.php --poner evolution_apikey=…</code>' ?>
+                    </p>
                 </div>
             </div>
             <?php if ($puedeConexion): ?>

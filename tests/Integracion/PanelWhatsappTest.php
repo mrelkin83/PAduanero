@@ -123,21 +123,22 @@ final class PanelWhatsappTest extends CasoBaseBd
     #[Test]
     public function laApikeySeGuardaCifradaYDescifraDeVuelta(): void
     {
-        $this->ctrl()->guardarConexion($this->ctx('super_admin', [
-            'evolution_url' => 'http://localhost:8080/',
-            'evolution_instancia' => 'pedro',
-            'evolution_apikey' => 'clave-secreta-de-prueba',
-        ]));
-
-        $fila = $this->bd->pdo()->query('SELECT evolution_url, evolution_apikey FROM wa_config WHERE id = 1')->fetch();
-
-        // La barra final se recorta y el secreto NO está en claro en la base.
-        self::assertSame('http://localhost:8080', $fila['evolution_url']);
-        self::assertStringNotContainsString('clave-secreta-de-prueba', (string) $fila['evolution_apikey']);
-
-        // Pero el motor la descifra de vuelta con el cifrado de la casa.
+        // La vía de la tubería es la de consola/despliegue (wa-configurar),
+        // no el formulario: se siembra directo y se comprueba el cifrado.
         $db = MotorWa::conectar($this->bd, Cifrado::desdeEntorno(),
             new Logger(sys_get_temp_dir() . '/pa-wa-panel.log', 'error'), dirname(__DIR__, 2));
+        WaConfig::guardar($db, [
+            'evolution_url' => 'http://localhost:8080',
+            'evolution_instancia' => 'pedro',
+            'evolution_apikey' => 'clave-secreta-de-prueba',
+        ]);
+
+        $fila = $this->bd->pdo()->query('SELECT evolution_apikey FROM wa_config WHERE id = 1')->fetch();
+
+        // El secreto NO está en claro en la base…
+        self::assertStringNotContainsString('clave-secreta-de-prueba', (string) $fila['evolution_apikey']);
+
+        // …pero el motor lo descifra de vuelta con el cifrado de la casa.
         self::assertSame(
             'clave-secreta-de-prueba',
             WaConfig::secreto(WaConfig::cargar($db, true), 'evolution_apikey'),
@@ -145,28 +146,45 @@ final class PanelWhatsappTest extends CasoBaseBd
     }
 
     #[Test]
-    public function unSecretoEnviadoVacioNoPisaElGuardado(): void
+    public function elFormularioNoPuedeTocarLaTuberia(): void
     {
-        $this->ctrl()->guardarConexion($this->ctx('super_admin', [
-            'evolution_url' => 'http://localhost:8080',
+        // La URL y la API Key las fija el despliegue. Un POST que intente
+        // cambiarlas —aunque venga de un super_admin legítimo— solo puede
+        // cambiar el nombre de la instancia.
+        $db = MotorWa::conectar($this->bd, Cifrado::desdeEntorno(),
+            new Logger(sys_get_temp_dir() . '/pa-wa-panel.log', 'error'), dirname(__DIR__, 2));
+        WaConfig::guardar($db, [
+            'evolution_url' => 'http://127.0.0.1:8080',
             'evolution_instancia' => 'pedro',
-            'evolution_apikey' => 'la-primera-clave',
+            'evolution_apikey' => 'la-clave-del-despliegue',
+        ]);
+
+        $this->ctrl()->guardarConexion($this->ctx('super_admin', [
+            'evolution_url' => 'http://atacante.example',
+            'evolution_instancia' => 'pedro-2',
+            'evolution_apikey' => 'clave-colada-en-el-post',
         ]));
 
-        // El formulario nunca recibe la clave real, así que reenviar la
-        // pantalla sin tocar ese campo llega con la clave vacía.
+        $cfg = WaConfig::cargar($db, true);
+        self::assertSame('http://127.0.0.1:8080', $cfg['evolution_url']);
+        self::assertSame('pedro-2', $cfg['evolution_instancia']);
+        self::assertSame('la-clave-del-despliegue', WaConfig::secreto($cfg, 'evolution_apikey'));
+    }
+
+    #[Test]
+    public function guardarSinUrlSembradaLaTomaDelEntorno(): void
+    {
+        // Con la base virgen, guardar la instancia no puede dejar la URL a
+        // medias: el controlador la completa con la del entorno.
         $this->ctrl()->guardarConexion($this->ctx('super_admin', [
-            'evolution_url' => 'http://localhost:8080',
             'evolution_instancia' => 'pedro',
-            'evolution_apikey' => '',
         ]));
 
         $db = MotorWa::conectar($this->bd, Cifrado::desdeEntorno(),
             new Logger(sys_get_temp_dir() . '/pa-wa-panel.log', 'error'), dirname(__DIR__, 2));
-        self::assertSame(
-            'la-primera-clave',
-            WaConfig::secreto(WaConfig::cargar($db, true), 'evolution_apikey'),
-        );
+        $cfg = WaConfig::cargar($db, true);
+        self::assertNotEmpty($cfg['evolution_url']);
+        self::assertSame('pedro', $cfg['evolution_instancia']);
     }
 
     #[Test]

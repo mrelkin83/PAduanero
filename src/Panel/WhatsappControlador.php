@@ -127,12 +127,18 @@ final class WhatsappControlador extends ControladorBase
     public function guardarConexion(Contexto $ctx): Respuesta
     {
         $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+        $db = $this->db();
 
-        WaConfig::guardar($this->db(), [
-            'evolution_url' => rtrim($ctx->campo('evolution_url'), '/'),
-            'evolution_instancia' => $ctx->campo('evolution_instancia'),
-            'evolution_apikey' => $ctx->campo('evolution_apikey'),
-        ]);
+        // La tubería (URL y API Key) la fija el despliegue y el panel no la
+        // toca: del formulario solo se acepta el nombre de la instancia,
+        // venga lo que venga en el POST. Si la URL aún no está sembrada, se
+        // toma la del entorno — el formulario no puede dejarla a medias.
+        $datos = ['evolution_instancia' => $ctx->campo('evolution_instancia')];
+        $cfg = WaConfig::cargar($db, true) ?? [];
+        if (empty($cfg['evolution_url'])) {
+            $datos['evolution_url'] = rtrim((string) (Entorno::obtener('EVOLUTION_URL', 'http://127.0.0.1:8080') ?? ''), '/');
+        }
+        WaConfig::guardar($db, $datos);
         $this->auditar($ctx, 'conexion');
 
         return $this->redirigirCon('/panel/whatsapp', 'ok', 'Conexión guardada.');
