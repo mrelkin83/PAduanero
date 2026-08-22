@@ -33,6 +33,38 @@ class GeminiAdapter implements LlmAdapterInterface
 
     public function nombre(): string { return 'Google Gemini'; }
 
+    /**
+     * Traduce un esquema de herramienta al dialecto de Gemini.
+     *
+     * Las herramientas del motor se declaran en JSON Schema, donde un tipo
+     * unión —['string','null'], ['integer','string']— es legal, y Anthropic y
+     * OpenAI lo aceptan. El esquema de Gemini es un proto: `type` admite UN
+     * solo valor, y una lista rompe la petición entera con
+     * «Invalid JSON payload … cannot start list» — el 400 llega antes del
+     * modelo, así que ninguna conversación con herramientas funciona. Aquí se
+     * queda el primer tipo real y, si la unión incluía 'null', se dice con
+     * `nullable`, que es como Gemini expresa lo opcional.
+     */
+    private static function esquemaGemini(array $esquema): array
+    {
+        if (isset($esquema['type']) && is_array($esquema['type'])) {
+            $tipos = array_values(array_diff($esquema['type'], ['null']));
+            if (in_array('null', $esquema['type'], true)) {
+                $esquema['nullable'] = true;
+            }
+            $esquema['type'] = $tipos[0] ?? 'string';
+        }
+        if (isset($esquema['properties']) && is_array($esquema['properties'])) {
+            foreach ($esquema['properties'] as $nombre => $prop) {
+                if (is_array($prop)) $esquema['properties'][$nombre] = self::esquemaGemini($prop);
+            }
+        }
+        if (isset($esquema['items']) && is_array($esquema['items'])) {
+            $esquema['items'] = self::esquemaGemini($esquema['items']);
+        }
+        return $esquema;
+    }
+
     public function chat(array $params): array
     {
         $out = ['ok' => false, 'texto' => '', 'tool_calls' => [], 'tokens_in' => 0,
@@ -82,10 +114,11 @@ class GeminiAdapter implements LlmAdapterInterface
         }
         if (!empty($params['tools'])) {
             $cuerpo['tools'] = [['functionDeclarations' => array_map(function ($t) {
+                $parametros = $t['parameters'] ?? ['type' => 'object', 'properties' => new \stdClass()];
                 return [
                     'name' => $t['name'],
                     'description' => $t['description'] ?? '',
-                    'parameters' => $t['parameters'] ?? ['type' => 'object', 'properties' => new \stdClass()],
+                    'parameters' => is_array($parametros) ? self::esquemaGemini($parametros) : $parametros,
                 ];
             }, $params['tools'])]];
         }
