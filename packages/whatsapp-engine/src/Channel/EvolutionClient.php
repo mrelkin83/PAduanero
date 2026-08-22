@@ -206,11 +206,18 @@ class EvolutionClient implements ChannelInterface
         $numero = self::normalizarNumero($telefono);
         if ($numero === '' || trim($texto) === '') return ['ok' => false, 'message_id' => null, 'error' => 'Destino o texto vacío'];
 
+        // Simulación de escritura: `delay` hace que Evolution muestre
+        // «escribiendo…» ese tiempo antes de entregar. Proporcional al largo
+        // del texto y con techo — la intención es que no se sienta un robot
+        // instantáneo, no hacer esperar de más. Evolution v1 ignora el campo
+        // sin quejarse, así que va en las dos formas del cuerpo.
+        $delay = min(5000, max(1200, (int) (mb_strlen($texto) * 28)));
+
         $ruta = $this->url . '/message/sendText/' . rawurlencode($this->instancia);
-        $r = Http::json('POST', $ruta, $this->cabeceras(), ['number' => $numero, 'text' => $texto], 30);
+        $r = Http::json('POST', $ruta, $this->cabeceras(), ['number' => $numero, 'text' => $texto, 'delay' => $delay], 30);
         if (!$r['ok']) {
             $r = Http::json('POST', $ruta, $this->cabeceras(),
-                ['number' => $numero, 'textMessage' => ['text' => $texto]], 30);
+                ['number' => $numero, 'delay' => $delay, 'textMessage' => ['text' => $texto]], 30);
         }
         return ['ok' => $r['ok'], 'message_id' => $r['json']['key']['id'] ?? null, 'error' => $r['error']];
     }
