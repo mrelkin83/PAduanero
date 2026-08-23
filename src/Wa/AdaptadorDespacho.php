@@ -222,6 +222,11 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
             'estado' => ($textos[$c['estado']] ?? $c['estado']),
             'estado_pago' => $p['estado_pago'] ?? 'PAYMENT_PENDING',
             'enlace_videollamada' => $c['gcal_meet_url'] ?: null,
+            // `total` no es decorativo: PaymentManager::generar() lo exige para
+            // saber cuánto cobrar, y sin la clave responde «Pedido no
+            // encontrado» — con lo que NINGÚN pago se podía generar. En pesos
+            // (ADR-010); los centavos de Wompi los pone su adaptador.
+            'total' => (float) $c['precio_cop'],
         ];
     }
 

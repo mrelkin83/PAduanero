@@ -85,7 +85,13 @@ interface DomainAdapter
      */
     public function calcularTotal(array $items, float $extra = 0.0): array;
 
-    /** Estado legible para contarle al cliente por dónde va lo suyo. */
+    /**
+     * Estado legible para contarle al cliente por dónde va lo suyo.
+     *
+     * OBLIGATORIO devolver la clave `total` (float, la moneda del negocio):
+     * es de donde PaymentManager::generar() saca el importe a cobrar. Sin
+     * ella, todo intento de pago muere en «Pedido no encontrado».
+     */
     public function estadoTransaccion(string $id): array;
 
     /**
