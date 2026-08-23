@@ -369,11 +369,27 @@ final class WebhookControlador
             }
 
             $textos = [
-                'PAYMENT_VERIFIED' => '✅ ¡Pago confirmado! Tu cita quedó agendada. La invitación con el enlace de la videollamada llega a tu correo.',
-                'PAYMENT_REJECTED' => '❌ El pago fue rechazado. Puedes intentarlo de nuevo cuando quieras.',
-                'PAYMENT_REVIEW_REQUIRED' => '⏳ Recibimos tu pago pero necesita una revisión rápida. Te confirmamos en un momento.',
+                'PAYMENT_REJECTED' => '❌ El pago fue rechazado. Puede intentarlo de nuevo cuando quiera.',
+                'PAYMENT_REVIEW_REQUIRED' => '⏳ Recibimos su pago pero necesita una revisión rápida. Le confirmamos en un momento.',
             ];
             $texto = $textos[$res['estado']] ?? null;
+
+            if ($res['estado'] === 'PAYMENT_VERIFIED') {
+                // Se arma con lo que la cita TIENE (correo, Meet), y con la
+                // invitación a adelantar los documentos: la revisión previa es
+                // parte del servicio y el Dr. Pedro llega con el caso leído.
+                $cita = $db->fetch('SELECT correo, gcal_meet_url FROM wa_citas WHERE id = ?', [(int) $res['pedido_id']]);
+                $texto = '✅ ¡Pago confirmado! Su cita con el Dr. Pedro quedó agendada.';
+                if (!empty($cita['correo'])) {
+                    $texto .= ' La invitación con el enlace de la videollamada llega a su correo.';
+                }
+                if (!empty($cita['gcal_meet_url'])) {
+                    $texto .= "\n\n🔗 Enlace de la videollamada: " . $cita['gcal_meet_url'];
+                }
+                $texto .= "\n\n📎 Si tiene documentos del caso (actas, resoluciones, declaraciones, requerimientos), "
+                    . 'envíelos con anticipación a info@pedroabogadoaduanero.com — así el Dr. Pedro los revisa antes de la sesión '
+                    . 'y la asesoría rinde mucho más.';
+            }
             if ($texto) {
                 $canal->enviarTexto((string) $conv['telefono'], $texto);
                 (new ConversationManager($db))->guardarMensaje((int) $conv['id'], 'saliente',

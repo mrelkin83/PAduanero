@@ -819,6 +819,8 @@ final class WhatsappControlador extends ControladorBase
                 if (!empty($cita['gcal_meet_url'])) {
                     $texto .= "\n\nEnlace de la videollamada: " . $cita['gcal_meet_url'];
                 }
+                $texto .= "\n\n📎 Si tiene documentos del caso, envíelos con anticipación a "
+                    . 'info@pedroabogadoaduanero.com — así el Dr. Pedro los revisa antes de la sesión.';
                 $canal->enviarTexto((string) $fila['telefono'], $texto);
             }
         } catch (\Throwable) {
