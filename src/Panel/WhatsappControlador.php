@@ -101,6 +101,7 @@ final class WhatsappControlador extends ControladorBase
             'googleConectado' => $google->conectado(),
             'urlAutorizacion' => $this->urlAutorizacionSiHayCliente($google),
             'horario' => WaConfig::horario(WaConfig::cargar($db, true)),
+            'smtpConfigurado' => \App\Soporte\Smtp::desdeEntorno() !== null,
             'citasProximas' => (int) $citasProximas,
             'avisos' => $this->avisos($ctx),
         ] + $extra);
@@ -464,11 +465,22 @@ final class WhatsappControlador extends ControladorBase
                 'Número de guardia inválido: solo dígitos con indicativo de país y sin «+», ej. 573001234567.');
         }
 
-        WaConfig::guardar($this->db(), [
+        // El recordatorio de citas viaja en el mismo formulario. Se acota en
+        // vez de rechazarse (un 9999 tecleado no debe tumbar el guardado del
+        // horario entero), y el campo AUSENTE no toca lo guardado: ausencia
+        // no es cero — cero es «sin recordatorio» y solo vale dicho a
+        // propósito.
+        $campos = [
             'horario_atencion' => json_encode($horario, JSON_UNESCAPED_UNICODE),
             'handoff_numero' => $guardia,
-        ]);
-        $this->auditar($ctx, 'horario', $horario + ['handoff_numero' => $guardia]);
+        ];
+        $crudoRecordatorio = trim($ctx->campo('recordatorio_minutos'));
+        if ($crudoRecordatorio !== '') {
+            $campos['recordatorio_minutos'] = (string) max(0, min(720, (int) $crudoRecordatorio));
+        }
+
+        WaConfig::guardar($this->db(), $campos);
+        $this->auditar($ctx, 'horario', $horario + array_diff_key($campos, ['horario_atencion' => 1]));
 
         $franjas = array_filter(array_keys($horario), is_numeric(...));
         $aviso = match (true) {

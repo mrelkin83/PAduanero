@@ -39,7 +39,7 @@ $modosPago = [
     'contra_entrega' => 'Agendar sin cobrar — el pago se maneja por fuera',
 ];
 
-$contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleConectado, $urlAutorizacion, $horario, $citasProximas, $tokenNuevo, $qr, $dias, $proveedores, $sttProveedores, $modosPago): void {
+$contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleConectado, $urlAutorizacion, $horario, $citasProximas, $tokenNuevo, $qr, $dias, $proveedores, $sttProveedores, $modosPago, $smtpConfigurado): void {
     $puedeConexion = $ctx->puede('ia.proveedores.escribir');
     $puedeSwitch = $ctx->puede('motor.killswitch');
     $puedePrompt = $ctx->puede('ia.prompts.editar');
@@ -518,6 +518,19 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                 <?php endforeach; ?>
                 </tbody>
             </table>
+            <div class="mt-4">
+                <label class="rotulo">Recordatorio de citas (minutos antes)</label>
+                <p class="mt-1 text-sm text-acero">
+                    Un cron revisa cada 5 minutos: cuando a una cita confirmada le
+                    falte este tiempo o menos, se recuerda una sola vez al cliente
+                    (WhatsApp<?= $smtpConfigurado ? ' y correo' : '; el correo se activará al configurar el SMTP del servidor' ?>)
+                    y al número de guardia. 0 = sin recordatorio.
+                </p>
+                <input name="recordatorio_minutos" type="number" min="0" max="720"
+                       value="<?= (int) ($cfg['recordatorio_minutos'] ?? 30) ?>"
+                       class="campo mt-1 w-32" <?= $puedeConfig ? '' : 'disabled' ?>>
+            </div>
+
             <div class="mt-4">
                 <label class="rotulo">Número de guardia — atención humana</label>
                 <p class="mt-1 text-sm text-acero">

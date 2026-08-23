@@ -26,6 +26,7 @@ use ElkinLinan\WhatsappAiEngine\Ports\DbPort;
  */
 final class Recordatorios
 {
+    /** Ventana por defecto; la manda `wa_config.recordatorio_minutos` (panel). */
     public const VENTANA_MIN = 30;
 
     public function __construct(
@@ -38,11 +39,17 @@ final class Recordatorios
     /** @return int citas recordadas en esta pasada */
     public function enviar(): int
     {
+        $cfg = WaConfig::cargar($this->db);
+        $ventana = (int) ($cfg['recordatorio_minutos'] ?? self::VENTANA_MIN);
+        if ($ventana <= 0) {
+            return 0;   // recordatorio apagado desde el panel
+        }
+
         // La ventana se calcula en PHP y NO con NOW(): la sesión de MySQL va
         // en UTC (BD.php) y `wa_citas.inicio` se guarda en hora de Bogotá —
         // con NOW() el recordatorio saldría cinco horas antes de la cita.
         $desde = date('Y-m-d H:i:s');
-        $hasta = date('Y-m-d H:i:s', time() + self::VENTANA_MIN * 60);
+        $hasta = date('Y-m-d H:i:s', time() + $ventana * 60);
 
         // El JID del chat viene de la conversación: `wa_citas.telefono` es el
         // número de CONTACTO que dictó el cliente (puede ser otro, o el chat
@@ -60,7 +67,6 @@ final class Recordatorios
             return 0;
         }
 
-        $cfg = WaConfig::cargar($this->db);
         $guardia = trim((string) ($cfg['handoff_numero'] ?? ''));
         $enviadas = 0;
 
