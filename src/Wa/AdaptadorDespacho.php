@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Wa;
 
 use App\Soporte\Fechas;
+use ElkinLinan\WhatsappAiEngine\Channel\EvolutionClient;
 use ElkinLinan\WhatsappAiEngine\Core\WaConfig;
 use ElkinLinan\WhatsappAiEngine\Ports\DbPort;
 use ElkinLinan\WhatsappAiEngine\Ports\DomainAdapter;
@@ -292,7 +293,43 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
             [$evento['event_id'], $evento['meet'], (int) $id],
         );
 
+        $this->avisarAlAbogado($c, $evento);
+
         return true;
+    }
+
+    /**
+     * WhatsApp al número de guardia con la cita recién confirmada (decisión
+     * del PO, 2026-08-22). Mejor esfuerzo por diseño: el pago ya está
+     * verificado y la cita confirmada — un aviso caído no puede deshacer eso,
+     * y Pedro la vería igual en su calendario y en el panel.
+     *
+     * @param array<string,mixed> $cita
+     * @param array{ok:bool,event_id:?string,meet:?string} $evento
+     */
+    private function avisarAlAbogado(array $cita, array $evento): void
+    {
+        try {
+            $cfg = WaConfig::cargar($this->db);
+            $guardia = trim((string) ($cfg['handoff_numero'] ?? ''));
+            $canal = EvolutionClient::desdeConfig($this->db);
+            if ($guardia === '' || $canal === null) {
+                return;
+            }
+
+            $inicio = (string) $cita['inicio'];
+            $texto = "📅 *Nueva cita confirmada*\n\n"
+                . '👤 ' . ((string) ($cita['nombre'] ?? '') ?: 'Sin nombre') . "\n"
+                . '🗓 ' . Fechas::fechaNatural(substr($inicio, 0, 10))
+                . ' a las ' . Fechas::horaNatural(substr($inicio, 11, 5)) . "\n"
+                . '📝 ' . ((string) ($cita['motivo'] ?? '') ?: 'Sin motivo registrado') . "\n"
+                . '📧 ' . ((string) ($cita['correo'] ?? '') ?: 'Sin correo')
+                . (!empty($evento['meet']) ? "\n🔗 " . $evento['meet'] : '');
+
+            $canal->enviarTexto($guardia, $texto);
+        } catch (\Throwable) {
+            // Nada: el aviso es cortesía, la cita ya quedó confirmada.
+        }
     }
 
     public function capacidades(): array
