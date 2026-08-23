@@ -51,3 +51,4 @@ client_secret_*.json
 
 # Muestras de voz para clonacion (datos personales, jamas al repo)
 /voz*.ogg
+/PAMELA*.wav
