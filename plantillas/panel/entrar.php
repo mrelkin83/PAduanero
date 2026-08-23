@@ -43,9 +43,22 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/panel.css') ?: '';
 
         <div>
             <label for="password" class="rotulo">Contraseña</label>
-            <input id="password" name="password" type="password" required
-                   autocomplete="current-password" class="campo mt-1">
+            <div class="relative mt-1">
+                <input id="password" name="password" type="password" required
+                       autocomplete="current-password" class="campo pr-16">
+                <?php /* type="button": dentro de un form, un botón sin tipo
+                         envía. Solo aparece con JS (lo revela el script):
+                         sin JS no puede alternar nada y sería un adorno. */ ?>
+                <button type="button" id="ver-clave" hidden
+                        class="absolute inset-y-0 right-0 px-3 text-xs text-acero underline"
+                        aria-label="Mostrar la contraseña">ver</button>
+            </div>
         </div>
+
+        <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" id="recordar">
+            <span>Recordar mi correo en este equipo</span>
+        </label>
 
         <button type="submit" class="boton w-full">Entrar</button>
     </form>
@@ -54,6 +67,52 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/panel.css') ?: '';
         Los accesos quedan registrados en la bitácora.
     </p>
 </div>
+
+<?php /* Comodidades de sesión, todas del lado del navegador:
+         · «Recordar mi correo» guarda SOLO el correo en localStorage de este
+           equipo — jamás la contraseña: recordar una contraseña es trabajo
+           del gestor del navegador, no de un localStorage legible por
+           cualquiera con acceso al equipo.
+         · «ver» alterna la visibilidad de la contraseña; existe solo con JS. */ ?>
+<script>
+(function () {
+    'use strict';
+
+    var CLAVE = 'panel.correo';
+    var correo = document.getElementById('email');
+    var recordar = document.getElementById('recordar');
+    var clave = document.getElementById('password');
+    var ver = document.getElementById('ver-clave');
+
+    try {
+        var guardado = localStorage.getItem(CLAVE);
+        if (guardado) {
+            correo.value = guardado;
+            recordar.checked = true;
+            clave.focus();
+        }
+    } catch (e) { /* almacenamiento bloqueado: la casilla queda sin memoria */ }
+
+    document.querySelector('form').addEventListener('submit', function () {
+        try {
+            if (recordar.checked && correo.value !== '') {
+                localStorage.setItem(CLAVE, correo.value);
+            } else {
+                localStorage.removeItem(CLAVE);
+            }
+        } catch (e) { }
+    });
+
+    ver.hidden = false;
+    ver.addEventListener('click', function () {
+        var oculta = clave.type === 'password';
+        clave.type = oculta ? 'text' : 'password';
+        ver.textContent = oculta ? 'ocultar' : 'ver';
+        ver.setAttribute('aria-label', (oculta ? 'Ocultar' : 'Mostrar') + ' la contraseña');
+        clave.focus();
+    });
+})();
+</script>
 
 </body>
 </html>
