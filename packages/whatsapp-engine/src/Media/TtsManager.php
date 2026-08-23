@@ -264,6 +264,10 @@ class TtsManager
             $r = Http::json('GET', 'https://api.elevenlabs.io/v1/voices', ['xi-api-key: ' . $this->apiKey], null, 30);
             if (!$r['ok']) return [];
             foreach (($r['json']['voices'] ?? []) as $v) {
+                // Las 'premade' son las ~20 voces de fábrica en inglés que trae
+                // toda cuenta: en el desplegable solo estorban. Se listan las
+                // que el negocio añadió a propósito — clonadas y de biblioteca.
+                if (($v['category'] ?? '') === 'premade') continue;
                 $out[] = ['id' => $v['voice_id'] ?? '', 'nombre' => $v['name'] ?? ''];
             }
             return $out;
