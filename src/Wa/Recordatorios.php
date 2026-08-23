@@ -44,11 +44,16 @@ final class Recordatorios
         $desde = date('Y-m-d H:i:s');
         $hasta = date('Y-m-d H:i:s', time() + self::VENTANA_MIN * 60);
 
+        // El JID del chat viene de la conversación: `wa_citas.telefono` es el
+        // número de CONTACTO que dictó el cliente (puede ser otro, o el chat
+        // ser un @lid), y el recordatorio de WhatsApp va al chat.
         $citas = $this->db->fetchAll(
-            "SELECT * FROM wa_citas
-              WHERE estado = 'confirmada' AND slot_activo = 1
-                AND recordatorio_enviado_at IS NULL
-                AND inicio > ? AND inicio <= ?",
+            "SELECT c.*, v.telefono AS chat_telefono
+               FROM wa_citas c
+               JOIN wa_conversaciones v ON v.id = c.conversacion_id
+              WHERE c.estado = 'confirmada' AND c.slot_activo = 1
+                AND c.recordatorio_enviado_at IS NULL
+                AND c.inicio > ? AND c.inicio <= ?",
             [$desde, $hasta],
         );
         if ($citas === []) {
@@ -77,14 +82,21 @@ final class Recordatorios
                     . ($meet !== '' ? "\n\nEnlace de la videollamada: " . $meet : '')
                     . "\n\nLo esperamos.";
                 try {
-                    $this->canal->enviarTexto((string) $cita['telefono'], $paraCliente);
+                    $this->canal->enviarTexto(
+                        (string) ($cita['chat_telefono'] ?? '') ?: (string) $cita['telefono'],
+                        $paraCliente,
+                    );
                 } catch (\Throwable) {
                     // El recordatorio no puede tumbar la pasada entera.
                 }
 
                 if ($guardia !== '') {
+                    $contacto = (string) ($cita['telefono'] ?? '');
                     $paraAbogado = '⏰ *Recordatorio de cita* — hoy a las ' . $hora . "\n\n"
                         . '👤 ' . ((string) ($cita['nombre'] ?? '') ?: 'Sin nombre') . "\n"
+                        . '📱 ' . (str_contains($contacto, '@lid')
+                            ? 'oculto por WhatsApp — el chat vive en el panel'
+                            : ($contacto ?: 'Sin teléfono')) . "\n"
                         . '📝 ' . ((string) ($cita['motivo'] ?? '') ?: 'Sin motivo registrado')
                         . ($meet !== '' ? "\n🔗 " . $meet : '');
                     try {

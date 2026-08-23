@@ -182,7 +182,13 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
                     mb_substr(trim((string) ($cita['nombre'] ?? '')), 0, 100)
                         ?: (string) ($conversacion['nombre_contacto'] ?? 'Cliente'),
                     ($cita['correo'] ?? '') !== '' ? mb_substr((string) $cita['correo'], 0, 150) : null,
-                    (string) ($conversacion['telefono'] ?? ''),
+                    // El teléfono de la cita es el de CONTACTO que dictó el
+                    // cliente, no el JID del chat: con remitentes @lid el JID
+                    // no es un número al que Pedro pueda llamar. Sin contacto
+                    // dictado, queda el JID como último recurso.
+                    trim((string) ($cita['telefono'] ?? '')) !== ''
+                        ? mb_substr((string) $cita['telefono'], 0, 25)
+                        : (string) ($conversacion['telefono'] ?? ''),
                     ($cita['motivo'] ?? '') !== '' ? mb_substr((string) $cita['motivo'], 0, 400) : null,
                     $inicio . ':00',
                     $det['duracion_min'],
@@ -318,10 +324,14 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
             }
 
             $inicio = (string) $cita['inicio'];
+            $telefono = (string) ($cita['telefono'] ?? '');
             $texto = "📅 *Nueva cita confirmada*\n\n"
                 . '👤 ' . ((string) ($cita['nombre'] ?? '') ?: 'Sin nombre') . "\n"
                 . '🗓 ' . Fechas::fechaNatural(substr($inicio, 0, 10))
                 . ' a las ' . Fechas::horaNatural(substr($inicio, 11, 5)) . "\n"
+                . '📱 ' . (str_contains($telefono, '@lid')
+                    ? 'oculto por WhatsApp — el chat vive en el panel'
+                    : ($telefono ?: 'Sin teléfono')) . "\n"
                 . '📝 ' . ((string) ($cita['motivo'] ?? '') ?: 'Sin motivo registrado') . "\n"
                 . '📧 ' . ((string) ($cita['correo'] ?? '') ?: 'Sin correo')
                 . (!empty($evento['meet']) ? "\n🔗 " . $evento['meet'] : '');

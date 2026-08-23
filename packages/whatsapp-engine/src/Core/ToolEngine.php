@@ -263,6 +263,7 @@ class ToolEngine
                     'inicio' => ['type' => 'string', 'description' => "La franja elegida, 'YYYY-MM-DD HH:MM', copiada tal cual de consultar_disponibilidad"],
                     'nombre' => ['type' => 'string', 'description' => 'Nombre completo de quien asiste'],
                     'correo' => ['type' => 'string', 'description' => 'Correo al que llega la invitación con el enlace de la reunión'],
+                    'telefono' => ['type' => 'string', 'description' => 'Número de contacto con indicativo de país, ej. 573001234567. Pídeselo SIEMPRE al cliente: WhatsApp puede ocultar su número real y el negocio necesita poder llamarlo'],
                     'motivo' => ['type' => 'string', 'description' => 'El asunto de la cita en una frase, en palabras del cliente'],
                 ], 'required' => ['inicio', 'nombre']],
             ],
@@ -647,11 +648,20 @@ class ToolEngine
                 if (!$this->adapter->franjaDisponible($inicio)) {
                     return ['ok' => false, 'error' => 'Esa franja ya no está libre; consulta la disponibilidad de nuevo y ofrécele otra'];
                 }
+                // El teléfono de contacto que dicta el cliente. Importa desde
+                // que WhatsApp entrega remitentes @lid (identificador de
+                // privacidad): el JID de la conversación puede no ser un
+                // número al que el negocio pueda llamar.
+                $telCita = preg_replace('/[\s+\-().]/', '', (string)($args['telefono'] ?? ''));
+                if ($telCita !== '' && !preg_match('/^\d{10,15}$/', $telCita)) {
+                    return ['ok' => false, 'error' => 'Ese teléfono no parece válido: pídelo con indicativo de país y solo dígitos, ej. 573001234567'];
+                }
                 $ctxConv = json_decode($conv['contexto'] ?? '{}', true) ?: [];
                 $ctxConv['cita'] = [
                     'inicio' => $inicio,
                     'nombre' => trim((string)($args['nombre'] ?? '')) ?: ($conv['nombre_contacto'] ?? ''),
                     'correo' => $correo,
+                    'telefono' => $telCita,
                     'motivo' => trim((string)($args['motivo'] ?? '')),
                 ];
                 $this->db->query("UPDATE wa_conversaciones SET contexto = ? WHERE id = ?",

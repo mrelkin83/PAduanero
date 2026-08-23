@@ -67,9 +67,16 @@ class HumanHandoff
         // Aviso al número de guardia, si el negocio configuró uno.
         $numero = $cfg['handoff_numero'] ?? null;
         if ($numero && $canal) {
+            // Un remitente @lid no es un número: es el identificador de
+            // privacidad de WhatsApp, y mostrárselo crudo al operador solo
+            // confunde — no puede llamarlo ni escribirle por fuera del chat.
+            $tel = (string)($conv['telefono'] ?? '');
+            $telMostrar = strpos($tel, '@lid') !== false
+                ? 'oculto por WhatsApp — el chat vive en el panel'
+                : $tel;
             $texto = "🔔 *Un cliente necesita atención*\n\n"
                    . '👤 ' . ($conv['nombre_contacto'] ?: 'Sin nombre') . "\n"
-                   . '📱 ' . ($conv['telefono'] ?? '') . "\n"
+                   . '📱 ' . $telMostrar . "\n"
                    . '📝 ' . $motivo . "\n\n"
                    . 'Responde desde el panel: WhatsApp IA → Conversaciones.';
             try { $canal->enviarTexto($numero, $texto); } catch (\Throwable $e) { /* sin ruido */ }
