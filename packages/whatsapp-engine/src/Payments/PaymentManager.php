@@ -272,7 +272,25 @@ class PaymentManager
         if ($ref === '') return ['ok' => false, 'error' => 'Evento sin referencia'];
 
         $pago = $this->db->fetch("SELECT * FROM wa_pagos WHERE referencia = ?", [$ref]);
-        if (!$pago) return ['ok' => false, 'error' => 'Referencia desconocida'];
+        if (!$pago) {
+            // La referencia de un enlace de Wompi ROTA con cada sesión de
+            // checkout: la transacción pagada puede llegar con un sufijo
+            // distinto al guardado. El prefijo (id del enlace) es estable —
+            // se casa por él y se adopta la referencia real para lo que siga.
+            $linkId = (string)($verificado['payment_link_id'] ?? '');
+            if ($linkId === '') $linkId = strstr($ref, '_', true) ?: '';
+            if ($linkId !== '') {
+                $pago = $this->db->fetch(
+                    "SELECT * FROM wa_pagos WHERE referencia LIKE ? OR enlace_pago LIKE ?
+                     ORDER BY id DESC LIMIT 1",
+                    [$linkId . '\_%', '%/l/' . $linkId]);
+                if ($pago) {
+                    $this->db->query("UPDATE wa_pagos SET referencia = ? WHERE id = ?", [$ref, (int)$pago['id']]);
+                    $pago['referencia'] = $ref;
+                }
+            }
+        }
+        if (!$pago) return ['ok' => false, 'error' => 'Referencia desconocida: ' . $ref];
 
         if (!empty($pago['evento_externo_id']) && $pago['evento_externo_id'] === ($verificado['evento_id'] ?? '')) {
             return ['ok' => true, 'duplicado' => true];

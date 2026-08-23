@@ -345,6 +345,16 @@ final class WebhookControlador
             $pm = new PaymentManager($db, $log, $adapter);
             $res = $pm->aplicarWebhook($v);
             if (empty($res['ok']) || !empty($res['duplicado'])) {
+                // JAMÁS en silencio: un evento de pago que no se aplica es un
+                // cliente que pagó y no ve su confirmación. El primer pago
+                // real se perdió exactamente así, sin dejar una sola línea.
+                if (empty($res['ok'])) {
+                    $log->log('webhook', 'Evento de pago SIN APLICAR: ' . (string) ($res['error'] ?? ''), [
+                        'referencia' => $v['referencia'] ?? '',
+                        'estado' => $v['estado'] ?? '',
+                    ], null);
+                }
+
                 return new Respuesta('', 200);
             }
 

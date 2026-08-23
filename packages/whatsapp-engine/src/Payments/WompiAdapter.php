@@ -25,6 +25,15 @@
  * referencia propia no habría casado nunca. Por eso, tras crear el enlace se
  * relee y se guarda LA REFERENCIA DE WOMPI como clave de emparejamiento.
  *
+ * Y LA TRAMPA DENTRO DE LA TRAMPA (primer pago real, 2026-08-23): esa
+ * referencia del enlace **ROTA con cada sesión de checkout** — el sufijo
+ * `_timestamp_aleatorio` cambia cada vez que alguien abre el enlace. La
+ * transacción pagada llegó con una referencia distinta a la releída, el
+ * webhook no casó y un pago APROBADO quedó invisible. Lo único estable es el
+ * PREFIJO: el id del enlace (`sj5Kcj_…`). Por eso el emparejamiento y la
+ * consulta caen a buscar por `payment_link_id` cuando la referencia exacta
+ * no aparece.
+ *
  * Queda sin verificar (necesita un pago real de punta a punta en sandbox): la
  * caducidad de un enlace y la forma exacta del evento entrante.
  */
@@ -219,6 +228,22 @@ class WompiAdapter implements PaymentAdapterInterface
 
         $datos = $r['json']['data'] ?? [];
         if (!$datos) {
+            // La referencia exacta no aparece, pero puede haber pagado con una
+            // referencia ROTADA del mismo enlace: se busca por el id del
+            // enlace (el prefijo) en las transacciones recientes.
+            $linkId = strstr($referencia, '_', true) ?: '';
+            if ($linkId !== '') {
+                $desde = urlencode(date('Y-m-d\TH:i:s', time() - 7 * 86400));
+                $hasta = urlencode(date('Y-m-d\TH:i:s', time() + 3600));
+                $r2 = Http::json('GET',
+                    $this->base() . "/transactions?from_date={$desde}&until_date={$hasta}&page=1&page_size=200",
+                    ['Authorization: Bearer ' . $this->privateKey], null, 30);
+                foreach (($r2['json']['data'] ?? []) as $t) {
+                    if ((string)($t['payment_link_id'] ?? '') === $linkId) $datos[] = $t;
+                }
+            }
+        }
+        if (!$datos) {
             // Aún no ha pagado: no es un error, es que no hay transacción.
             $out['ok'] = true;
             $out['estado'] = 'PAYMENT_INITIATED';
@@ -287,6 +312,8 @@ class WompiAdapter implements PaymentAdapterInterface
         // como transferencia y descuadraba el arqueo. Lo cazó el primer pago de
         // punta a punta en sandbox (2026-08-14).
         $out['metodo']         = (string)($t['payment_method_type'] ?? '');
+        // El id del ENLACE: la única clave estable cuando la referencia rota.
+        $out['payment_link_id'] = (string)($t['payment_link_id'] ?? '');
         // Sin id de evento propio, la transacción + su estado identifican el
         // evento lo bastante bien para no aplicarlo dos veces.
         $out['evento_id']      = (string)($j['event'] ?? 'transaction') . ':' . $out['transaccion_id'] . ':' . ($t['status'] ?? '');
