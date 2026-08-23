@@ -673,16 +673,26 @@ final class WhatsappControlador extends ControladorBase
         }
 
         // Avisarle al cliente. Mejor esfuerzo: la aprobación ya quedó hecha.
+        // El texto se arma con lo que la cita TIENE: prometer «le llega al
+        // correo» a quien nunca dio correo es mentirle en el momento en que
+        // acaba de pagar.
         try {
             $fila = $db->fetch(
                 'SELECT v.telefono FROM wa_pedidos w JOIN wa_conversaciones v ON v.id = w.conversacion_id
                   WHERE w.pedido_id = ?',
                 [$pedidoId],
             );
+            $cita = $db->fetch('SELECT correo, gcal_meet_url FROM wa_citas WHERE id = ?', [$pedidoId]);
             $canal = \ElkinLinan\WhatsappAiEngine\Channel\EvolutionClient::desdeConfig($db);
             if ($fila && $canal !== null) {
-                $canal->enviarTexto((string) $fila['telefono'],
-                    '✅ Verificamos su pago. Su cita quedó confirmada: la invitación con el enlace de la videollamada llega a su correo.');
+                $texto = '✅ Verificamos su pago. Su cita quedó confirmada.';
+                if (!empty($cita['correo'])) {
+                    $texto .= ' La invitación con el enlace de la videollamada llega a su correo.';
+                }
+                if (!empty($cita['gcal_meet_url'])) {
+                    $texto .= "\n\nEnlace de la videollamada: " . $cita['gcal_meet_url'];
+                }
+                $canal->enviarTexto((string) $fila['telefono'], $texto);
             }
         } catch (\Throwable) {
         }

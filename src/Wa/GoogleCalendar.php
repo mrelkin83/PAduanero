@@ -211,7 +211,13 @@ final class GoogleCalendar
         );
 
         if (empty($r['id'])) {
-            $this->log->error('wa.google_evento_fallido', ['claves' => array_keys($r)]);
+            // El detalle del error, no las claves: un 400 «Bad Request» pelado
+            // costó una noche de diagnóstico porque aquí solo quedaba la forma
+            // de la respuesta.
+            $this->log->error('wa.google_evento_fallido', [
+                'codigo' => $r['error']['code'] ?? null,
+                'detalle' => $r['error']['message'] ?? 'sin detalle',
+            ]);
 
             return ['ok' => false, 'event_id' => null, 'meet' => null];
         }
@@ -293,10 +299,23 @@ final class GoogleCalendar
         return $this->accessToken = (string) $r['access_token'];
     }
 
-    /** 'Y-m-d H:i' local → RFC3339 con el desfase de Bogotá (fijo, sin DST). */
+    /**
+     * Hora local → RFC3339 con el desfase de Bogotá (fijo, sin DST).
+     *
+     * Acepta 'Y-m-d H:i' Y 'Y-m-d H:i:s': el free/busy manda la primera,
+     * pero `crearEvento` recibe el `inicio` tal cual sale de la base — CON
+     * segundos. La versión anterior concatenaba ':00' a ciegas y producía
+     * '09:00:00:00', que Google rechazaba con un 400 pelado: ningún evento
+     * de calendario llegó a crearse hasta que un pago aprobado lo delató.
+     */
     private function rfc3339(string $local): string
     {
-        return str_replace(' ', 'T', $local) . ':00-05:00';
+        $t = strtotime($local);
+        if ($t === false) {
+            return str_replace(' ', 'T', $local) . '-05:00';
+        }
+
+        return date('Y-m-d\TH:i:s', $t) . '-05:00';
     }
 
     private function http(string $metodo, string $url, ?string $cuerpo, ?string $tipo, ?string $token = null): array
