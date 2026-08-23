@@ -222,10 +222,13 @@ class TtsManager
             return $out;
         }
 
-        // Se espera hasta ~90 s: Kokoro tarda segundos, pero un motor de
-        // clonación en CPU puede tomarse su tiempo. La respuesta de estado
-        // llega como línea de SSE («data: {…}»): se pela el prefijo.
-        $limite = time() + 90;
+        // Se espera hasta 5 minutos: Kokoro tarda segundos, pero la clonación
+        // (Chatterbox) en CPU toma ~1 minuto por respuesta con el modelo
+        // caliente — y más la primera vez, que además lo carga. El webhook ya
+        // soltó su 200 (fastcgi_finish_request), así que aquí nadie se
+        // impacienta salvo el cliente, que ve «grabando audio…». La respuesta
+        // de estado llega como línea de SSE («data: {…}»): se pela el prefijo.
+        $limite = time() + 300;
         while (time() < $limite) {
             $e = Http::request('GET', $this->url . '/generate/' . rawurlencode($id) . '/status', ['timeout' => 15]);
             $crudo = trim((string)($e['body'] ?? ''));
