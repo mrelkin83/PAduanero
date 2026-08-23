@@ -112,7 +112,12 @@ class TtsManager
     public function sintetizar(string $texto): array
     {
         $out = ['ok' => false, 'audio' => '', 'mime' => 'audio/mpeg', 'error' => ''];
-        $texto = trim($texto);
+        // El texto viene FORMATEADO PARA WHATSAPP (*negrita*, _cursiva_,
+        // emojis) y la voz lo lee tal cual: «asterisco negrita asterisco».
+        // Se le quita todo lo que es tinta y no habla.
+        $texto = (string)preg_replace('/[*_~`]+/u', '', $texto);
+        $texto = (string)preg_replace('/[\x{1F000}-\x{1FAFF}\x{2190}-\x{2BFF}\x{FE0F}\x{200D}\x{2716}\x{274C}\x{2705}]/u', '', $texto);
+        $texto = trim((string)preg_replace('/[ \t]+/', ' ', $texto));
         if (!$this->disponible()) { $out['error'] = 'Voz no configurada'; return $out; }
         if ($texto === '')        { $out['error'] = 'Texto vacío'; return $out; }
         // Una nota de voz de tres minutos no la escucha nadie.
