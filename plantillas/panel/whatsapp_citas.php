@@ -42,7 +42,7 @@ $contenido = static function () use ($e, $ctx, $citas, $estados, $pagos): void {
         <table class="tabla">
             <thead>
                 <tr><th>Fecha y hora</th><th>Cliente</th><th>Teléfono</th><th>Servicio</th>
-                    <th>Estado</th><th>Pago</th><th>Precio</th><th>Meet</th></tr>
+                    <th>Estado</th><th>Pago</th><th>Precio</th><th>Meet</th><th>Recordatorio</th></tr>
             </thead>
             <tbody>
             <?php foreach ($citas as $c): ?>
@@ -69,6 +69,15 @@ $contenido = static function () use ($e, $ctx, $citas, $estados, $pagos): void {
                         <?php if (!empty($c['gcal_meet_url'])): ?>
                             <a class="underline" href="<?= $e((string) $c['gcal_meet_url']) ?>" target="_blank" rel="noopener">enlace</a>
                         <?php else: ?>—<?php endif; ?>
+                    </td>
+                    <td class="font-mono text-xs whitespace-nowrap">
+                        <?php /* La marca la pone el cron (bin/wa-recordatorios.php):
+                                 WhatsApp al cliente y a la guardia, y correo si hay
+                                 SMTP. Vacía = todavía no tocaba, o la cita no llegó
+                                 a confirmarse. */ ?>
+                        <?= !empty($c['recordatorio_enviado_at'])
+                            ? '✓ ' . $e(substr((string) $c['recordatorio_enviado_at'], 5, 11))
+                            : '—' ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
