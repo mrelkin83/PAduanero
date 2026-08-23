@@ -617,9 +617,28 @@ class ToolEngine
                 if (!$this->pedidoEsDeLaConversacion($pid, (int)$conv['id'])) {
                     return ['ok' => false, 'error' => 'Ese pedido no es de esta conversación'];
                 }
-                return $nombre === 'generar_pago'
-                    ? $this->pagos->generar($pid, $conv, (string)($args['metodo'] ?? ''))
-                    : $this->pagos->consultar($pid);
+                if ($nombre !== 'generar_pago') {
+                    return $this->pagos->consultar($pid);
+                }
+                $res = $this->pagos->generar($pid, $conv, (string)($args['metodo'] ?? ''));
+                // El enlace viaja como BOTÓN en un mensaje aparte (con caída a
+                // texto plano dentro del canal): un botón «Pagar» se toca; una
+                // URL larga en medio del mensaje se lee con desconfianza.
+                if (!empty($res['ok']) && !empty($res['enlace'])
+                    && !empty($ctx['canal']) && method_exists($ctx['canal'], 'enviarBotonUrl')) {
+                    $env = $ctx['canal']->enviarBotonUrl(
+                        (string)$conv['telefono'],
+                        'Pago seguro de su cita (Nequi, PSE o tarjeta):',
+                        'Pagar ahora 🔒',
+                        (string)$res['enlace'],
+                    );
+                    if (!empty($env['ok'])) {
+                        $res['boton_enviado'] = true;
+                        $res['nota'] = 'El botón/enlace de pago YA le llegó al cliente en un mensaje aparte. '
+                            . 'NO repitas la URL: solo dile que le acaba de llegar el botón para pagar y que la cita se confirma sola al acreditarse.';
+                    }
+                }
+                return $res;
 
             case 'consultar_disponibilidad':
                 if (!$this->adapter instanceof SoportaCitas) {

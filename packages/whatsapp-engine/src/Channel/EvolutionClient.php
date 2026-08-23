@@ -222,6 +222,34 @@ class EvolutionClient implements ChannelInterface
         return ['ok' => $r['ok'], 'message_id' => $r['json']['key']['id'] ?? null, 'error' => $r['error']];
     }
 
+    /**
+     * Un botón que abre una URL (el enlace de pago, típicamente).
+     *
+     * WhatsApp renderiza los botones de URL según la versión del cliente:
+     * en unas aparece el botón, en otras nada. Por eso esta función tiene
+     * red: si Evolution rechaza el envío, cae a texto plano con la URL — el
+     * cliente JAMÁS se queda sin el enlace por culpa de la estética.
+     */
+    public function enviarBotonUrl(string $telefono, string $texto, string $etiqueta, string $url): array
+    {
+        $numero = self::normalizarNumero($telefono);
+        if ($numero === '' || $url === '') return ['ok' => false, 'message_id' => null, 'error' => 'Destino o URL vacíos'];
+
+        $ruta = $this->url . '/message/sendButtons/' . rawurlencode($this->instancia);
+        $r = Http::json('POST', $ruta, $this->cabeceras(), [
+            'number' => $numero,
+            'title' => $texto,
+            'description' => ' ',
+            'buttons' => [['type' => 'url', 'displayText' => $etiqueta, 'url' => $url]],
+        ], 30);
+
+        if ($r['ok']) {
+            return ['ok' => true, 'message_id' => $r['json']['key']['id'] ?? null, 'error' => ''];
+        }
+
+        return $this->enviarTexto($telefono, $texto . "\n\n" . $url);
+    }
+
     public function enviarAudio(string $telefono, string $audioBase64, string $mime = 'audio/ogg'): array
     {
         $numero = self::normalizarNumero($telefono);
