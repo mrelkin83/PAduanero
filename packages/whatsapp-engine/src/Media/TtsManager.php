@@ -100,10 +100,17 @@ class TtsManager
         }
     }
 
-    /** ¿Se manda además el texto? */
+    /**
+     * ¿Se manda además el texto?
+     *
+     * Solo en 'texto_y_audio', que existe justo para eso. En 'espejo' y en
+     * 'siempre' la voz VA SOLA: mandar la misma respuesta dos veces (audio y
+     * texto idéntico debajo) se siente a máquina — el cliente que quiera
+     * leerla tiene la transcripción de WhatsApp. Antes 'espejo' duplicaba.
+     */
     public function tambienTexto(): bool
     {
-        return $this->modo !== 'siempre';
+        return $this->modo === 'texto_y_audio';
     }
 
     /**
