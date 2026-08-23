@@ -71,9 +71,10 @@ class TtsManager
         $modelo = (string)($cfg['tts_modelo'] ?? '');
         // Los de pago no funcionan sin clave; el autoalojado, sin URL — y si el
         // negocio eligió Piper sin URL/modelo propios, cae a los de plataforma.
-        if ($proveedor === 'piper') {
+        // Voicebox es el otro autoalojado: mismo trato — URL, sin API key.
+        if ($proveedor === 'piper' || $proveedor === 'voicebox') {
             if ($url === '')    $url    = $urlDef;
-            if ($modelo === '') $modelo = \ElkinLinan\WhatsappAiEngine\Engine::config()->ttsModeloPorDefecto();
+            if ($modelo === '' && $proveedor === 'piper') $modelo = \ElkinLinan\WhatsappAiEngine\Engine::config()->ttsModeloPorDefecto();
             if ($url === '') return null;
         } elseif ($clave === '') { return null; }
         return new self($proveedor, $clave, (string)($cfg['tts_voice_id'] ?? ''),
@@ -82,7 +83,9 @@ class TtsManager
 
     public function disponible(): bool
     {
-        return $this->proveedor === 'piper' ? $this->url !== '' : $this->apiKey !== '';
+        return in_array($this->proveedor, ['piper', 'voicebox'], true)
+            ? $this->url !== ''
+            : $this->apiKey !== '';
     }
 
     /** ¿Toca contestar con voz este turno? */
@@ -170,7 +173,69 @@ class TtsManager
             return $out;
         }
 
+        if ($this->proveedor === 'voicebox') {
+            return $this->sintetizarVoicebox($texto, $out);
+        }
+
         $out['error'] = 'Proveedor de voz no soportado';
+        return $out;
+    }
+
+    /**
+     * Voicebox (github.com/jamiepine/voicebox) — estudio de voz autoalojado
+     * con clonación. Su API es por TRABAJOS, no síncrona:
+     *
+     *   POST /generate {profile_id, text, language, engine} → {id, status}
+     *   GET  /generate/{id}/status → línea SSE `data: {...}` hasta completed
+     *   GET  /audio/{id}           → el WAV
+     *
+     * La «voz» es el id (o nombre) de un PERFIL creado en Voicebox — ahí es
+     * donde vive la clonación: se le suben muestras al perfil y todo esto
+     * sigue funcionando igual. El «modelo» es el motor (kokoro por defecto:
+     * es el que responde a velocidad conversacional en CPU).
+     */
+    private function sintetizarVoicebox(string $texto, array $out): array
+    {
+        if ($this->voz === '') { $out['error'] = 'Falta el perfil de voz de Voicebox (tts_voice_id)'; return $out; }
+
+        $r = Http::json('POST', $this->url . '/generate', ['Content-Type: application/json'], [
+            'profile_id' => $this->voz,
+            'text' => $texto,
+            'language' => 'es',
+            'engine' => $this->modelo ?: 'kokoro',
+        ], 30);
+        $id = (string)($r['json']['id'] ?? '');
+        if (!$r['ok'] || $id === '') {
+            $out['error'] = $r['error'] ?: 'Voicebox no aceptó la generación';
+            return $out;
+        }
+
+        // Se espera hasta ~90 s: Kokoro tarda segundos, pero un motor de
+        // clonación en CPU puede tomarse su tiempo. La respuesta de estado
+        // llega como línea de SSE («data: {…}»): se pela el prefijo.
+        $limite = time() + 90;
+        while (time() < $limite) {
+            $e = Http::request('GET', $this->url . '/generate/' . rawurlencode($id) . '/status', ['timeout' => 15]);
+            $crudo = trim((string)($e['body'] ?? ''));
+            if (strncmp($crudo, 'data:', 5) === 0) $crudo = trim(substr($crudo, 5));
+            $est = json_decode($crudo, true) ?: [];
+            $estado = (string)($est['status'] ?? '');
+            if ($estado === 'completed') {
+                $a = Http::request('GET', $this->url . '/audio/' . rawurlencode($id), ['timeout' => 30]);
+                if ($a['ok'] && strncmp($a['body'], 'RIFF', 4) === 0) {
+                    $out['ok'] = true; $out['audio'] = $a['body']; $out['mime'] = 'audio/wav';
+                    return $out;
+                }
+                $out['error'] = 'Voicebox terminó pero no entregó el audio';
+                return $out;
+            }
+            if ($estado === 'failed') {
+                $out['error'] = 'Voicebox: ' . (string)($est['error'] ?? 'la generación falló');
+                return $out;
+            }
+            sleep(1);
+        }
+        $out['error'] = 'Voicebox no terminó a tiempo';
         return $out;
     }
 
@@ -185,6 +250,19 @@ class TtsManager
             if (!$r['ok']) return [];
             foreach (($r['json']['voices'] ?? []) as $v) {
                 $out[] = ['id' => $v['voice_id'] ?? '', 'nombre' => $v['name'] ?? ''];
+            }
+            return $out;
+        }
+
+        if ($this->proveedor === 'voicebox') {
+            // GET /profiles → los perfiles creados (incluidos los clonados).
+            $r = Http::json('GET', $this->url . '/profiles', [], null, 15);
+            if (!$r['ok']) return [];
+            $lista = is_array($r['json']) ? ($r['json']['items'] ?? $r['json']) : [];
+            foreach ($lista as $p) {
+                if (!is_array($p)) continue;
+                $id = (string)($p['id'] ?? '');
+                if ($id !== '') $out[] = ['id' => $id, 'nombre' => (string)($p['name'] ?? $id)];
             }
             return $out;
         }

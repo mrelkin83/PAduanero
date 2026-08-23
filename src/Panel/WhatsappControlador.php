@@ -166,7 +166,7 @@ final class WhatsappControlador extends ControladorBase
             'stt_api_key' => $ctx->campo('stt_api_key'),
             // El modo es un enum NOT NULL: lo no reconocido cae al recomendado.
             'tts_modo' => in_array($modo, ['nunca', 'siempre', 'espejo', 'texto_y_audio'], true) ? $modo : 'espejo',
-            'tts_proveedor' => $en($ctx->campo('tts_proveedor'), ['elevenlabs', 'openai', 'piper']),
+            'tts_proveedor' => $en($ctx->campo('tts_proveedor'), ['elevenlabs', 'openai', 'piper', 'voicebox']),
             'tts_voice_id' => $ctx->campo('tts_voice_id'),
             'tts_modelo' => $ctx->campo('tts_modelo'),
             'tts_url' => rtrim($ctx->campo('tts_url'), '/'),

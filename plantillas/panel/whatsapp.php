@@ -334,7 +334,7 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                     <label class="rotulo">Proveedor de voz</label>
                     <select name="tts_proveedor" class="campo mt-1" <?= $puedeConexion ? '' : 'disabled' ?>>
                         <option value="">Sin voz — solo texto</option>
-                        <?php foreach (['elevenlabs' => 'ElevenLabs (la mejor calidad)', 'openai' => 'OpenAI', 'piper' => 'Piper — servidor propio, sin API key'] as $v => $n): ?>
+                        <?php foreach (['elevenlabs' => 'ElevenLabs (la mejor calidad)', 'openai' => 'OpenAI', 'piper' => 'Piper — servidor propio, sin API key', 'voicebox' => 'Voicebox — servidor propio, con clonación de voz'] as $v => $n): ?>
                             <option value="<?= $e($v) ?>" <?= ($cfg['tts_proveedor'] ?? '') === $v ? 'selected' : '' ?>><?= $e($n) ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -357,7 +357,7 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                            class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
                 </div>
                 <div>
-                    <label class="rotulo">URL <span class="text-acero">· solo Piper</span></label>
+                    <label class="rotulo">URL <span class="text-acero">· solo servidor propio (Piper o Voicebox)</span></label>
                     <input name="tts_url" value="<?= $e((string) ($cfg['tts_url'] ?? '')) ?>"
                            placeholder="http://127.0.0.1:5000" class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
                 </div>
