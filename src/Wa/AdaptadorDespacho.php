@@ -247,6 +247,12 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
 
         return [
             'cita_id' => (int) $c['id'],
+            // El inicio CRUDO ('Y-m-d H:i') además del natural: la guarda del
+            // motor que detecta «esta franja ya es de este mismo cliente»
+            // compara contra este campo — con el texto natural («1:00 p. m.»)
+            // no casaba nunca y el bot le decía al cliente que su propia hora
+            // «se acababa de ocupar».
+            'inicio' => substr((string) $c['inicio'], 0, 16),
             'fecha' => Fechas::fechaNatural(substr((string) $c['inicio'], 0, 10))
                 . ' a las ' . Fechas::horaNatural(substr((string) $c['inicio'], 11, 5)),
             'duracion_min' => (int) $c['duracion_min'],

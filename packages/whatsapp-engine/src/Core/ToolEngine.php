@@ -677,9 +677,8 @@ class ToolEngine
                     // cliente que la franja «se acababa de ocupar» — mentira
                     // que además lo mandó a elegir otra hora.
                     foreach ($this->adapter->citasDe((int)$conv['id']) as $cita) {
-                        $ini = (string)($cita['inicio'] ?? ($cita['fecha'] ?? ''));
-                        if (str_contains($ini, substr($inicio, 11, 5)) || $ini === $inicio) {
-                            return ['ok' => true, 'ya_apartada' => true,
+                        if (substr((string)($cita['inicio'] ?? ''), 0, 16) === $inicio) {
+                            return ['ok' => true, 'ya_apartada' => true, 'cita' => $cita,
                                     'nota' => 'Esa hora YA está apartada para este mismo cliente: no la registres otra vez ni le digas que se ocupó. Continúa con el pago (generar_pago del pedido existente).'];
                         }
                     }
