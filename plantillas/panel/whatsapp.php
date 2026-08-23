@@ -39,7 +39,7 @@ $modosPago = [
     'contra_entrega' => 'Agendar sin cobrar — el pago se maneja por fuera',
 ];
 
-$contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleConectado, $urlAutorizacion, $horario, $citasProximas, $tokenNuevo, $qr, $dias, $proveedores, $sttProveedores, $modosPago, $smtpConfigurado): void {
+$contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleConectado, $urlAutorizacion, $horario, $citasProximas, $tokenNuevo, $qr, $dias, $proveedores, $sttProveedores, $modosPago, $smtpConfigurado, $vocesTts): void {
     $puedeConexion = $ctx->puede('ia.proveedores.escribir');
     $puedeSwitch = $ctx->puede('motor.killswitch');
     $puedePrompt = $ctx->puede('ia.prompts.editar');
@@ -340,9 +340,23 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                     </select>
                 </div>
                 <div>
-                    <label class="rotulo">Voz (voice id)</label>
-                    <input name="tts_voice_id" value="<?= $e((string) ($cfg['tts_voice_id'] ?? '')) ?>"
-                           class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                    <label class="rotulo">Voz</label>
+                    <?php if ($vocesTts !== []): ?>
+                        <?php /* La lista viene del proveedor configurado (los
+                                 perfiles de Voicebox, con los clonados). Si el
+                                 servidor no responde, se cae al campo libre. */ ?>
+                        <select name="tts_voice_id" class="campo mt-1" <?= $puedeConexion ? '' : 'disabled' ?>>
+                            <option value="">— elegir una voz —</option>
+                            <?php foreach ($vocesTts as $v): ?>
+                                <option value="<?= $e($v['id']) ?>" <?= ($cfg['tts_voice_id'] ?? '') === $v['id'] ? 'selected' : '' ?>>
+                                    <?= $e($v['nombre']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    <?php else: ?>
+                        <input name="tts_voice_id" value="<?= $e((string) ($cfg['tts_voice_id'] ?? '')) ?>"
+                               class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                    <?php endif; ?>
                 </div>
                 <div>
                     <label class="rotulo">Modelo</label>

@@ -102,6 +102,7 @@ final class WhatsappControlador extends ControladorBase
             'urlAutorizacion' => $this->urlAutorizacionSiHayCliente($google),
             'horario' => WaConfig::horario(WaConfig::cargar($db, true)),
             'smtpConfigurado' => \App\Soporte\Smtp::desdeEntorno() !== null,
+            'vocesTts' => $this->vocesTts($db),
             'citasProximas' => (int) $citasProximas,
             'avisos' => $this->avisos($ctx),
         ] + $extra);
@@ -568,6 +569,25 @@ final class WhatsappControlador extends ControladorBase
             ? $this->redirigirCon('/panel/whatsapp', 'ok', 'Calendario conectado.')
             : $this->redirigirCon('/panel/whatsapp', 'error',
                 'Google no aceptó el código (caducan en minutos). Genere otro con el enlace de autorización.');
+    }
+
+    /**
+     * Las voces del proveedor de voz configurado (perfiles de Voicebox —
+     * incluidos los clonados —, voces de ElevenLabs…), para elegir de una
+     * lista en vez de pegar identificadores a mano. Vacío si el proveedor no
+     * está configurado o no responde: la pantalla cae al campo de texto.
+     *
+     * @return list<array{id:string,nombre:string}>
+     */
+    private function vocesTts(\App\Wa\DbMotor $db): array
+    {
+        try {
+            $tts = \ElkinLinan\WhatsappAiEngine\Media\TtsManager::desdeConfig(WaConfig::cargar($db, true));
+
+            return $tts !== null ? $tts->listarVoces() : [];
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     /* ── Citas y conversaciones ───────────────────────────────────────── */
