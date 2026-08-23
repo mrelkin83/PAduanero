@@ -362,7 +362,9 @@ class ToolEngine
         try {
             $res = $this->despachar($nombre, $args, $ctx);
         } catch (\InvalidArgumentException $e) {
-            return $this->fallo($nombre, $e->getMessage(), $ctx);          // mensaje apto para el cliente
+            // Con los args: sin ellos, un producto_id mutilado por el modelo
+            // fue indistinguible de un catálogo roto durante toda una noche.
+            return $this->fallo($nombre, $e->getMessage(), $ctx, $args);   // mensaje apto para el cliente
         } catch (\Throwable $e) {
             // Detalle real solo a la bitácora; al cliente jamás (§43)
             if ($this->log) $this->log->error('Fallo en la herramienta ' . $nombre . ': ' . $e->getMessage(),
@@ -379,10 +381,12 @@ class ToolEngine
         return $res;
     }
 
-    private function fallo(string $nombre, string $motivo, array $ctx): array
+    private function fallo(string $nombre, string $motivo, array $ctx, array $args = []): array
     {
         if ($this->log) {
-            $this->log->log('tool', 'Herramienta rechazada: ' . $nombre, ['motivo' => $motivo],
+            $detalle = ['motivo' => $motivo];
+            if ($args !== []) $detalle['args'] = $args;
+            $this->log->log('tool', 'Herramienta rechazada: ' . $nombre, $detalle,
                 $ctx['conversacion']['id'] ?? null);
         }
         return ['ok' => false, 'error' => $motivo];
@@ -653,6 +657,12 @@ class ToolEngine
                 // privacidad): el JID de la conversación puede no ser un
                 // número al que el negocio pueda llamar.
                 $telCita = preg_replace('/[\s+\-().]/', '', (string)($args['telefono'] ?? ''));
+                // Un número colombiano dictado sin indicativo (10 dígitos) se
+                // completa con 57: es el país del negocio y pedirle al cliente
+                // que lo repita "con indicativo" es fricción sin motivo.
+                if (preg_match('/^\d{10}$/', (string)$telCita)) {
+                    $telCita = '57' . $telCita;
+                }
                 if ($telCita !== '' && !preg_match('/^\d{10,15}$/', $telCita)) {
                     return ['ok' => false, 'error' => 'Ese teléfono no parece válido: pídelo con indicativo de país y solo dígitos, ej. 573001234567'];
                 }

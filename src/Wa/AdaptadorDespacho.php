@@ -93,6 +93,30 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
             [$id],
         );
 
+        // Pasó en producción (2026-08-22): el modelo mutiló el UUID del
+        // servicio al confirmar la cita y la venta murió en «no está en el
+        // catálogo» — tres rechazos seguidos y transferencia a humano. Dos
+        // redes, las dos sin riesgo porque el precio siempre lo pone esta
+        // tabla, jamás el modelo: se acepta también el NOMBRE del servicio,
+        // y si el catálogo activo tiene UN solo servicio —que es el caso de
+        // este despacho— un id irreconocible resuelve a ese único servicio.
+        if (!$f && trim($id) !== '') {
+            $f = $this->db->fetch(
+                'SELECT id, nombre, descripcion, duracion_min, precio_cop, modalidad
+                   FROM modalidades_asesoria WHERE LOWER(nombre) = LOWER(?) AND activo = 1',
+                [trim($id)],
+            );
+        }
+        if (!$f) {
+            $activos = $this->db->fetchAll(
+                'SELECT id, nombre, descripcion, duracion_min, precio_cop, modalidad
+                   FROM modalidades_asesoria WHERE activo = 1',
+            );
+            if (count($activos) === 1) {
+                $f = $activos[0];
+            }
+        }
+
         return $f ? $this->comoItem($f) : null;
     }
 
