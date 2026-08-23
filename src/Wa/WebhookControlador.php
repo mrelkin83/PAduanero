@@ -255,18 +255,57 @@ final class WebhookControlador
         }
 
         // ── Pensar y responder ────────────────────────────────────────
-        $orq = new AiOrchestrator($db, $canal, $log, $pagos);
-        $respuesta = $orq->procesar($conv, $texto);
-
-        // ── Voz de vuelta, si toca ────────────────────────────────────
+        // Cuando la respuesta va a ser hablada, el orquestador escribe sobre
+        // un canal que RETIENE los textos: la regla del PO es que a una nota
+        // de voz se contesta con voz, y por texto va solo lo que se dicta mal
+        // (enlaces, correos, horas, montos). Antes el texto salía siempre y
+        // el audio llegaba de duplicado tardío.
         $tts = TtsManager::desdeConfig($cfg);
-        if ($respuesta !== '' && $tts && $tts->debeHablar($eraAudio)) {
-            $s = $tts->sintetizar($respuesta);
-            if ($s['ok']) {
-                $canal->enviarAudio($msg['telefono'], base64_encode($s['audio']), $s['mime']);
+        $hablara = $tts !== null && $tts->debeHablar($eraAudio);
+
+        $canalTurno = $hablara ? new CanalConVoz($canal) : $canal;
+        $orq = new AiOrchestrator($db, $canalTurno, $log, $pagos);
+        $orq->procesar($conv, $texto);
+
+        if (!$hablara || !$canalTurno instanceof CanalConVoz) {
+            return;
+        }
+
+        $hablables = [];
+        $escritos = [];
+        foreach ($canalTurno->retenidos() as $m) {
+            if (CanalConVoz::esDatoDuro($m['texto'])) {
+                $escritos[] = $m;
             } else {
-                $log->error('No se pudo generar el audio de respuesta: ' . $s['error'], null, (int) $conv['id']);
+                $hablables[] = $m;
             }
+        }
+
+        $dicho = trim(implode("\n\n", array_column($hablables, 'texto')));
+        $vozSalio = false;
+        if ($dicho !== '') {
+            $s = $tts->sintetizar($dicho);
+            if ($s['ok']) {
+                $env = $canal->enviarAudio($msg['telefono'], base64_encode($s['audio']), $s['mime']);
+                $vozSalio = !empty($env['ok']);
+            }
+            if (!$vozSalio) {
+                $log->error('No se pudo responder con voz: ' . ($s['error'] ?? 'envío fallido'), null, (int) $conv['id']);
+            }
+        }
+
+        // La red: si la voz no salió — o el modo pide las dos cosas — los
+        // textos hablables se entregan escritos. El cliente jamás se queda
+        // mirando el chat en silencio.
+        if (!$vozSalio || $tts->tambienTexto()) {
+            foreach ($hablables as $m) {
+                $canal->enviarTexto($m['telefono'], $m['texto']);
+            }
+        }
+
+        // Los datos duros van escritos SIEMPRE, después del audio, en su orden.
+        foreach ($escritos as $m) {
+            $canal->enviarTexto($m['telefono'], $m['texto']);
         }
     }
 
