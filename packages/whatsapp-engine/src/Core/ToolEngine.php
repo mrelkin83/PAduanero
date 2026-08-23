@@ -263,7 +263,7 @@ class ToolEngine
                     'inicio' => ['type' => 'string', 'description' => "La franja elegida, 'YYYY-MM-DD HH:MM', copiada tal cual de consultar_disponibilidad"],
                     'nombre' => ['type' => 'string', 'description' => 'Nombre completo de quien asiste'],
                     'correo' => ['type' => 'string', 'description' => 'Correo al que llega la invitación con el enlace de la reunión'],
-                    'telefono' => ['type' => 'string', 'description' => 'Número de contacto con indicativo de país, ej. 573001234567. Pídeselo SIEMPRE al cliente: WhatsApp puede ocultar su número real y el negocio necesita poder llamarlo'],
+                    'telefono' => ['type' => 'string', 'description' => 'Celular de contacto del cliente, 10 dígitos tal como lo dicte (ej. 3001234567) — NUNCA le pidas indicativo ni prefijo de país: el sistema lo completa solo. Pídeselo SIEMPRE: WhatsApp puede ocultar su número real y el negocio necesita poder llamarlo'],
                     'motivo' => ['type' => 'string', 'description' => 'El asunto de la cita en una frase, en palabras del cliente'],
                 ], 'required' => ['inicio', 'nombre']],
             ],
@@ -621,21 +621,23 @@ class ToolEngine
                     return $this->pagos->consultar($pid);
                 }
                 $res = $this->pagos->generar($pid, $conv, (string)($args['metodo'] ?? ''));
-                // El enlace viaja como BOTÓN en un mensaje aparte (con caída a
-                // texto plano dentro del canal): un botón «Pagar» se toca; una
-                // URL larga en medio del mensaje se lee con desconfianza.
+                // El enlace viaja en un mensaje aparte, limpio y como TEXTO.
+                // Se intentó como botón de URL (sendButtons): Evolution lo
+                // acepta con 200 pero WhatsApp lo renderiza según la versión
+                // del cliente, y en producción sencillamente no llegó — un
+                // «ok» del canal que el cliente nunca ve es la peor clase de
+                // éxito. El texto plano se muestra siempre y WhatsApp mismo lo
+                // vuelve tocable.
                 if (!empty($res['ok']) && !empty($res['enlace'])
-                    && !empty($ctx['canal']) && method_exists($ctx['canal'], 'enviarBotonUrl')) {
-                    $env = $ctx['canal']->enviarBotonUrl(
+                    && !empty($ctx['canal']) && method_exists($ctx['canal'], 'enviarTexto')) {
+                    $env = $ctx['canal']->enviarTexto(
                         (string)$conv['telefono'],
-                        'Pago seguro de su cita (Nequi, PSE o tarjeta):',
-                        'Pagar ahora 🔒',
-                        (string)$res['enlace'],
+                        "🔒 Pago seguro de su cita (Nequi, PSE o tarjeta):\n\n" . $res['enlace'],
                     );
                     if (!empty($env['ok'])) {
-                        $res['boton_enviado'] = true;
-                        $res['nota'] = 'El botón/enlace de pago YA le llegó al cliente en un mensaje aparte. '
-                            . 'NO repitas la URL: solo dile que le acaba de llegar el botón para pagar y que la cita se confirma sola al acreditarse.';
+                        $res['enlace_enviado'] = true;
+                        $res['nota'] = 'El enlace de pago YA le llegó al cliente en un mensaje aparte. '
+                            . 'NO repitas la URL: solo dile que le acaba de llegar y que la cita se confirma sola al acreditarse el pago.';
                     }
                 }
                 return $res;
@@ -669,6 +671,18 @@ class ToolEngine
                 // y eligió: se revalida aquí, y crear_pedido revalidará OTRA
                 // vez de forma atómica al reservar.
                 if (!$this->adapter->franjaDisponible($inicio)) {
+                    // ¿La tiene tomada ESTE mismo cliente? Pasó en producción:
+                    // tras crear el pedido, el modelo volvió a registrar la
+                    // misma hora, chocó con su propia reserva y le dijo al
+                    // cliente que la franja «se acababa de ocupar» — mentira
+                    // que además lo mandó a elegir otra hora.
+                    foreach ($this->adapter->citasDe((int)$conv['id']) as $cita) {
+                        $ini = (string)($cita['inicio'] ?? ($cita['fecha'] ?? ''));
+                        if (str_contains($ini, substr($inicio, 11, 5)) || $ini === $inicio) {
+                            return ['ok' => true, 'ya_apartada' => true,
+                                    'nota' => 'Esa hora YA está apartada para este mismo cliente: no la registres otra vez ni le digas que se ocupó. Continúa con el pago (generar_pago del pedido existente).'];
+                        }
+                    }
                     return ['ok' => false, 'error' => 'Esa franja ya no está libre; consulta la disponibilidad de nuevo y ofrécele otra'];
                 }
                 // El teléfono de contacto que dicta el cliente. Importa desde
