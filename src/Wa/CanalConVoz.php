@@ -27,8 +27,17 @@ final class CanalConVoz implements ChannelInterface
     /** @var list<array{telefono:string,texto:string}> */
     private array $retenidos = [];
 
-    public function __construct(private readonly ChannelInterface $real)
-    {
+    /**
+     * @param string $telefonoCliente el chat cuya respuesta va a ser hablada:
+     *        SOLO sus textos se retienen. Los dirigidos a cualquier otro
+     *        número (la alerta al guardia, por ejemplo) pasan derecho — pasó
+     *        en producción que la alerta interna del guardia terminó LEÍDA EN
+     *        VOZ dentro de la nota que recibió el cliente.
+     */
+    public function __construct(
+        private readonly ChannelInterface $real,
+        private readonly string $telefonoCliente,
+    ) {
     }
 
     /** @return list<array{telefono:string,texto:string}> */
@@ -48,6 +57,10 @@ final class CanalConVoz implements ChannelInterface
 
     public function enviarTexto(string $telefono, string $texto): array
     {
+        if ($telefono !== $this->telefonoCliente) {
+            return $this->real->enviarTexto($telefono, $texto);
+        }
+
         $this->retenidos[] = ['telefono' => $telefono, 'texto' => $texto];
 
         return ['ok' => true, 'message_id' => null, 'error' => ''];

@@ -48,6 +48,9 @@ class LlmProviderManager
     private $db;
     private $log;
 
+    /** El respaldo tomó el mando en este turno y se queda con él (ver chat()). */
+    private $respaldoAlMando = false;
+
     public function __construct($db, $log = null)
     {
         $this->db  = $db;
@@ -153,6 +156,24 @@ class LlmProviderManager
                     'error' => 'No hay proveedor de IA configurado', 'proveedor_usado' => '', 'fue_respaldo' => false];
         }
 
+        // Si el respaldo ya tomó el mando en este turno, SE QUEDA al mando.
+        // Volver al principal a mitad de turno rompe con Gemini 3: sus
+        // functionCall exigen la firma de razonamiento (thoughtSignature) que
+        // las llamadas hechas por OTRO proveedor no tienen, y rechaza el
+        // historial entero — pasó en producción con Groq de relevo.
+        if ($this->respaldoAlMando) {
+            $respaldo = $this->respaldo();
+            if ($respaldo) {
+                $res2 = $respaldo->chat($params);
+                $res2['proveedor_usado'] = $cfg['llm_fallback_proveedor'] ?? '';
+                $res2['fue_respaldo']    = true;
+                $res2['latencia_ms']     = (int)round((microtime(true) - $inicio) * 1000);
+                if ($res2['ok']) return $res2;
+            }
+            // El respaldo también murió: se intenta el principal como último
+            // recurso — peor es callar.
+        }
+
         $res = $adapter->chat($params);
 
         // Límite de tasa: se ESPERA Y SE REINTENTA, no se escala.
@@ -198,7 +219,7 @@ class LlmProviderManager
                 $res2['proveedor_usado'] = $cfg['llm_fallback_proveedor'] ?? '';
                 $res2['fue_respaldo']    = true;
                 $res2['latencia_ms']     = (int)round((microtime(true) - $inicio2) * 1000);
-                if ($res2['ok']) return $res2;
+                if ($res2['ok']) { $this->respaldoAlMando = true; return $res2; }
                 // Los dos fallaron: se conserva el error del principal, que es el
                 // que el operador tiene que arreglar.
                 $res['error'] .= ' (el respaldo también falló: ' . $res2['error'] . ')';

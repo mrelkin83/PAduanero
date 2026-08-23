@@ -263,7 +263,7 @@ final class WebhookControlador
         $tts = TtsManager::desdeConfig($cfg);
         $hablara = $tts !== null && $tts->debeHablar($eraAudio);
 
-        $canalTurno = $hablara ? new CanalConVoz($canal) : $canal;
+        $canalTurno = $hablara ? new CanalConVoz($canal, (string) $msg['telefono']) : $canal;
         $orq = new AiOrchestrator($db, $canalTurno, $log, $pagos);
         $orq->procesar($conv, $texto);
 
