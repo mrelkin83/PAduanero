@@ -42,6 +42,22 @@ try {
         $log->info('wa.citas_recordadas', ['citas' => $enviadas]);
         echo "Recordadas: {$enviadas}\n";
     }
+
+    // La otra cara de la agenda: la reserva aparta la franja MIENTRAS se
+    // paga, y si el pago no llega (wa_config.pago_expira_minutos, 30 por
+    // defecto), aquí se cancela y la hora vuelve a ofrecerse. Sin esta
+    // llamada, nada vencía los apartados y una franja sin pagar quedaba
+    // retenida para siempre.
+    $vencidos = (new \ElkinLinan\WhatsappAiEngine\Payments\PaymentManager(
+        $db,
+        new \ElkinLinan\WhatsappAiEngine\Core\AuditLogger($db),
+        \ElkinLinan\WhatsappAiEngine\Engine::dominio(),
+    ))->vencerAbandonados();
+
+    if ($vencidos > 0) {
+        $log->info('wa.apartados_vencidos', ['pedidos' => $vencidos]);
+        echo "Vencidos: {$vencidos}\n";
+    }
 } catch (\Throwable $e) {
     error_log('[wa-recordatorios] ' . $e->getMessage());
     exit(1);
