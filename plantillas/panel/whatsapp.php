@@ -357,6 +357,12 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                         <input name="tts_voice_id" value="<?= $e((string) ($cfg['tts_voice_id'] ?? '')) ?>"
                                class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
                     <?php endif; ?>
+                    <?php /* type="button": no envía el formulario y el bloqueo
+                             global no lo apaga — se puede escuchar sin pulsar
+                             Editar. Lo revela el script; sin JS no hay audio
+                             que reproducir. */ ?>
+                    <button type="button" id="escuchar-voz" hidden
+                            class="mt-1 text-xs text-acero underline">▶ Escuchar la voz seleccionada</button>
                 </div>
                 <div>
                     <label class="rotulo">Modelo</label>
@@ -669,6 +675,34 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
  * guardada. El botón «Buscar modelos» fuerza siempre la sincronización.
  */
 $scripts = static function (): void { ?>
+(function () {
+    'use strict';
+
+    // Previsualización de la voz elegida: el servidor sintetiza una frase
+    // corta (con caché por voz) y aquí solo se reproduce.
+    var escuchar = document.getElementById('escuchar-voz');
+    if (escuchar) {
+        var reproductor = new Audio();
+        escuchar.hidden = false;
+        escuchar.addEventListener('click', function () {
+            var campo = document.querySelector('[name="tts_voice_id"]');
+            var voz = campo ? campo.value : '';
+            if (!voz) {
+                escuchar.textContent = 'elige una voz primero';
+                setTimeout(function () { escuchar.textContent = '▶ Escuchar la voz seleccionada'; }, 1800);
+                return;
+            }
+            escuchar.disabled = true;
+            escuchar.textContent = 'generando la muestra…';
+            reproductor.src = '/panel/whatsapp/voz-prueba?voz=' + encodeURIComponent(voz);
+            reproductor.onplaying = function () { escuchar.textContent = '🔊 sonando'; };
+            reproductor.onended = function () { escuchar.disabled = false; escuchar.textContent = '▶ Escuchar la voz seleccionada'; };
+            reproductor.onerror = function () { escuchar.disabled = false; escuchar.textContent = 'no se pudo — reintentar'; };
+            reproductor.play().catch(function () { escuchar.disabled = false; escuchar.textContent = 'no se pudo — reintentar'; });
+        });
+    }
+})();
+
 (function () {
     'use strict';
 

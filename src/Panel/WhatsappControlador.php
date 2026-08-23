@@ -590,6 +590,56 @@ final class WhatsappControlador extends ControladorBase
         }
     }
 
+    /**
+     * Previsualización de una voz: sintetiza una frase corta con la voz
+     * pedida y la devuelve como audio. Con caché en disco por voz+modelo —
+     * escuchar dos veces la misma voz no puede costar créditos dos veces.
+     */
+    public function probarVoz(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.ver');
+        $db = $this->db();
+
+        $voz = trim((string) ($ctx->peticion->consulta['voz'] ?? ''));
+        if ($voz === '' || !preg_match('/^[\w\-.]{1,80}$/', $voz)) {
+            return new Respuesta('Voz inválida.', 422, ['Content-Type' => 'text/plain; charset=utf-8']);
+        }
+
+        $cfg = WaConfig::cargar($db, true) ?? [];
+        $prov = (string) ($cfg['tts_proveedor'] ?? '');
+        if ($prov === '') {
+            return new Respuesta('No hay proveedor de voz configurado.', 422, ['Content-Type' => 'text/plain; charset=utf-8']);
+        }
+
+        $mime = in_array($prov, ['elevenlabs', 'openai'], true) ? 'audio/mpeg' : 'audio/wav';
+        $ruta = dirname(__DIR__, 2) . '/storage/cache/voz-'
+            . md5($prov . '|' . $voz . '|' . (string) ($cfg['tts_modelo'] ?? '')) . '.audio';
+
+        if (!is_file($ruta) || filesize($ruta) === 0) {
+            $tts = new \ElkinLinan\WhatsappAiEngine\Media\TtsManager(
+                $prov,
+                WaConfig::secreto($cfg, 'tts_api_key'),
+                $voz,
+                (string) ($cfg['tts_modelo'] ?? ''),
+                'siempre',
+                (string) ($cfg['tts_url'] ?? ''),
+            );
+            $s = $tts->sintetizar('Hola, le habla la asistente del doctor Pedro. Así sueno yo, ¿le gusta mi voz?');
+            if (empty($s['ok'])) {
+                return new Respuesta('No se pudo generar la muestra: ' . (string) $s['error'], 502,
+                    ['Content-Type' => 'text/plain; charset=utf-8']);
+            }
+            $mime = (string) $s['mime'];
+            @file_put_contents($ruta, $s['audio']);
+
+            return new Respuesta((string) $s['audio'], 200,
+                ['Content-Type' => $mime, 'Cache-Control' => 'private, max-age=86400']);
+        }
+
+        return new Respuesta((string) file_get_contents($ruta), 200,
+            ['Content-Type' => $mime, 'Cache-Control' => 'private, max-age=86400']);
+    }
+
     /* ── Citas y conversaciones ───────────────────────────────────────── */
 
     public function citas(Contexto $ctx): Respuesta

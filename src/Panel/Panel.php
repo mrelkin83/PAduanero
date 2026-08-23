@@ -170,6 +170,7 @@ final class Panel
             'GET /whatsapp/citas' => $modulos['whatsapp']->citas($ctx),
             'GET /whatsapp/conversaciones' => $modulos['whatsapp']->conversaciones($ctx),
             'POST /whatsapp/conversaciones/reanudar' => $modulos['whatsapp']->reanudarIa($ctx),
+            'GET /whatsapp/voz-prueba' => $modulos['whatsapp']->probarVoz($ctx),
             'POST /whatsapp/pagos/aprobar' => $modulos['whatsapp']->aprobarPago($ctx),
             'GET /whatsapp/comprobante' => $modulos['whatsapp']->comprobante($ctx),
 
