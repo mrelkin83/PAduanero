@@ -363,6 +363,8 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                              que reproducir. */ ?>
                     <button type="button" id="escuchar-voz" hidden
                             class="mt-1 text-xs text-acero underline">▶ Escuchar la voz seleccionada</button>
+                    <button type="button" id="enviar-voz" hidden
+                            class="mt-1 ml-3 text-xs text-acero underline">📲 Enviar prueba al WhatsApp de guardia</button>
                 </div>
                 <div>
                     <label class="rotulo">Modelo</label>
@@ -699,6 +701,41 @@ $scripts = static function (): void { ?>
             reproductor.onended = function () { escuchar.disabled = false; escuchar.textContent = '▶ Escuchar la voz seleccionada'; };
             reproductor.onerror = function () { escuchar.disabled = false; escuchar.textContent = 'no se pudo — reintentar'; };
             reproductor.play().catch(function () { escuchar.disabled = false; escuchar.textContent = 'no se pudo — reintentar'; });
+        });
+    }
+
+    // La misma muestra, como nota de voz al WhatsApp del número de guardia:
+    // se escucha donde de verdad va a sonar, con la compresión de WhatsApp.
+    var enviar = document.getElementById('enviar-voz');
+    if (enviar) {
+        enviar.hidden = false;
+        enviar.addEventListener('click', function () {
+            var campo = document.querySelector('[name="tts_voice_id"]');
+            var voz = campo ? campo.value : '';
+            if (!voz) {
+                enviar.textContent = 'elige una voz primero';
+                setTimeout(function () { enviar.textContent = '📲 Enviar prueba al WhatsApp de guardia'; }, 1800);
+                return;
+            }
+            enviar.disabled = true;
+            enviar.textContent = 'enviando…';
+            var cuerpo = new URLSearchParams();
+            cuerpo.set('voz', voz);
+            fetch('/panel/whatsapp/voz-prueba/enviar', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': (document.cookie.match(/(?:^|; )pa_csrf=([a-f0-9]{64})/) || [])[1] || '' },
+                body: cuerpo
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (j) {
+                    enviar.disabled = false;
+                    enviar.textContent = j.ok ? '✓ enviada al número de guardia' : (j.error || 'falló el envío');
+                    setTimeout(function () { enviar.textContent = '📲 Enviar prueba al WhatsApp de guardia'; }, 4000);
+                })
+                .catch(function () {
+                    enviar.disabled = false;
+                    enviar.textContent = 'falló el envío — reintentar';
+                });
         });
     }
 })();

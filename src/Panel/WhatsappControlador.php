@@ -611,33 +611,90 @@ final class WhatsappControlador extends ControladorBase
             return new Respuesta('No hay proveedor de voz configurado.', 422, ['Content-Type' => 'text/plain; charset=utf-8']);
         }
 
+        $s = $this->muestraDeVoz($cfg, $prov, $voz);
+        if (empty($s['ok'])) {
+            return new Respuesta('No se pudo generar la muestra: ' . (string) $s['error'], 502,
+                ['Content-Type' => 'text/plain; charset=utf-8']);
+        }
+
+        return new Respuesta((string) $s['audio'], 200,
+            ['Content-Type' => (string) $s['mime'], 'Cache-Control' => 'private, max-age=86400']);
+    }
+
+    /**
+     * La misma muestra, pero entregada como NOTA DE VOZ al WhatsApp del
+     * número de guardia — así se escucha donde de verdad va a sonar: en el
+     * teléfono, con la compresión de WhatsApp incluida.
+     */
+    public function enviarPruebaVoz(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.ver');
+        $db = $this->db();
+
+        $voz = trim($ctx->campo('voz'));
+        if ($voz === '' || !preg_match('/^[\w\-.]{1,80}$/', $voz)) {
+            return Respuesta::json(['ok' => false, 'error' => 'Voz inválida.'], 422);
+        }
+
+        $cfg = WaConfig::cargar($db, true) ?? [];
+        $prov = (string) ($cfg['tts_proveedor'] ?? '');
+        $guardia = trim((string) ($cfg['handoff_numero'] ?? ''));
+        if ($prov === '') {
+            return Respuesta::json(['ok' => false, 'error' => 'No hay proveedor de voz configurado.'], 422);
+        }
+        if ($guardia === '') {
+            return Respuesta::json(['ok' => false, 'error' => 'No hay número de guardia configurado (Horario y agenda).'], 422);
+        }
+
+        $s = $this->muestraDeVoz($cfg, $prov, $voz);
+        if (empty($s['ok'])) {
+            return Respuesta::json(['ok' => false, 'error' => 'No se pudo generar: ' . (string) $s['error']], 502);
+        }
+
+        $canal = \ElkinLinan\WhatsappAiEngine\Channel\EvolutionClient::desdeConfig($db);
+        if ($canal === null) {
+            return Respuesta::json(['ok' => false, 'error' => 'El canal de WhatsApp no está configurado.'], 422);
+        }
+        $canal->enviarTexto($guardia, '🎙 Prueba de voz del panel');
+        $env = $canal->enviarAudio($guardia, base64_encode((string) $s['audio']), (string) $s['mime']);
+        $this->auditar($ctx, 'prueba_voz_enviada', ['voz' => $voz, 'a' => $guardia]);
+
+        return Respuesta::json(!empty($env['ok'])
+            ? ['ok' => true, 'mensaje' => 'Nota de voz enviada al número de guardia.']
+            : ['ok' => false, 'error' => (string) ($env['error'] ?? 'El envío falló.')]);
+    }
+
+    /**
+     * Sintetiza (o recupera de la caché) la frase de muestra con una voz.
+     *
+     * @param array<string,mixed> $cfg
+     * @return array{ok:bool,audio:string,mime:string,error:string}
+     */
+    private function muestraDeVoz(array $cfg, string $prov, string $voz): array
+    {
         $mime = in_array($prov, ['elevenlabs', 'openai'], true) ? 'audio/mpeg' : 'audio/wav';
         $ruta = dirname(__DIR__, 2) . '/storage/cache/voz-'
             . md5($prov . '|' . $voz . '|' . (string) ($cfg['tts_modelo'] ?? '')) . '.audio';
 
-        if (!is_file($ruta) || filesize($ruta) === 0) {
-            $tts = new \ElkinLinan\WhatsappAiEngine\Media\TtsManager(
-                $prov,
-                WaConfig::secreto($cfg, 'tts_api_key'),
-                $voz,
-                (string) ($cfg['tts_modelo'] ?? ''),
-                'siempre',
-                (string) ($cfg['tts_url'] ?? ''),
-            );
-            $s = $tts->sintetizar('Hola, le habla la asistente del doctor Pedro. Así sueno yo, ¿le gusta mi voz?');
-            if (empty($s['ok'])) {
-                return new Respuesta('No se pudo generar la muestra: ' . (string) $s['error'], 502,
-                    ['Content-Type' => 'text/plain; charset=utf-8']);
-            }
-            $mime = (string) $s['mime'];
-            @file_put_contents($ruta, $s['audio']);
-
-            return new Respuesta((string) $s['audio'], 200,
-                ['Content-Type' => $mime, 'Cache-Control' => 'private, max-age=86400']);
+        if (is_file($ruta) && filesize($ruta) > 0) {
+            return ['ok' => true, 'audio' => (string) file_get_contents($ruta), 'mime' => $mime, 'error' => ''];
         }
 
-        return new Respuesta((string) file_get_contents($ruta), 200,
-            ['Content-Type' => $mime, 'Cache-Control' => 'private, max-age=86400']);
+        $tts = new \ElkinLinan\WhatsappAiEngine\Media\TtsManager(
+            $prov,
+            WaConfig::secreto($cfg, 'tts_api_key'),
+            $voz,
+            (string) ($cfg['tts_modelo'] ?? ''),
+            'siempre',
+            (string) ($cfg['tts_url'] ?? ''),
+        );
+        $s = $tts->sintetizar('Hola, le habla la asistente del doctor Pedro. Así sueno yo, ¿le gusta mi voz?');
+        if (!empty($s['ok'])) {
+            @file_put_contents($ruta, $s['audio']);
+        }
+
+        return ['ok' => (bool) ($s['ok'] ?? false), 'audio' => (string) ($s['audio'] ?? ''),
+                'mime' => (string) ($s['mime'] ?? $mime), 'error' => (string) ($s['error'] ?? '')];
     }
 
     /* ── Citas y conversaciones ───────────────────────────────────────── */
