@@ -605,12 +605,110 @@ final class WhatsappControlador extends ControladorBase
             }
         }
 
+        // Pagos que esperan un ojo humano: la transferencia directa (Nequi,
+        // banco) no tiene API que la confirme, así que el comprobante lo
+        // aprueba una persona aquí — y esa aprobación es la que confirma la
+        // cita y dispara el evento del calendario.
+        $pagosRevision = $db->fetchAll(
+            "SELECT pg.id AS pago_id, pg.monto, pg.referencia, pg.estado,
+                    pg.comprobante_media_ruta, pg.updated_at,
+                    w.pedido_id, w.conversacion_id, v.nombre_contacto,
+                    ci.inicio AS cita_inicio
+               FROM wa_pagos pg
+               JOIN wa_pedidos w ON w.id = pg.wa_pedido_id
+               JOIN wa_conversaciones v ON v.id = w.conversacion_id
+               LEFT JOIN wa_citas ci ON ci.id = w.pedido_id
+              WHERE pg.estado IN ('PAYMENT_REVIEW_REQUIRED','PAYMENT_SCREENSHOT_RECEIVED','PAYMENT_VALIDATING')
+              ORDER BY pg.updated_at DESC
+              LIMIT 50"
+        );
+
         return $this->vista('panel/whatsapp_conversaciones', [
             'ctx' => $ctx,
             'lista' => $lista,
             'abierta' => $abierta,
             'mensajes' => $mensajes,
+            'pagosRevision' => $pagosRevision,
             'avisos' => $this->avisos($ctx),
+        ]);
+    }
+
+    /**
+     * Aprueba a mano un pago en revisión (comprobante de transferencia).
+     *
+     * Es la contraparte humana del webhook de Wompi: `aprobarManual` deja
+     * constancia de quién aprobó, y el motor hace el resto — confirma la
+     * cita, crea el evento con Meet y avisa al abogado. Aquí solo se añade
+     * el mensaje al cliente, que de otro modo no se enteraría.
+     */
+    public function aprobarPago(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'casos.editar');
+        $db = $this->db();
+
+        $pedidoId = (int) $ctx->campo('pedido_id');
+        $pm = new \ElkinLinan\WhatsappAiEngine\Payments\PaymentManager(
+            $db,
+            new \ElkinLinan\WhatsappAiEngine\Core\AuditLogger($db),
+            \ElkinLinan\WhatsappAiEngine\Engine::dominio(),
+        );
+        $r = $pm->aprobarManual($pedidoId, (int) $ctx->usuario->id, mb_substr($ctx->campo('nota'), 0, 200));
+        $this->auditar($ctx, 'aprobar_pago', ['pedido' => $pedidoId, 'ok' => !empty($r['ok'])]);
+
+        if (empty($r['ok'])) {
+            return $this->redirigirCon('/panel/whatsapp/conversaciones', 'error',
+                (string) ($r['error'] ?? 'No se pudo aprobar el pago.'));
+        }
+
+        // Avisarle al cliente. Mejor esfuerzo: la aprobación ya quedó hecha.
+        try {
+            $fila = $db->fetch(
+                'SELECT v.telefono FROM wa_pedidos w JOIN wa_conversaciones v ON v.id = w.conversacion_id
+                  WHERE w.pedido_id = ?',
+                [$pedidoId],
+            );
+            $canal = \ElkinLinan\WhatsappAiEngine\Channel\EvolutionClient::desdeConfig($db);
+            if ($fila && $canal !== null) {
+                $canal->enviarTexto((string) $fila['telefono'],
+                    '✅ Verificamos su pago. Su cita quedó confirmada: la invitación con el enlace de la videollamada llega a su correo.');
+            }
+        } catch (\Throwable) {
+        }
+
+        return $this->redirigirCon('/panel/whatsapp/conversaciones', 'ok',
+            'Pago aprobado: la cita queda confirmada y el cliente ya fue avisado.');
+    }
+
+    /** Sirve el comprobante adjunto de un pago, solo a quien puede ver casos. */
+    public function comprobante(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'casos.ver');
+        $db = $this->db();
+
+        $pago = $db->fetch(
+            'SELECT comprobante_media_ruta FROM wa_pagos WHERE id = ?',
+            [(int) ($ctx->peticion->consulta['pago'] ?? 0)],
+        );
+        $rel = (string) ($pago['comprobante_media_ruta'] ?? '');
+        $raiz = realpath(\ElkinLinan\WhatsappAiEngine\Engine::archivos()->raiz());
+        $ruta = $rel !== '' && $raiz !== false ? realpath($raiz . '/' . $rel) : false;
+
+        // El realpath ancla la ruta dentro del almacén: una ruta con ../ en la
+        // base no puede sacar archivos de otra parte del disco.
+        if ($ruta === false || !str_starts_with($ruta, $raiz . DIRECTORY_SEPARATOR)) {
+            return new Respuesta('No encontrado.', 404, ['Content-Type' => 'text/plain; charset=utf-8']);
+        }
+
+        $mime = match (strtolower(pathinfo($ruta, PATHINFO_EXTENSION))) {
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            'pdf' => 'application/pdf',
+            default => 'image/jpeg',
+        };
+
+        return new Respuesta((string) file_get_contents($ruta), 200, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'private, max-age=300',
         ]);
     }
 

@@ -15,6 +15,7 @@ use App\Soporte\Vista;
  * @var list<array<string,mixed>> $lista
  * @var array<string,mixed>|null  $abierta
  * @var list<array<string,mixed>> $mensajes
+ * @var list<array<string,mixed>> $pagosRevision
  * @var array{ok:string,error:string} $avisos
  */
 
@@ -28,12 +29,54 @@ $estados = [
     'CERRADA' => 'Cerrada',
 ];
 
-$contenido = static function () use ($e, $ctx, $lista, $abierta, $mensajes, $estados): void { ?>
+$contenido = static function () use ($e, $ctx, $lista, $abierta, $mensajes, $estados, $pagosRevision): void { ?>
 
     <p class="text-sm text-acero">
         Las últimas 100. Para responder en persona: WhatsApp del negocio.
         <a class="underline" href="/panel/whatsapp">Volver a la configuración</a>.
     </p>
+
+    <?php if ($pagosRevision !== []): ?>
+    <section class="mt-4">
+        <h2 class="rotulo">Pagos por verificar</h2>
+        <p class="mt-1 text-sm text-acero">
+            Transferencias directas (Nequi, banco): el cliente mandó su comprobante y
+            espera. Aprobar el pago confirma la cita, crea el evento en el calendario
+            y le avisa al cliente por WhatsApp.
+        </p>
+        <table class="tabla mt-2">
+            <thead><tr><th>Cliente</th><th>Monto</th><th>Cita</th><th>Comprobante</th><th></th></tr></thead>
+            <tbody>
+            <?php foreach ($pagosRevision as $p): ?>
+                <tr>
+                    <td>
+                        <?= $e((string) ($p['nombre_contacto'] ?: 'Sin nombre')) ?>
+                        <a class="block text-xs underline" href="/panel/whatsapp/conversaciones?ver=<?= (int) $p['conversacion_id'] ?>">ver conversación</a>
+                    </td>
+                    <td class="font-mono">$<?= $e(number_format((float) $p['monto'], 0, ',', '.')) ?></td>
+                    <td class="font-mono text-xs"><?= $e((string) ($p['cita_inicio'] ?? '—')) ?></td>
+                    <td>
+                        <?php if (($p['comprobante_media_ruta'] ?? '') !== ''): ?>
+                            <a class="underline" target="_blank" href="/panel/whatsapp/comprobante?pago=<?= (int) $p['pago_id'] ?>">abrir</a>
+                        <?php else: ?>
+                            <span class="text-acero">sin adjunto</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($ctx->puede('casos.editar')): ?>
+                        <form method="post" action="/panel/whatsapp/pagos/aprobar">
+                            <?= $ctx->csrf->campoOculto() ?>
+                            <input type="hidden" name="pedido_id" value="<?= (int) $p['pedido_id'] ?>">
+                            <button type="submit" class="boton">Aprobar pago</button>
+                        </form>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </section>
+    <?php endif; ?>
 
     <div class="mt-4 grid gap-6 lg:grid-cols-2">
 
