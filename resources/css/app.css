@@ -637,9 +637,11 @@
   /* =====================================================================
      La firma
      ---------------------------------------------------------------------
-     No hay marca gráfica: el logotipo es el nombre compuesto. El punto en
-     oro es lo único que lo distingue de una palabra suelta, y por eso va
-     aparte y no dentro del texto — para que nadie lo borre al editar.
+     La firma tipográfica es el nombre compuesto; convive con la insignia
+     gráfica (`/img/logo-pedro.png`), que en la cabecera la tapa (el nombre
+     queda en `sr-only`) y en el pie la acompaña. El punto en oro es lo único
+     que la distingue de una palabra suelta, y por eso va aparte y no dentro
+     del texto — para que nadie lo borre al editar.
      ==================================================================== */
   .marca {
     font-family: var(--font-mono);

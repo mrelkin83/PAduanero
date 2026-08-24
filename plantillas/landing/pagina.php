@@ -191,7 +191,15 @@ $menu = array_values(array_filter(
 ?>
 <header class="barra-sitio">
     <div class="mx-auto flex items-center gap-6 px-5 py-3 md:px-7">
-        <a href="#contenido" class="marca" aria-label="Pedro, abogado aduanero y tributario">Pedro</a>
+        <?php /* La insignia tapa el nombre, no lo reemplaza: «Pedro» sigue en
+                 el enlace para lectores de pantalla y buscadores (`sr-only`),
+                 y el `aria-label` conserva la firma completa. El archivo es
+                 `logo-pedro.png` (192 px, generado desde el original de 2 MB:
+                 nunca servir ese aquí — presupuesto §6.1). */ ?>
+        <a href="#contenido" class="flex shrink-0 items-center" aria-label="Pedro, abogado aduanero y tributario">
+            <img src="/img/logo-pedro.png" alt="" width="40" height="40" class="h-10 w-10" decoding="async">
+            <span class="sr-only">Pedro</span>
+        </a>
 
         <?php if ($menu !== []): ?>
         <?php /* Los enlaces marcan la sección en curso con un punto de oro

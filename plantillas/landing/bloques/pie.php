@@ -55,6 +55,10 @@ $hayContacto = $correo !== '' || $telefono !== '' || $redes !== [];
             ? 'md:grid-cols-[1.4fr_1fr_1fr]'
             : 'md:grid-cols-[1.4fr_1fr]' ?> md:gap-20">
             <div>
+                <?php /* La insignia cierra todas las páginas públicas: este pie
+                         lo comparten la landing, `/perfil` y las legales. Va
+                         sobre la firma, no en vez de ella. */ ?>
+                <img src="/img/logo-pedro.png" alt="" width="72" height="72" class="mb-5 h-18 w-18" loading="lazy" decoding="async">
                 <p class="marca">Pedro</p>
                 <p class="rotulo mt-4 text-acero">
                     Abogado aduanero y tributario
