@@ -84,8 +84,11 @@ $invitacion = $bloque->texto('invitacion');
                 $delay = 100 + ($i * 100);
                 ?>
                 <?php $pendiente = ($dato['pendiente'] ?? null) === true; ?>
-                <div class="doble-bisel p-6 md:p-12 md:hover:bg-white/5 transition-colors duration-500 revelar group" style="--retardo: <?= $delay ?>ms">
-                    <div class="absolute inset-0 bg-gradient-to-tr from-oro/5 to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+                <?php /* El velo de oro del hover va en `before:` y no en un
+                         <div>: dentro de un grupo del <dl> solo caben <dt> y
+                         <dd>, y ese div de adorno era lo que tenía la
+                         accesibilidad en 96 en vez de 100. */ ?>
+                <div class="doble-bisel p-6 md:p-12 md:hover:bg-white/5 transition-colors duration-500 revelar group before:pointer-events-none before:absolute before:inset-0 before:bg-gradient-to-tr before:from-oro/5 before:to-transparent before:opacity-0 before:transition-opacity before:duration-700 md:hover:before:opacity-100" style="--retardo: <?= $delay ?>ms">
                     <dt class="rotulo text-acero mb-4 md:mb-6 relative z-10"><?= $e($etiqueta) ?></dt>
 
                     <dd class="relative z-10 flex flex-col h-full">
