@@ -43,6 +43,23 @@ use ElkinLinan\WhatsappAiEngine\Payments\WompiAdapter;
  */
 final class WebhookControlador
 {
+    /**
+     * El guion de la nota de voz OBLIGATORIA de los medios de pago (regla del
+     * PO, 2026-08-24). Se dicta, así que no lleva cifras, enlaces ni montos —
+     * esos son datos duros y viajan escritos. Público para que la prueba que
+     * lo defiende no dependa de reflexión.
+     */
+    public const GUION_MEDIOS_DE_PAGO =
+        'Le cuento cómo confirmar su cita. Manejamos dos medios de pago. '
+        . 'El primero es Wompi, la pasarela de pagos de Bancolombia: usted paga desde el enlace que le enviamos, '
+        . 'el sistema verifica el pago de manera automática, sin que tenga que enviar recibos ni soportes, '
+        . 'y su cita queda agendada de inmediato. '
+        . 'El segundo es la transferencia bancaria: usted hace la transferencia y nos envía el comprobante '
+        . 'por este mismo chat; una persona de nuestro equipo la revisa, y esa verificación puede tomar '
+        . 'entre diez y treinta minutos. Apenas quede confirmada, agendamos su cita. '
+        . 'Tenga en cuenta que si el pago no se completa, la cita se cancela. '
+        . '¿Con cuál de los dos medios prefiere continuar?';
+
     public function __construct(
         private readonly BD $bd,
         private readonly Cifrado $cifrado,
@@ -254,6 +271,15 @@ final class WebhookControlador
             return;
         }
 
+        // Foto de los pedidos ANTES del turno: si al terminar hay uno nuevo
+        // esperando pago, es que la cita se apartó en este turno y toca la
+        // nota de voz de los medios de pago (ver notaDeVozDeMediosDePago).
+        $foto = $db->fetch(
+            'SELECT COALESCE(MAX(id), 0) AS m FROM wa_pedidos WHERE conversacion_id = ?',
+            [(int) $conv['id']],
+        );
+        $pedidosAntes = (int) ($foto['m'] ?? 0);
+
         // ── Pensar y responder ────────────────────────────────────────
         // Cuando la respuesta va a ser hablada, el orquestador escribe sobre
         // un canal que RETIENE los textos: la regla del PO es que a una nota
@@ -267,46 +293,111 @@ final class WebhookControlador
         $orq = new AiOrchestrator($db, $canalTurno, $log, $pagos);
         $orq->procesar($conv, $texto);
 
-        if (!$hablara || !$canalTurno instanceof CanalConVoz) {
-            return;
-        }
-
-        $hablables = [];
-        $escritos = [];
-        foreach ($canalTurno->retenidos() as $m) {
-            if (CanalConVoz::esDatoDuro($m['texto'])) {
-                $escritos[] = $m;
-            } else {
-                $hablables[] = $m;
+        if ($hablara && $canalTurno instanceof CanalConVoz) {
+            $hablables = [];
+            $escritos = [];
+            foreach ($canalTurno->retenidos() as $m) {
+                if (CanalConVoz::esDatoDuro($m['texto'])) {
+                    $escritos[] = $m;
+                } else {
+                    $hablables[] = $m;
+                }
             }
-        }
 
-        $dicho = trim(implode("\n\n", array_column($hablables, 'texto')));
-        $vozSalio = false;
-        if ($dicho !== '') {
-            $s = $tts->sintetizar($dicho);
-            if ($s['ok']) {
-                $env = $canal->enviarAudio($msg['telefono'], base64_encode($s['audio']), $s['mime']);
-                $vozSalio = !empty($env['ok']);
+            $dicho = trim(implode("\n\n", array_column($hablables, 'texto')));
+            $vozSalio = false;
+            if ($dicho !== '') {
+                $s = $tts->sintetizar($dicho);
+                if ($s['ok']) {
+                    $env = $canal->enviarAudio($msg['telefono'], base64_encode($s['audio']), $s['mime']);
+                    $vozSalio = !empty($env['ok']);
+                }
+                if (!$vozSalio) {
+                    $log->error('No se pudo responder con voz: ' . ($s['error'] ?? 'envío fallido'), null, (int) $conv['id']);
+                }
             }
-            if (!$vozSalio) {
-                $log->error('No se pudo responder con voz: ' . ($s['error'] ?? 'envío fallido'), null, (int) $conv['id']);
-            }
-        }
 
-        // La red: si la voz no salió — o el modo pide las dos cosas — los
-        // textos hablables se entregan escritos. El cliente jamás se queda
-        // mirando el chat en silencio.
-        if (!$vozSalio || $tts->tambienTexto()) {
-            foreach ($hablables as $m) {
+            // La red: si la voz no salió — o el modo pide las dos cosas — los
+            // textos hablables se entregan escritos. El cliente jamás se queda
+            // mirando el chat en silencio.
+            if (!$vozSalio || $tts->tambienTexto()) {
+                foreach ($hablables as $m) {
+                    $canal->enviarTexto($m['telefono'], $m['texto']);
+                }
+            }
+
+            // Los datos duros van escritos SIEMPRE, después del audio, en su orden.
+            foreach ($escritos as $m) {
                 $canal->enviarTexto($m['telefono'], $m['texto']);
             }
         }
 
-        // Los datos duros van escritos SIEMPRE, después del audio, en su orden.
-        foreach ($escritos as $m) {
-            $canal->enviarTexto($m['telefono'], $m['texto']);
+        $this->notaDeVozDeMediosDePago($db, $log, $canal, $cfg, $conv, $tts, $pedidosAntes);
+    }
+
+    /**
+     * La nota de voz OBLIGATORIA de los medios de pago (regla del PO,
+     * 2026-08-24): en el turno en que la cita queda apartada con el pago
+     * pendiente y el cliente aún no eligió medio, le llega SIEMPRE una nota
+     * de voz con el guion de los dos medios — también al cliente que solo
+     * escribe, sin importar el modo del TTS. Si la síntesis falla o no hay
+     * voz configurada, el guion sale como texto: jamás en silencio.
+     *
+     * El bot sabe de esta nota por reglasDeDominio(): confirma la hora,
+     * pregunta el medio y no repite la explicación por escrito.
+     */
+    private function notaDeVozDeMediosDePago(
+        $db,
+        AuditLogger $log,
+        $canal,
+        array $cfg,
+        array $conv,
+        ?TtsManager $tts,
+        int $pedidosAntes,
+    ): void {
+        // Solo tiene sentido donde hay DOS medios que explicar.
+        $acepta = PaymentManager::metodosDe((string) ($cfg['pago_modo'] ?? 'contra_entrega'));
+        if (!in_array('wompi', $acepta, true) || !in_array('transferencia', $acepta, true)) {
+            return;
         }
+
+        // ¿Este turno apartó una cita que espera pago? El NOT EXISTS deja por
+        // fuera al cliente que ya eligió medio en el mismo turno (generar_pago
+        // registra el cobro): explicarle los dos después de elegir confunde.
+        $pendiente = $db->fetch(
+            "SELECT p.id FROM wa_pedidos p
+              WHERE p.conversacion_id = ? AND p.id > ?
+                AND p.estado_pago = 'PAYMENT_PENDING' AND p.enviado_cocina = 0
+                AND NOT EXISTS (SELECT 1 FROM wa_pagos g WHERE g.wa_pedido_id = p.id)
+              ORDER BY p.id DESC LIMIT 1",
+            [(int) $conv['id'], $pedidosAntes],
+        );
+        if (!$pendiente) {
+            return;
+        }
+
+        $guion = self::GUION_MEDIOS_DE_PAGO;
+        $vozSalio = false;
+        if ($tts !== null && $tts->disponible()) {
+            $s = $tts->sintetizar($guion);
+            if ($s['ok']) {
+                $env = $canal->enviarAudio((string) $conv['telefono'], base64_encode($s['audio']), $s['mime']);
+                $vozSalio = !empty($env['ok']);
+            }
+            if (!$vozSalio) {
+                $log->error('La nota de voz de los medios de pago no salió: '
+                    . ($s['error'] ?? 'envío fallido'), null, (int) $conv['id']);
+            }
+        } else {
+            $log->log('pago', 'Sin TTS configurado: el guion de medios de pago salió como texto', null, (int) $conv['id']);
+        }
+        if (!$vozSalio) {
+            $canal->enviarTexto((string) $conv['telefono'], $guion);
+        }
+        (new ConversationManager($db))->guardarMensaje((int) $conv['id'], 'saliente', [
+            'tipo' => $vozSalio ? 'audio' : 'texto',
+            'contenido' => $guion,
+        ]);
     }
 
     /* ── Eventos de la pasarela de pago ───────────────────────────────── */

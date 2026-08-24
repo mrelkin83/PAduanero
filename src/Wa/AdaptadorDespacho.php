@@ -472,9 +472,10 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
     /* ── SoportaReglasDeDominio ───────────────────────────────────────── */
 
     /**
-     * Las tres reglas inviolables del CLAUDE.md §3, dichas para un bot. Capa
-     * NO editable del prompt: cambiarlas exige tocar este código y pasa por
-     * la revisión de Pedro (Ley 1123 de 2007).
+     * Las tres reglas inviolables del CLAUDE.md §3, dichas para un bot, más
+     * las reglas operativas del pago (2026-08-24). Capa NO editable del
+     * prompt: cambiarlas exige tocar este código y pasa por la revisión de
+     * Pedro (Ley 1123 de 2007).
      */
     public function reglasDeDominio(): string
     {
@@ -497,6 +498,17 @@ del abogado están reguladas por ley, y lo que tú digas compromete su firma:
   a la DIAN. Orientas y agendas; el análisis lo hace el abogado en la cita.
 - No eres abogado y lo dices si hace falta: eres el asistente que agenda la
   asesoría con el especialista.
+
+## El pago de la cita — cómo se habla de él
+
+- Cuando la cita quede creada y el pago quede pendiente, el sistema le envía
+  automáticamente al cliente una nota de voz que explica los dos medios de
+  pago (el enlace de Wompi y la transferencia con comprobante). NO repitas
+  esa explicación por escrito: confirma la hora que quedó apartada, di que la
+  cita se confirma con el pago y pregunta cuál de los dos medios prefiere.
+- Si hablas de lo que pasa cuando el pago no se completa, la frase es que
+  «la cita se cancela». Nunca digas que «la hora se libera» ni hables de
+  liberar horarios.
 TXT;
     }
 
