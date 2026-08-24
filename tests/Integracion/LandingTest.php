@@ -392,6 +392,51 @@ final class LandingTest extends CasoBaseBd
         self::assertStringContainsString('Ejemplo · sin publicar', $html);
     }
 
+    // ── El pie (0019) ────────────────────────────────────────────────────
+    //
+    // El contacto del pie sale del bloque `pie` y sigue la regla de 0014:
+    // lo que no tiene dato se omite en silencio, sin dejar huecos.
+
+    #[Test]
+    public function elPiePintaElContactoDelBloque(): void
+    {
+        $this->ponerBloque('pie', [
+            'correo' => 'info@pedroabogadoaduanero.com',
+            'telefono' => '+57 601 555 5555',
+            'redes' => [
+                ['nombre' => 'LinkedIn', 'url' => 'https://www.linkedin.com/in/ejemplo'],
+            ],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString('mailto:info@pedroabogadoaduanero.com', $html);
+        self::assertStringContainsString('tel:+576015555555', $html);
+        self::assertStringContainsString('https://www.linkedin.com/in/ejemplo', $html);
+    }
+
+    #[Test]
+    public function unaRedSinUrlNoDejaUnEnlaceHueco(): void
+    {
+        // La semilla trae los nombres usuales con la URL vacía para que el
+        // panel tenga de dónde clonar. Ninguno puede pintarse como enlace
+        // muerto, y una URL que no sea https tampoco entra: ese campo lo
+        // escribe una persona y `javascript:` también es una URL.
+        $this->ponerBloque('pie', [
+            'correo' => '',
+            'telefono' => '',
+            'redes' => [
+                ['nombre' => 'LinkedIn', 'url' => ''],
+                ['nombre' => 'Instagram', 'url' => 'javascript:alert(1)'],
+            ],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringNotContainsString('>Contacto<', $html);
+        self::assertStringNotContainsString('javascript:alert(1)', $html);
+    }
+
     #[Test]
     public function unTestimonioAnonimoNoSePublicaAunqueEsteAutorizado(): void
     {

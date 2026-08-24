@@ -17,6 +17,7 @@ use App\Soporte\Vista;
  * @var string   $whatsapp     número del negocio, para el canal de contacto
  * @var string   $actualizada  fecha visible de la última revisión del texto
  * @var callable $cuerpoLegal  las secciones propias de cada página
+ * @var \App\Modelos\Bloque|null $pie  bloque `pie` (0019) para el contacto del pie
  */
 
 $e = Vista::e(...);

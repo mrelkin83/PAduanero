@@ -226,7 +226,13 @@ $menu = array_values(array_filter(
 <?= $cuerpo ?>
 </main>
 
-<?php require __DIR__ . '/bloques/pie.php'; ?>
+<?php
+// El pie lee su contacto del bloque `pie` (0019). No va en la lista de
+// secciones de arriba porque no es una sección: se pinta siempre, con o
+// sin bloque — sin él solo pierde la columna de contacto.
+$pie = $bloques['pie'] ?? null;
+require __DIR__ . '/bloques/pie.php';
+?>
 
 <script src="/js/landing.js" defer></script>
 

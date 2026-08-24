@@ -95,6 +95,20 @@ final class PaginasLegalesTest extends CasoBaseBd
     }
 
     #[Test]
+    public function conBaseDeDatosElPieTraeElContactoDelBloque(): void
+    {
+        // La semilla de 0019 trae el correo real del dominio. Sin BD (el
+        // constructor de arriba no la pasa) el pie sale sin contacto y las
+        // demás pruebas lo demuestran al no romperse; con BD, aparece.
+        $conBd = new PaginaLegal($this->config, self::URL, $this->bd);
+
+        self::assertStringContainsString(
+            'mailto:info@pedroabogadoaduanero.com',
+            $conBd->privacidad()->cuerpo,
+        );
+    }
+
+    #[Test]
     public function elInterruptorDeIndexadoLesAplica(): void
     {
         self::assertStringNotContainsString('noindex', $this->paginas->privacidad()->cuerpo);

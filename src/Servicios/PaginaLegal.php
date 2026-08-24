@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Servicios;
 
+use App\Core\BD;
 use App\Core\Respuesta;
+use App\Modelos\Bloque;
 
 /**
  * Las páginas legales: `/privacidad` y `/condiciones`.
@@ -30,6 +32,10 @@ final class PaginaLegal
     public function __construct(
         private readonly Config $config,
         private readonly string $urlBase,
+        // Opcional a propósito: estas páginas vivieron sin base de datos y
+        // pueden seguir haciéndolo. Solo se usa para leer el bloque `pie`
+        // (0019) del pie compartido; sin ella, el pie sale sin contacto.
+        private readonly ?BD $bd = null,
     ) {
     }
 
@@ -62,6 +68,28 @@ final class PaginaLegal
                 'ruta' => '/' . $slug,
             ],
             'whatsapp' => (string) $this->config->get('whatsapp_numero_negocio', ''),
+            'pie' => $this->pie(),
         ]);
+    }
+
+    /**
+     * El bloque `pie` del pie compartido. Estas páginas no participan del
+     * juego de cachés de la landing, así que la consulta es por visita — y
+     * está bien: no reciben tráfico que lo haga costoso.
+     */
+    private function pie(): ?Bloque
+    {
+        if ($this->bd === null) {
+            return null;
+        }
+
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT clave, titulo, subtitulo, contenido, orden, visible
+               FROM landing_bloques WHERE clave = ? AND visible = 1'
+        );
+        $stmt->execute(['pie']);
+        $fila = $stmt->fetch();
+
+        return $fila === false ? null : Bloque::desdeFila($fila);
     }
 }

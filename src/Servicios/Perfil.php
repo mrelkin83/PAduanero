@@ -30,8 +30,8 @@ use App\Motor\Cuestionario;
  */
 final class Perfil
 {
-    /** Los bloques editables de esta página. */
-    private const CLAVES = ['perfil_intro', 'perfil_resultado', 'perfil_fuera_alcance'];
+    /** Los bloques editables de esta página. `pie` alimenta el pie compartido (0019). */
+    private const CLAVES = ['perfil_intro', 'perfil_resultado', 'perfil_fuera_alcance', 'pie'];
 
     private readonly CachePagina $cache;
 

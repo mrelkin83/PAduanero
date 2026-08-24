@@ -182,6 +182,7 @@ final class Aplicacion
             static fn (Contenedor $c): \App\Servicios\PaginaLegal => new \App\Servicios\PaginaLegal(
                 $c->obtener(Config::class),
                 $urlBase,
+                $c->obtener(BD::class),
             ),
         );
 

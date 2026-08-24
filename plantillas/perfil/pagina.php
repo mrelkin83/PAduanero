@@ -433,7 +433,11 @@ window.__paRedRevelado = setTimeout(function () {
 
 </main>
 
-<?php require dirname(__DIR__) . '/landing/bloques/pie.php'; ?>
+<?php
+// Mismo pie que la landing, con el mismo bloque `pie` de contacto (0019).
+$pie = $bloques['pie'] ?? null;
+require dirname(__DIR__) . '/landing/bloques/pie.php';
+?>
 
 <?php /* landing.js primero: perfil.js le pide la referencia de campaña y el
          registro de eventos en vez de duplicar sessionStorage y sendBeacon.
