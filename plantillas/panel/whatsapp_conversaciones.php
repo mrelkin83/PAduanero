@@ -5,11 +5,12 @@ declare(strict_types=1);
 use App\Soporte\Vista;
 
 /**
- * Conversaciones del bot: lista y lectura.
+ * Conversaciones del bot: lista, lectura y respuesta puntual.
  *
- * Solo lectura a propósito, salvo «devolver a la IA»: responder al cliente se
- * hace desde el WhatsApp del negocio, no desde aquí — el panel no es una
- * bandeja (ADR-006).
+ * El ADR-006 sigue en pie — esto no es una bandeja: es UN campo de texto por
+ * conversación (decisión del PO, 2026-08-24). Responder a mano deja la
+ * conversación en HUMANO_ATENDIENDO para que la IA no conteste encima;
+ * «Devolver a la IA» es el camino de vuelta y se conserva a propósito.
  *
  * @var \App\Panel\Contexto $ctx
  * @var list<array<string,mixed>> $lista
@@ -32,7 +33,8 @@ $estados = [
 $contenido = static function () use ($e, $ctx, $lista, $abierta, $mensajes, $estados, $pagosRevision): void { ?>
 
     <p class="text-sm text-acero">
-        Las últimas 100. Para responder en persona: WhatsApp del negocio.
+        Las últimas 100. Responder desde aquí deja la conversación contigo
+        (la IA no contesta encima) hasta que la devuelvas.
         <a class="underline" href="/panel/whatsapp">Volver a la configuración</a>.
     </p>
 
@@ -135,6 +137,21 @@ $contenido = static function () use ($e, $ctx, $lista, $abierta, $mensajes, $est
                     </div>
                 <?php endforeach; ?>
                 </div>
+
+                <?php if ($ctx->puede('casos.editar')): ?>
+                <form method="post" action="/panel/whatsapp/conversaciones/responder" class="mt-4">
+                    <?= $ctx->csrf->campoOculto() ?>
+                    <input type="hidden" name="conversacion_id" value="<?= (int) $abierta['id'] ?>">
+                    <label class="rotulo" for="texto-respuesta">Responder al cliente</label>
+                    <textarea id="texto-respuesta" name="texto" rows="3" required maxlength="4000"
+                              class="campo mt-1 w-full"
+                              placeholder="El mensaje sale por el WhatsApp del negocio tal cual lo escribas."></textarea>
+                    <div class="mt-2 flex items-center justify-between gap-2">
+                        <p class="text-xs text-acero">Al enviar, la conversación queda contigo.</p>
+                        <button type="submit" class="boton">Enviar</button>
+                    </div>
+                </form>
+                <?php endif; ?>
             </div>
             <?php endif; ?>
         </div>

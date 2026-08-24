@@ -863,6 +863,59 @@ final class WhatsappControlador extends ControladorBase
         ]);
     }
 
+    /**
+     * Responde en persona desde el panel (decisión del PO, 2026-08-24, que
+     * matiza el ADR-006: no es una bandeja — es un solo campo de texto).
+     *
+     * Enviar a mano deja la conversación en HUMANO_ATENDIENDO: quien escribe
+     * en persona no quiere que la IA conteste encima. El botón «Devolver a
+     * la IA» es el camino de vuelta.
+     */
+    public function responder(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'casos.editar');
+        $db = $this->db();
+
+        $id = (int) $ctx->campo('conversacion_id');
+        $texto = trim(mb_substr($ctx->campo('texto'), 0, 4000));
+        $conv = $db->fetch('SELECT id, telefono FROM wa_conversaciones WHERE id = ?', [$id]);
+
+        if (!$conv || $texto === '') {
+            return $this->redirigirCon('/panel/whatsapp/conversaciones?ver=' . $id, 'error',
+                'Escriba el mensaje antes de enviarlo.');
+        }
+
+        $canal = \ElkinLinan\WhatsappAiEngine\Channel\EvolutionClient::desdeConfig($db);
+        if ($canal === null) {
+            return $this->redirigirCon('/panel/whatsapp/conversaciones?ver=' . $id, 'error',
+                'El canal de WhatsApp no está configurado.');
+        }
+
+        $r = $canal->enviarTexto((string) $conv['telefono'], $texto);
+        $this->auditar($ctx, 'responder_conversacion', ['conversacion' => $id, 'ok' => !empty($r['ok'])]);
+
+        if (empty($r['ok'])) {
+            return $this->redirigirCon('/panel/whatsapp/conversaciones?ver=' . $id, 'error',
+                'WhatsApp no aceptó el envío' . (!empty($r['error']) ? ': ' . (string) $r['error'] : '.'));
+        }
+
+        $db->query(
+            "INSERT INTO wa_mensajes (conversacion_id, message_id_externo, direccion, tipo, contenido)
+             VALUES (?, ?, 'saliente', 'texto', ?)",
+            [$id, $r['message_id'] ?? null, $texto],
+        );
+        // `atendida_por` es un int heredado del motor y los usuarios de aquí
+        // llevan UUID: quién respondió queda en la auditoría, no en un cero.
+        $db->query(
+            "UPDATE wa_conversaciones SET estado = 'HUMANO_ATENDIENDO', ultimo_mensaje_at = NOW()
+              WHERE id = ?",
+            [$id],
+        );
+
+        return $this->redirigirCon('/panel/whatsapp/conversaciones?ver=' . $id, 'ok',
+            'Mensaje enviado. La conversación queda contigo; usa «Devolver a la IA» cuando termines.');
+    }
+
     /** Devuelve a la IA una conversación que quedó con una persona. */
     public function reanudarIa(Contexto $ctx): Respuesta
     {

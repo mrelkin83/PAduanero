@@ -469,4 +469,29 @@ final class PanelWhatsappTest extends CasoBaseBd
             (string) $pdo->query('SELECT estado FROM wa_conversaciones WHERE id = 1')->fetchColumn(),
         );
     }
+
+    #[Test]
+    public function responderDesdeElPanelNoSaleSinTextoNiSinCanal(): void
+    {
+        $pdo = $this->bd->pdo();
+        $pdo->exec("INSERT INTO wa_conversaciones (telefono, estado) VALUES ('573001112233', 'IA_ACTIVA')");
+
+        // La caja de respuesta acompaña al historial.
+        $html = $this->ctrl()->conversaciones($this->ctx('abogado', [], ['ver' => '1']))->cuerpo;
+        self::assertStringContainsString('Responder al cliente', $html);
+
+        // Vacío: nada que enviar.
+        $r = $this->ctrl()->responder($this->ctx('abogado', ['conversacion_id' => '1', 'texto' => '   ']));
+        self::assertStringContainsString('antes de enviarlo', urldecode($r->cabeceras['Location']));
+
+        // Sin canal configurado el envío no puede salir — y la conversación
+        // no cambia de manos ni se registra un mensaje que nunca existió.
+        $r = $this->ctrl()->responder($this->ctx('abogado', ['conversacion_id' => '1', 'texto' => 'Buenas tardes']));
+        self::assertStringContainsString('no está configurado', urldecode($r->cabeceras['Location']));
+        self::assertSame(
+            'IA_ACTIVA',
+            (string) $pdo->query('SELECT estado FROM wa_conversaciones WHERE id = 1')->fetchColumn(),
+        );
+        self::assertSame(0, (int) $pdo->query('SELECT COUNT(*) FROM wa_mensajes')->fetchColumn());
+    }
 }
