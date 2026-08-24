@@ -38,7 +38,12 @@ $items = $bloque->lista('items');
             </h2>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 md:auto-rows-[24rem]">
+        <?php /* Las filas parten de 24rem pero CRECEN con el contenido
+                 (minmax, no altura fija): el detalle de una credencial lo
+                 escribe Pedro desde el panel y puede ser un párrafo entero.
+                 Con altura fija + overflow-hidden, el texto que no cupiera
+                 desaparecería sin dar ningún error — ya pasó. */ ?>
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 md:auto-rows-[minmax(24rem,auto)]">
 
             <?php /* El retrato va como el bloque grande (Hero Bento). 
                      En móvil tiene altura fija para no comerse la pantalla. */ ?>
@@ -82,7 +87,10 @@ $items = $bloque->lista('items');
                     <div class="mt-auto relative z-10">
                         <p class="text-xl md:text-2xl font-medium tracking-tight text-white md:group-hover:text-oro-claro transition-colors duration-500 mb-2 md:mb-3 leading-tight"><?= $e($titulo) ?></p>
                         <?php if ($detalle !== ''): ?>
-                        <p class="text-acero text-[0.95rem] md:text-[1rem] leading-relaxed md:line-clamp-3 md:group-hover:text-papel transition-colors duration-500"><?= $e($detalle) ?></p>
+                        <?php /* Sin line-clamp: el texto se muestra entero.
+                                 Recortarlo a tres líneas escondía el grueso
+                                 de la credencial que Pedro escribió. */ ?>
+                        <p class="text-acero text-[0.95rem] md:text-[1rem] leading-relaxed md:group-hover:text-papel transition-colors duration-500"><?= $e($detalle) ?></p>
                         <?php endif; ?>
                     </div>
                 </div>
