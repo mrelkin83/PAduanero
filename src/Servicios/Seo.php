@@ -62,7 +62,20 @@ final class Seo
         $base = $this->urlBase();
 
         $urls = [
-            ['loc' => $base . '/', 'prioridad' => '1.0', 'cambio' => 'weekly'],
+            // Las imágenes solo van en `/`: son las que la landing sirve
+            // fijas (hero, credenciales, proceso, cierre) y con alt
+            // descriptivo real — lo que el sitemap de imágenes pide. Ganar
+            // Google Imágenes no depende de una dirección física, así que es
+            // terreno alcanzable ya, a diferencia del paquete de mapa.
+            [
+                'loc' => $base . '/', 'prioridad' => '1.0', 'cambio' => 'weekly',
+                'imagenes' => [
+                    $base . '/img/pedro-hero.jpg',
+                    $base . '/img/pedro-perfil.jpg',
+                    $base . '/img/pedro-documentos.jpg',
+                    $base . '/img/pedro-comercio-exterior.jpg',
+                ],
+            ],
             // El diagnóstico. Prioridad alta y no la de una página
             // secundaria: sus preguntas son literalmente las búsquedas por
             // las que este despacho quiere aparecer («me llegó un acta de
@@ -97,6 +110,7 @@ final class Seo
         $xml->startDocument('1.0', 'UTF-8');
         $xml->startElement('urlset');
         $xml->writeAttribute('xmlns', 'http://www.sitemaps.org/schemas/sitemap/0.9');
+        $xml->writeAttribute('xmlns:image', 'http://www.google.com/schemas/sitemap-image/1.1');
 
         foreach ($urls as $url) {
             $xml->startElement('url');
@@ -108,6 +122,13 @@ final class Seo
 
             $xml->writeElement('changefreq', $url['cambio']);
             $xml->writeElement('priority', $url['prioridad']);
+
+            foreach ($url['imagenes'] ?? [] as $imagen) {
+                $xml->startElement('image:image');
+                $xml->writeElement('image:loc', $imagen);
+                $xml->endElement();
+            }
+
             $xml->endElement();
         }
 
@@ -174,7 +195,56 @@ final class Seo
         // Sin `priceRange`: la tarifa está en el bloque `proceso`, en pesos y
         // sin adornos.
 
+        $sameAs = $this->redesSociales();
+        if ($sameAs !== []) {
+            // Cada perfil verificado que Google puede cruzar con este mismo
+            // nombre y teléfono es una señal de que la entidad es real — la
+            // misma lógica que el bloque `confianza`, aplicada al grafo de
+            // conocimiento en vez de al ojo del visitante. Hoy `pie.redes`
+            // no tiene ninguna URL cargada: en cuanto Pedro cargue una desde
+            // el panel, aparece aquí solo, sin otro cambio.
+            $datos['sameAs'] = $sameAs;
+        }
+
         return $datos;
+    }
+
+    /**
+     * Las redes sociales con URL real, para `sameAs`. Misma validación que
+     * `bloques/pie.php`: nombre y URL con `https://`, o no cuenta.
+     *
+     * @return list<string>
+     */
+    private function redesSociales(): array
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            "SELECT contenido FROM landing_bloques WHERE clave = 'pie' AND visible = 1"
+        );
+        $stmt->execute();
+        $crudo = $stmt->fetchColumn();
+
+        if (!is_string($crudo)) {
+            return [];
+        }
+
+        $contenido = json_decode($crudo, true);
+        $redes = is_array($contenido) && is_array($contenido['redes'] ?? null)
+            ? $contenido['redes']
+            : [];
+
+        $salida = [];
+        foreach ($redes as $red) {
+            if (!is_array($red)) {
+                continue;
+            }
+            $nombre = is_string($red['nombre'] ?? null) ? trim($red['nombre']) : '';
+            $url = is_string($red['url'] ?? null) ? trim($red['url']) : '';
+            if ($nombre !== '' && preg_match('#^https://#i', $url) === 1) {
+                $salida[] = $url;
+            }
+        }
+
+        return $salida;
     }
 
     /**

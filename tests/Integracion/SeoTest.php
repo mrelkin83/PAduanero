@@ -110,6 +110,50 @@ final class SeoTest extends CasoBaseBd
     }
 
     #[Test]
+    public function losDatosEstructuradosNoTraenSameAsSinRedesConUrl(): void
+    {
+        // El pie sembrado por la migración trae las redes con `url: ''`: sin
+        // URL real, `sameAs` no debe aparecer — inventar un perfil social es
+        // la misma clase de afirmación falsa que la prueba de arriba prohíbe
+        // para la dirección.
+        self::assertArrayNotHasKey('sameAs', $this->seo->datosEstructurados());
+    }
+
+    #[Test]
+    public function losDatosEstructuradosTraenSameAsCuandoElPieTieneRedesReales(): void
+    {
+        $this->bd->pdo()->exec(
+            "UPDATE landing_bloques SET contenido = JSON_OBJECT(
+                'correo', 'info@pedroabogadoaduanero.com',
+                'telefono', '',
+                'redes', JSON_ARRAY(
+                    JSON_OBJECT('nombre', 'LinkedIn', 'url', 'https://www.linkedin.com/in/pedro'),
+                    JSON_OBJECT('nombre', 'Instagram', 'url', '')
+                )
+             ) WHERE clave = 'pie'"
+        );
+
+        $sameAs = $this->seo->datosEstructurados()['sameAs'] ?? null;
+
+        self::assertSame(['https://www.linkedin.com/in/pedro'], $sameAs);
+    }
+
+    #[Test]
+    public function elSitemapMarcaLasImagenesDeLaHome(): void
+    {
+        $cuerpo = $this->seo->sitemap()->cuerpo;
+
+        self::assertStringContainsString('xmlns:image=', $cuerpo);
+        self::assertStringContainsString(
+            '<image:loc>' . self::URL . '/img/pedro-hero.jpg</image:loc>',
+            $cuerpo,
+        );
+
+        $xml = simplexml_load_string($cuerpo);
+        self::assertInstanceOf(\SimpleXMLElement::class, $xml);
+    }
+
+    #[Test]
     public function losDatosEstructuradosSonJsonValido(): void
     {
         $json = json_encode($this->seo->datosEstructurados());
