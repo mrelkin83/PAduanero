@@ -116,6 +116,16 @@ final class Cuestionario
                         'salida' => null,
                     ],
                     [
+                        'valor' => 'contenedor',
+                        'etiqueta' => 'Cobros de demoras o sobrestadía de contenedores',
+                        'detalle' => 'La naviera o el puerto le cobran por contenedores devueltos tarde y quiere revisar si el cobro le corresponde.',
+                        'mensaje' => 'Me están cobrando demoras o sobrestadía de contenedores y quiero revisar si me corresponden',
+                        'tecnico' => 'Cobros de demoras de contenedores',
+                        'rama' => 'aduanero',
+                        'tipo' => 'demoras_contenedor',
+                        'salida' => null,
+                    ],
+                    [
                         'valor' => 'preventivo',
                         'etiqueta' => 'Todavía nada: quiero prevenir',
                         'detalle' => 'No hay ningún proceso abierto ni mercancía retenida. Busco ordenar la operación antes.',
@@ -180,6 +190,16 @@ final class Cuestionario
                         'salida' => null,
                     ],
                     [
+                        'valor' => 'requerimiento_solvencia',
+                        'etiqueta' => 'Un requerimiento que cuestiona mi solvencia económica',
+                        'detalle' => 'La DIAN pone en duda la capacidad de pago, el patrimonio o el origen de los recursos usados en la operación.',
+                        'mensaje' => 'Recibí un requerimiento que cuestiona la solvencia económica de mi operación',
+                        'tecnico' => 'Cuestionamiento de solvencia económica',
+                        'rama' => null,
+                        'tipo' => 'cuestionamiento_solvencia_economica',
+                        'salida' => null,
+                    ],
+                    [
                         'valor' => 'operativo',
                         'etiqueta' => 'Un operativo de la POLFA en curso',
                         'detalle' => 'La POLFA está en el sitio ahora, o hubo allanamiento o captura.',
@@ -188,6 +208,16 @@ final class Cuestionario
                         'rama' => null,
                         'tipo' => 'operativo_polfa',
                         'salida' => null, // lo pone esCritico() en definicion()
+                    ],
+                    [
+                        'valor' => 'cobro_naviera',
+                        'etiqueta' => 'No es de la DIAN: es un cobro de la naviera o el puerto',
+                        'detalle' => 'Factura o cobro por demoras, sobrestadía o uso de contenedores tras la devolución.',
+                        'mensaje' => 'Me están cobrando demoras o sobrestadía de contenedores',
+                        'tecnico' => 'Cobros de demoras de contenedores',
+                        'rama' => null,
+                        'tipo' => 'demoras_contenedor',
+                        'salida' => null,
                     ],
                     [
                         'valor' => 'nada_escrito',

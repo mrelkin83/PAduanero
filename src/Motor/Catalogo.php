@@ -32,6 +32,12 @@ final class Catalogo
         'transporte_transito',
         'devolucion_mercancia',
         'agencia_aduanas_sancion',
+        // 2026-08-24: los dos siguientes vienen del propio material de
+        // difusión de Pedro, no de una lista inventada aquí — es el criterio
+        // que sostiene el catálogo cerrado (§5): quien decide qué se atiende
+        // es el abogado, no el desarrollador.
+        'cuestionamiento_solvencia_economica',
+        'demoras_contenedor',
     ];
 
     /** @var list<string> */
