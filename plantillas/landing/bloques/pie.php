@@ -30,6 +30,7 @@ $pie ??= null;
 
 $correo = $pie?->texto('correo') ?? '';
 $telefono = $pie?->texto('telefono') ?? '';
+$direccion = $pie?->texto('direccion') ?? '';
 
 // Solo las redes con nombre Y url: una URL sin rótulo o un rótulo sin
 // destino son huecos, no enlaces.
@@ -45,7 +46,7 @@ foreach ($pie?->lista('redes') ?? [] as $red) {
     }
 }
 
-$hayContacto = $correo !== '' || $telefono !== '' || $redes !== [];
+$hayContacto = $correo !== '' || $telefono !== '' || $direccion !== '' || $redes !== [];
 ?>
 <footer class="border-t border-linea py-16 md:py-20">
     <div class="mx-auto max-w-[78rem] px-6 md:px-20">
@@ -92,6 +93,9 @@ $hayContacto = $correo !== '' || $telefono !== '' || $redes !== [];
                     <?php endif; ?>
                     <?php if ($telefono !== ''): ?>
                     <li><a href="tel:<?= $e(preg_replace('/[^+\d]/', '', $telefono) ?? '') ?>" class="menu-enlace"><?= $e($telefono) ?></a></li>
+                    <?php endif; ?>
+                    <?php if ($direccion !== ''): ?>
+                    <li><address class="not-italic"><?= $e($direccion) ?></address></li>
                     <?php endif; ?>
                     <?php foreach ($redes as $red): ?>
                     <li>
