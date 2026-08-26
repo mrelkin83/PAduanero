@@ -265,4 +265,65 @@ final class PanelCursosTest extends CasoBaseBd
 
         self::assertStringContainsString('obligatorio', urldecode($r->cabeceras['Location']));
     }
+
+    #[Test]
+    public function agregarUnModuloLoNumeraEnOrden(): void
+    {
+        $cursoId = $this->crearCursoCompleto($this->categoriaId());
+
+        $this->controlador()->agregarModulo($this->ctx('abogado', ['curso_id' => $cursoId, 'titulo' => 'Módulo 1']));
+        $this->controlador()->agregarModulo($this->ctx('abogado', ['curso_id' => $cursoId, 'titulo' => 'Módulo 2']));
+
+        $ordenes = $this->bd->pdo()->query(
+            "SELECT orden FROM curso_modulos WHERE curso_id = '{$cursoId}' ORDER BY orden"
+        )->fetchAll(\PDO::FETCH_COLUMN);
+
+        self::assertSame([1, 2], array_map('intval', $ordenes));
+    }
+
+    #[Test]
+    public function eliminarUnModuloBorraSusLecciones(): void
+    {
+        $cursoId = $this->crearCursoCompleto($this->categoriaId());
+        $this->controlador()->agregarModulo($this->ctx('abogado', ['curso_id' => $cursoId, 'titulo' => 'Módulo']));
+        $moduloId = (string) $this->bd->pdo()->query('SELECT id FROM curso_modulos LIMIT 1')->fetchColumn();
+
+        $this->controlador()->agregarLeccion($this->ctx('abogado', [
+            'modulo_id' => $moduloId, 'titulo' => 'Lección', 'duracion_min' => '10',
+        ]));
+
+        self::assertSame(1, (int) $this->bd->pdo()->query('SELECT COUNT(*) FROM curso_lecciones')->fetchColumn());
+
+        $this->controlador()->eliminarModulo($this->ctx('abogado', ['id' => $moduloId]));
+
+        self::assertSame(0, (int) $this->bd->pdo()->query('SELECT COUNT(*) FROM curso_modulos')->fetchColumn());
+        self::assertSame(0, (int) $this->bd->pdo()->query('SELECT COUNT(*) FROM curso_lecciones')->fetchColumn());
+    }
+
+    #[Test]
+    public function agregarUnaLeccionSinTituloFalla(): void
+    {
+        $cursoId = $this->crearCursoCompleto($this->categoriaId());
+        $this->controlador()->agregarModulo($this->ctx('abogado', ['curso_id' => $cursoId, 'titulo' => 'Módulo']));
+        $moduloId = (string) $this->bd->pdo()->query('SELECT id FROM curso_modulos LIMIT 1')->fetchColumn();
+
+        $r = $this->controlador()->agregarLeccion($this->ctx('abogado', ['modulo_id' => $moduloId, 'titulo' => '']));
+
+        self::assertStringContainsString('titulo', strtolower(urldecode($r->cabeceras['Location'])));
+        self::assertSame(0, (int) $this->bd->pdo()->query('SELECT COUNT(*) FROM curso_lecciones')->fetchColumn());
+    }
+
+    #[Test]
+    public function eliminarUnaLeccion(): void
+    {
+        $cursoId = $this->crearCursoCompleto($this->categoriaId());
+        $this->controlador()->agregarModulo($this->ctx('abogado', ['curso_id' => $cursoId, 'titulo' => 'Módulo']));
+        $moduloId = (string) $this->bd->pdo()->query('SELECT id FROM curso_modulos LIMIT 1')->fetchColumn();
+        $this->controlador()->agregarLeccion($this->ctx('abogado', ['modulo_id' => $moduloId, 'titulo' => 'Lección']));
+        $leccionId = (string) $this->bd->pdo()->query('SELECT id FROM curso_lecciones LIMIT 1')->fetchColumn();
+
+        $this->controlador()->eliminarLeccion($this->ctx('abogado', ['id' => $leccionId]));
+
+        self::assertSame(0, (int) $this->bd->pdo()->query('SELECT COUNT(*) FROM curso_lecciones')->fetchColumn());
+    }
 }

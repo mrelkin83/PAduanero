@@ -259,6 +259,112 @@ final class PanelCursosControlador extends ControladorBase
         return $this->redirigirCon('/panel/cursos/categorias', 'ok', 'Categoría guardada.');
     }
 
+    public function agregarModulo(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $cursoId = $ctx->campo('curso_id');
+        $titulo = $ctx->campo('titulo');
+
+        if ($cursoId === '' || $titulo === '') {
+            return $this->redirigirCon($this->rutaEdicion($cursoId), 'error', 'El módulo necesita un título.');
+        }
+
+        $siguienteOrden = $this->bd->pdo()->prepare(
+            'SELECT COALESCE(MAX(orden), 0) + 1 FROM curso_modulos WHERE curso_id = ?'
+        );
+        $siguienteOrden->execute([$cursoId]);
+        $orden = (int) $siguienteOrden->fetchColumn();
+
+        $id = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+
+        $this->bd->pdo()->prepare(
+            'INSERT INTO curso_modulos (id, curso_id, titulo, orden) VALUES (?, ?, ?, ?)'
+        )->execute([$id, $cursoId, $titulo, $orden]);
+
+        $this->auditoria->registrar('curso_modulo', $id, 'crear', $ctx->actor(), ['titulo' => $titulo], $ctx->ip());
+
+        return $this->redirigirCon($this->rutaEdicion($cursoId), 'ok', 'Módulo agregado.');
+    }
+
+    public function eliminarModulo(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $id = $ctx->campo('id');
+        $stmt = $this->bd->pdo()->prepare('SELECT curso_id FROM curso_modulos WHERE id = ?');
+        $stmt->execute([$id]);
+        $cursoId = (string) $stmt->fetchColumn();
+
+        // ON DELETE CASCADE en curso_lecciones se encarga de sus lecciones.
+        $this->bd->pdo()->prepare('DELETE FROM curso_modulos WHERE id = ?')->execute([$id]);
+
+        $this->auditoria->registrar('curso_modulo', $id, 'eliminar', $ctx->actor(), [], $ctx->ip());
+
+        return $this->redirigirCon($this->rutaEdicion($cursoId), 'ok', 'Módulo eliminado.');
+    }
+
+    public function agregarLeccion(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $moduloId = $ctx->campo('modulo_id');
+        $titulo = $ctx->campo('titulo');
+        $duracion = $ctx->campo('duracion_min');
+        $vistaPrevia = (int) ($ctx->campo('vista_previa_gratis') === '1');
+
+        $stmt = $this->bd->pdo()->prepare('SELECT curso_id FROM curso_modulos WHERE id = ?');
+        $stmt->execute([$moduloId]);
+        $cursoId = $stmt->fetchColumn();
+
+        if ($cursoId === false) {
+            return $this->redirigirCon('/panel/cursos', 'error', 'Ese módulo no existe.');
+        }
+
+        if ($titulo === '') {
+            return $this->redirigirCon($this->rutaEdicion((string) $cursoId), 'error', 'La lección necesita un titulo.');
+        }
+
+        $duracionMin = preg_match('/^\d+$/', $duracion) === 1 ? (int) $duracion : null;
+
+        $siguienteOrden = $this->bd->pdo()->prepare(
+            'SELECT COALESCE(MAX(orden), 0) + 1 FROM curso_lecciones WHERE modulo_id = ?'
+        );
+        $siguienteOrden->execute([$moduloId]);
+        $orden = (int) $siguienteOrden->fetchColumn();
+
+        $id = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+
+        $this->bd->pdo()->prepare(
+            'INSERT INTO curso_lecciones (id, modulo_id, titulo, duracion_min, orden, vista_previa_gratis)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute([$id, $moduloId, $titulo, $duracionMin, $orden, $vistaPrevia]);
+
+        $this->auditoria->registrar('curso_leccion', $id, 'crear', $ctx->actor(), ['titulo' => $titulo], $ctx->ip());
+
+        return $this->redirigirCon($this->rutaEdicion((string) $cursoId), 'ok', 'Lección agregada.');
+    }
+
+    public function eliminarLeccion(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $id = $ctx->campo('id');
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT cm.curso_id FROM curso_lecciones cl
+               JOIN curso_modulos cm ON cm.id = cl.modulo_id
+              WHERE cl.id = ?'
+        );
+        $stmt->execute([$id]);
+        $cursoId = $stmt->fetchColumn();
+
+        $this->bd->pdo()->prepare('DELETE FROM curso_lecciones WHERE id = ?')->execute([$id]);
+
+        $this->auditoria->registrar('curso_leccion', $id, 'eliminar', $ctx->actor(), [], $ctx->ip());
+
+        return $this->redirigirCon($this->rutaEdicion((string) $cursoId), 'ok', 'Lección eliminada.');
+    }
+
     private function rutaEdicion(string $id): string
     {
         return $id === '' ? '/panel/cursos/editar' : '/panel/cursos/editar?id=' . urlencode($id);
