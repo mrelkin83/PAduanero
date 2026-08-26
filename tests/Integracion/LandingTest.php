@@ -402,7 +402,11 @@ final class LandingTest extends CasoBaseBd
     {
         $this->ponerBloque('pie', [
             'correo' => 'info@pedroabogadoaduanero.com',
-            'telefonos' => ['+57 601 555 5555', '+57 601 555 5556', ''],
+            'telefonos' => [
+                ['numero' => '+57 601 555 5555', 'icono' => 'telefono'],
+                ['numero' => '+57 601 555 5556', 'icono' => 'whatsapp'],
+                ['numero' => '', 'icono' => 'telefono'],
+            ],
             'redes' => [
                 ['nombre' => 'LinkedIn', 'url' => 'https://www.linkedin.com/in/ejemplo'],
             ],
@@ -414,6 +418,32 @@ final class LandingTest extends CasoBaseBd
         self::assertStringContainsString('tel:+576015555555', $html);
         self::assertStringContainsString('tel:+576015555556', $html);
         self::assertStringContainsString('https://www.linkedin.com/in/ejemplo', $html);
+    }
+
+    #[Test]
+    public function elPiePintaUnIconoPorTipoDeContacto(): void
+    {
+        // Cada categoría trae su glifo (App\Soporte\Iconos): la dirección
+        // uno fijo, el teléfono el que el panel eligió por número, y la red
+        // el que se deduce de su nombre — sin campo nuevo para eso último.
+        $this->ponerBloque('pie', [
+            'correo' => 'info@pedroabogadoaduanero.com',
+            'direccion' => 'Bogotá, Colombia',
+            'telefonos' => [
+                ['numero' => '+57 601 555 5555', 'icono' => 'telefono'],
+                ['numero' => '+57 300 123 4567', 'icono' => 'whatsapp'],
+                ['numero' => '', 'icono' => 'telefono'],
+            ],
+            'redes' => [
+                ['nombre' => 'Instagram', 'url' => 'https://instagram.com/ejemplo'],
+            ],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString('viewBox="0 0 384 512"', $html); // ubicación
+        self::assertStringContainsString('viewBox="0 0 512 512"', $html); // correo + teléfono comparten viewBox
+        self::assertStringContainsString('viewBox="0 0 448 512"', $html); // whatsapp / instagram
     }
 
     #[Test]

@@ -28,7 +28,7 @@ $rotulo = static function (string $clave): string {
         'empresa' => 'Empresa', 'titulo' => 'Título', 'subtitulo' => 'Subtítulo',
         'descripcion' => 'Descripción', 'nota' => 'Nota', 'valor' => 'Valor',
         'etiqueta' => 'Etiqueta', 'nombre' => 'Nombre', 'direccion' => 'Dirección',
-        'telefonos' => 'Teléfonos',
+        'telefonos' => 'Teléfonos', 'numero' => 'Número', 'icono' => 'Icono',
     ];
 
     return $mapa[$clave] ?? ucfirst(str_replace('_', ' ', $clave));
@@ -52,6 +52,27 @@ $contenido = static function () use ($e, $ctx, $bloque, $datos, $rotulo): void {
                        <?= $valor ? 'checked' : '' ?> <?= $editable ? '' : 'disabled' ?>>
                 Dato pendiente de confirmar (la página lo pinta en gris; desmarque al cargar el dato real)
             </label>
+            <?php
+            return;
+        }
+
+        // El icono de un teléfono: nada en el número dice si es un fijo o
+        // el WhatsApp del despacho (0026), así que el dato lo pone Pedro.
+        // Selector cerrado y no texto libre: un valor mal escrito aquí no
+        // rompe el enlace `tel:`, solo cae en el icono genérico en
+        // silencio (regla de 0014) — pero un desplegable evita el problema
+        // antes de que pase.
+        if ($clave === 'icono' && is_string($valor)) {
+            $opciones = ['telefono' => 'Teléfono', 'whatsapp' => 'WhatsApp'];
+            ?>
+            <div class="mt-2">
+                <label class="rotulo"><?= $e($rotulo($clave)) ?></label>
+                <select name="<?= $e($nombre) ?>" class="campo mt-1" <?= $editable ? '' : 'disabled' ?>>
+                    <?php foreach ($opciones as $val => $etiqueta): ?>
+                    <option value="<?= $e($val) ?>" <?= $valor === $val ? 'selected' : '' ?>><?= $e($etiqueta) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <?php
             return;
         }

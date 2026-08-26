@@ -234,6 +234,34 @@ final class PanelContenidoTest extends CasoBaseBd
     }
 
     #[Test]
+    public function elEditorDelTelefonoOfreceUnDesplegableDeIcono(): void
+    {
+        // No es texto libre (0026): un valor mal escrito ahí no rompe el
+        // enlace `tel:`, pero cae en el icono genérico en silencio — mejor
+        // que el desplegable no deje escribir eso desde el principio.
+        $html = $this->ctrl()->editar($this->ctx('abogado', [], ['clave' => 'pie']))->cuerpo;
+
+        self::assertStringContainsString('<select name="c[telefonos][0][icono]"', $html);
+        self::assertStringContainsString('value="whatsapp"', $html);
+    }
+
+    #[Test]
+    public function guardarElIconoDeUnTelefonoNoTocaLosDemas(): void
+    {
+        $this->ctrl()->guardar($this->ctx('abogado', [
+            'clave' => 'pie',
+            'visible' => '1',
+            'c' => ['telefonos' => [0 => ['numero' => '+57 300 123 4567', 'icono' => 'whatsapp']]],
+        ]));
+
+        $telefonos = $this->json('pie')['telefonos'];
+
+        self::assertSame('whatsapp', $telefonos[0]['icono']);
+        self::assertSame('+57 300 123 4567', $telefonos[0]['numero']);
+        self::assertSame('telefono', $telefonos[1]['icono'], 'el segundo teléfono no se tocó');
+    }
+
+    #[Test]
     public function ocultarUnBloqueQuedaAuditado(): void
     {
         $this->ctrl()->guardar($this->ctx('abogado', [

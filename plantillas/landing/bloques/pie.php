@@ -24,6 +24,12 @@ use App\Soporte\Vista;
  *
  * `telefonos` (0023) es una lista de hasta tres, no un solo campo: cada
  * número es su propio enlace `tel:`, y los vacíos se omiten uno por uno.
+ * Desde 0026 cada uno lleva también su `icono` (`telefono` o `whatsapp`):
+ * nada en el número dice si es un fijo o el WhatsApp del despacho.
+ *
+ * Los iconos (0026, `App\Soporte\Iconos`) son Font Awesome incrustado a
+ * mano — mismo patrón que el glifo de `Vista::botonWhatsapp()` — y no un
+ * webfont ni un CDN: el presupuesto de la landing (§6.1) no da para eso.
  *
  * @var \App\Modelos\Bloque|null $pie
  */
@@ -38,14 +44,20 @@ $direccion = $pie?->texto('direccion') ?? '';
 // campo de texto libre producía un `tel:` con los dos pegados y sin sentido.
 $telefonos = [];
 foreach ($pie?->lista('telefonos') ?? [] as $telefono) {
-    $telefono = is_string($telefono) ? trim($telefono) : '';
-    if ($telefono !== '') {
-        $telefonos[] = $telefono;
+    $numero = is_string($telefono)
+        ? trim($telefono)
+        : (is_array($telefono) && is_string($telefono['numero'] ?? null) ? trim($telefono['numero']) : '');
+    if ($numero === '') {
+        continue;
     }
+    $icono = is_array($telefono) && ($telefono['icono'] ?? null) === 'whatsapp' ? 'whatsapp' : 'telefono';
+    $telefonos[] = ['numero' => $numero, 'icono' => $icono];
 }
 
 // Solo las redes con nombre Y url: una URL sin rótulo o un rótulo sin
-// destino son huecos, no enlaces.
+// destino son huecos, no enlaces. El icono se deduce del nombre
+// (`Iconos::deRed()`): es el mismo dato que ya escribe Pedro en el panel
+// para el texto del enlace, no uno nuevo que pueda quedar desincronizado.
 $redes = [];
 foreach ($pie?->lista('redes') ?? [] as $red) {
     if (!is_array($red)) {
@@ -54,7 +66,7 @@ foreach ($pie?->lista('redes') ?? [] as $red) {
     $nombre = is_string($red['nombre'] ?? null) ? trim($red['nombre']) : '';
     $url = is_string($red['url'] ?? null) ? trim($red['url']) : '';
     if ($nombre !== '' && preg_match('#^https://#i', $url) === 1) {
-        $redes[] = ['nombre' => $nombre, 'url' => $url];
+        $redes[] = ['nombre' => $nombre, 'url' => $url, 'icono' => \App\Soporte\Iconos::deRed($nombre)];
     }
 }
 
@@ -101,16 +113,26 @@ $hayContacto = $correo !== '' || $telefonos !== [] || $direccion !== '' || $rede
                 <p class="rotulo text-acero">Contacto</p>
                 <ul class="mt-4 space-y-4">
                     <?php if ($correo !== ''): ?>
-                    <li><a href="mailto:<?= $e($correo) ?>" class="menu-enlace"><?= $e($correo) ?></a></li>
+                    <li class="flex items-center gap-2.5 text-acero">
+                        <?= \App\Soporte\Iconos::svg('correo') ?>
+                        <a href="mailto:<?= $e($correo) ?>" class="menu-enlace"><?= $e($correo) ?></a>
+                    </li>
                     <?php endif; ?>
                     <?php foreach ($telefonos as $telefono): ?>
-                    <li><a href="tel:<?= $e(preg_replace('/[^+\d]/', '', $telefono) ?? '') ?>" class="menu-enlace"><?= $e($telefono) ?></a></li>
+                    <li class="flex items-center gap-2.5 text-acero">
+                        <?= \App\Soporte\Iconos::svg($telefono['icono']) ?>
+                        <a href="tel:<?= $e(preg_replace('/[^+\d]/', '', $telefono['numero']) ?? '') ?>" class="menu-enlace"><?= $e($telefono['numero']) ?></a>
+                    </li>
                     <?php endforeach; ?>
                     <?php if ($direccion !== ''): ?>
-                    <li><address class="not-italic menu-enlace"><?= $e($direccion) ?></address></li>
+                    <li class="flex items-center gap-2.5 text-acero">
+                        <?= \App\Soporte\Iconos::svg('ubicacion') ?>
+                        <address class="not-italic menu-enlace"><?= $e($direccion) ?></address>
+                    </li>
                     <?php endif; ?>
                     <?php foreach ($redes as $red): ?>
-                    <li>
+                    <li class="flex items-center gap-2.5 text-acero">
+                        <?= \App\Soporte\Iconos::svg($red['icono']) ?>
                         <a href="<?= $e($red['url']) ?>" class="menu-enlace" rel="noopener" target="_blank">
                             <?= $e($red['nombre']) ?>
                         </a>
