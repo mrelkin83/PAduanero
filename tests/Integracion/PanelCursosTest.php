@@ -161,4 +161,67 @@ final class PanelCursosTest extends CasoBaseBd
 
         self::assertStringContainsString('Cursos', $html);
     }
+
+    private function crearCursoCompleto(string $categoriaId, int $precio = 250000): string
+    {
+        $this->controlador()->guardar($this->ctx('abogado', [
+            'id' => '', 'categoria_id' => $categoriaId, 'titulo' => 'Curso completo ' . bin2hex(random_bytes(3)),
+            'resumen' => 'r', 'descripcion' => 'd', 'lo_que_aprendera' => 'x',
+            'nivel' => 'basico', 'precio_cop' => (string) $precio, 'orden' => '0',
+        ]));
+
+        return (string) $this->bd->pdo()->query('SELECT id FROM cursos ORDER BY creado_en DESC LIMIT 1')->fetchColumn();
+    }
+
+    #[Test]
+    public function publicarSinModulosFalla(): void
+    {
+        $cursoId = $this->crearCursoCompleto($this->categoriaId());
+
+        $r = $this->controlador()->publicar($this->ctx('abogado', ['id' => $cursoId]));
+
+        self::assertStringContainsString('modulo', strtolower(urldecode($r->cabeceras['Location'])));
+        self::assertSame(
+            'borrador',
+            $this->bd->pdo()->query("SELECT estado FROM cursos WHERE id = '{$cursoId}'")->fetchColumn(),
+        );
+    }
+
+    #[Test]
+    public function publicarConTemarioFunciona(): void
+    {
+        $cursoId = $this->crearCursoCompleto($this->categoriaId());
+
+        $moduloId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO curso_modulos (id, curso_id, titulo, orden) VALUES (?, ?, ?, ?)'
+        )->execute([$moduloId, $cursoId, 'Módulo único', 1]);
+
+        $leccionId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO curso_lecciones (id, modulo_id, titulo, orden) VALUES (?, ?, ?, ?)'
+        )->execute([$leccionId, $moduloId, 'Lección única', 1]);
+
+        $r = $this->controlador()->publicar($this->ctx('abogado', ['id' => $cursoId]));
+
+        self::assertSame(302, $r->estado);
+        self::assertSame(
+            'publicado',
+            $this->bd->pdo()->query("SELECT estado FROM cursos WHERE id = '{$cursoId}'")->fetchColumn(),
+        );
+    }
+
+    #[Test]
+    public function despublicarVuelveABorrador(): void
+    {
+        $cursoId = $this->crearCursoCompleto($this->categoriaId());
+        $this->bd->pdo()->exec("UPDATE cursos SET estado = 'publicado' WHERE id = '{$cursoId}'");
+
+        $this->controlador()->despublicar($this->ctx('abogado', ['id' => $cursoId]));
+
+        self::assertSame(
+            'borrador',
+            $this->bd->pdo()->query("SELECT estado FROM cursos WHERE id = '{$cursoId}'")->fetchColumn(),
+        );
+    }
 }

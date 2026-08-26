@@ -157,6 +157,60 @@ final class PanelCursosControlador extends ControladorBase
         return $this->redirigirCon($this->rutaEdicion($id), 'ok', 'Curso actualizado.');
     }
 
+    public function publicar(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $id = $ctx->campo('id');
+        $stmt = $this->bd->pdo()->prepare('SELECT * FROM cursos WHERE id = ?');
+        $stmt->execute([$id]);
+        $curso = $stmt->fetch();
+
+        if ($curso === false) {
+            return $this->redirigirCon('/panel/cursos', 'error', 'Ese curso no existe.');
+        }
+
+        if ((int) $curso['precio_cop'] <= 0) {
+            return $this->redirigirCon($this->rutaEdicion($id), 'error', 'El curso necesita un precio mayor que cero para publicarse.');
+        }
+
+        $tieneLeccion = $this->bd->pdo()->prepare(
+            'SELECT COUNT(*) FROM curso_lecciones cl
+               JOIN curso_modulos cm ON cm.id = cl.modulo_id
+              WHERE cm.curso_id = ?'
+        );
+        $tieneLeccion->execute([$id]);
+
+        if ((int) $tieneLeccion->fetchColumn() === 0) {
+            return $this->redirigirCon(
+                $this->rutaEdicion($id),
+                'error',
+                'El curso necesita al menos un modulo con una leccion para publicarse.',
+            );
+        }
+
+        $this->bd->pdo()->prepare(
+            "UPDATE cursos SET estado = 'publicado', publicado_en = NOW() WHERE id = ?"
+        )->execute([$id]);
+
+        $this->auditoria->registrar('curso', $id, 'publicar', $ctx->actor(), [], $ctx->ip());
+
+        return $this->redirigirCon($this->rutaEdicion($id), 'ok', 'Curso publicado.');
+    }
+
+    public function despublicar(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $id = $ctx->campo('id');
+
+        $this->bd->pdo()->prepare("UPDATE cursos SET estado = 'borrador' WHERE id = ?")->execute([$id]);
+
+        $this->auditoria->registrar('curso', $id, 'despublicar', $ctx->actor(), [], $ctx->ip());
+
+        return $this->redirigirCon($this->rutaEdicion($id), 'ok', 'Curso pasado a borrador.');
+    }
+
     private function rutaEdicion(string $id): string
     {
         return $id === '' ? '/panel/cursos/editar' : '/panel/cursos/editar?id=' . urlencode($id);
