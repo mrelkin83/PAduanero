@@ -40,8 +40,14 @@ $precio = '$' . number_format((int) $curso['precio_cop'], 0, ',', '.') . ' COP';
 </header>
 
 <main class="mx-auto max-w-3xl px-5 py-12 md:px-7">
+    <?php if (!empty($curso['imagen_portada'])): ?>
+    <img src="/img/cursos/<?= $e((string) $curso['imagen_portada']) ?>"
+         alt="<?= $e((string) $curso['titulo']) ?>"
+         class="mb-6 aspect-video w-full rounded object-cover" loading="eager" decoding="async">
+    <?php endif; ?>
+
     <?php if ($curso['estado'] === 'borrador'): ?>
-    <p class="mb-3 inline-block rounded px-2 py-1 text-xs font-semibold text-tinta bg-ambar">
+    <p class="mb-3 inline-block rounded px-2 py-1 text-xs font-semibold text-tinta bg-oro">
         Borrador — vista previa
     </p>
     <?php endif; ?>
@@ -55,7 +61,7 @@ $precio = '$' . number_format((int) $curso['precio_cop'], 0, ',', '.') . ' COP';
         <h2 class="rotulo">Lo que aprenderá</h2>
         <ul class="mt-3 space-y-2">
             <?php foreach ($curso['lo_que_aprendera'] as $item): ?>
-            <li class="flex gap-2"><span class="text-ambar">✓</span><span><?= $e((string) $item) ?></span></li>
+            <li class="flex gap-2"><span class="text-oro">✓</span><span><?= $e((string) $item) ?></span></li>
             <?php endforeach; ?>
         </ul>
     </section>
@@ -85,7 +91,7 @@ $precio = '$' . number_format((int) $curso['precio_cop'], 0, ',', '.') . ' COP';
     <?php endif; ?>
 
     <section class="doble-bisel mt-10 p-6 text-center">
-        <p class="font-mono text-2xl text-ambar"><?= $e($precio) ?></p>
+        <p class="font-mono text-2xl text-oro"><?= $e($precio) ?></p>
         <a href="/cursos/<?= $e((string) $curso['slug']) ?>/comprar" class="boton-diagnostico-global mt-4 inline-block">
             Comprar
         </a>

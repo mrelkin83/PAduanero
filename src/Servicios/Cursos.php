@@ -50,7 +50,15 @@ final class Cursos
         return Respuesta::vista('cursos/ficha', [
             'curso' => $curso,
             'modulos' => $this->temario($curso['id']),
-            'meta' => $this->meta($curso['titulo'], $curso['resumen'], '/cursos/' . $slug),
+            'meta' => $this->meta(
+                $curso['titulo'],
+                $curso['resumen'],
+                '/cursos/' . $slug,
+                // Un borrador nunca es indexable, sin importar el interruptor
+                // global: es un enlace pensado para compartir en privado
+                // (spec §5), no para que lo encuentre un buscador.
+                $curso['estado'] === 'borrador' ? false : null,
+            ),
         ]);
     }
 
@@ -141,13 +149,19 @@ final class Cursos
         )->fetchAll();
     }
 
-    /** @return array{titulo:string,descripcion:string,indexable:bool,url:string} */
-    private function meta(string $titulo, string $descripcion, string $ruta): array
+    /**
+     * @param bool|null $indexableForzado Si no es null, gana sobre el
+     *     interruptor global `landing_indexable` (usado para forzar
+     *     `noindex` en un curso en borrador — ver `ficha()`).
+     *
+     * @return array{titulo:string,descripcion:string,indexable:bool,url:string}
+     */
+    private function meta(string $titulo, string $descripcion, string $ruta, ?bool $indexableForzado = null): array
     {
         return [
             'titulo' => $titulo . ' · Pedro, abogado aduanero',
             'descripcion' => $descripcion,
-            'indexable' => (bool) $this->config->get('landing_indexable', true),
+            'indexable' => $indexableForzado ?? (bool) $this->config->get('landing_indexable', true),
             'url' => rtrim($this->urlBase, '/') . $ruta,
         ];
     }

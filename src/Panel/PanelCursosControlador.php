@@ -203,6 +203,12 @@ final class PanelCursosControlador extends ControladorBase
         $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
 
         $id = $ctx->campo('id');
+        $stmt = $this->bd->pdo()->prepare('SELECT id FROM cursos WHERE id = ?');
+        $stmt->execute([$id]);
+
+        if ($stmt->fetch() === false) {
+            return $this->redirigirCon('/panel/cursos', 'error', 'Ese curso no existe.');
+        }
 
         $this->bd->pdo()->prepare("UPDATE cursos SET estado = 'borrador' WHERE id = ?")->execute([$id]);
 
@@ -294,14 +300,18 @@ final class PanelCursosControlador extends ControladorBase
         $id = $ctx->campo('id');
         $stmt = $this->bd->pdo()->prepare('SELECT curso_id FROM curso_modulos WHERE id = ?');
         $stmt->execute([$id]);
-        $cursoId = (string) $stmt->fetchColumn();
+        $cursoId = $stmt->fetchColumn();
+
+        if ($cursoId === false) {
+            return $this->redirigirCon('/panel/cursos', 'error', 'Ese módulo no existe.');
+        }
 
         // ON DELETE CASCADE en curso_lecciones se encarga de sus lecciones.
         $this->bd->pdo()->prepare('DELETE FROM curso_modulos WHERE id = ?')->execute([$id]);
 
         $this->auditoria->registrar('curso_modulo', $id, 'eliminar', $ctx->actor(), [], $ctx->ip());
 
-        return $this->redirigirCon($this->rutaEdicion($cursoId), 'ok', 'Módulo eliminado.');
+        return $this->redirigirCon($this->rutaEdicion((string) $cursoId), 'ok', 'Módulo eliminado.');
     }
 
     public function agregarLeccion(Contexto $ctx): Respuesta
@@ -357,6 +367,10 @@ final class PanelCursosControlador extends ControladorBase
         );
         $stmt->execute([$id]);
         $cursoId = $stmt->fetchColumn();
+
+        if ($cursoId === false) {
+            return $this->redirigirCon('/panel/cursos', 'error', 'Esa lección no existe.');
+        }
 
         $this->bd->pdo()->prepare('DELETE FROM curso_lecciones WHERE id = ?')->execute([$id]);
 

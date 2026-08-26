@@ -326,4 +326,96 @@ final class PanelCursosTest extends CasoBaseBd
 
         self::assertSame(0, (int) $this->bd->pdo()->query('SELECT COUNT(*) FROM curso_lecciones')->fetchColumn());
     }
+
+    #[Test]
+    public function editarSinIdMuestraElFormularioVacio(): void
+    {
+        $r = $this->controlador()->editar($this->ctx('abogado'));
+
+        self::assertSame(200, $r->estado);
+        self::assertStringNotContainsString('Curso completo', $r->cuerpo);
+    }
+
+    #[Test]
+    public function editarConIdMuestraElCursoExistente(): void
+    {
+        $cat = $this->categoriaId();
+        $this->controlador()->guardar($this->ctx('abogado', [
+            'id' => '', 'categoria_id' => $cat, 'titulo' => 'Curso para editar',
+            'resumen' => 'r', 'descripcion' => 'd', 'lo_que_aprendera' => 'x',
+            'nivel' => 'basico', 'precio_cop' => '100000', 'orden' => '0',
+        ]));
+        $cursoId = (string) $this->bd->pdo()->query(
+            "SELECT id FROM cursos WHERE titulo = 'Curso para editar'"
+        )->fetchColumn();
+
+        $r = $this->controlador()->editar($this->ctx('abogado', [], ['id' => $cursoId]));
+
+        self::assertSame(200, $r->estado);
+        self::assertStringContainsString('Curso para editar', $r->cuerpo);
+    }
+
+    #[Test]
+    public function categoriasMuestraLasCategoriasExistentes(): void
+    {
+        $this->categoriaId('Comercio internacional');
+
+        $r = $this->controlador()->categorias($this->ctx('abogado'));
+
+        self::assertSame(200, $r->estado);
+        self::assertStringContainsString('Comercio internacional', $r->cuerpo);
+    }
+
+    #[Test]
+    public function publicarDejaUnaEntradaEnLaAuditoria(): void
+    {
+        $cursoId = $this->crearCursoCompleto($this->categoriaId());
+
+        $moduloId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO curso_modulos (id, curso_id, titulo, orden) VALUES (?, ?, ?, ?)'
+        )->execute([$moduloId, $cursoId, 'Módulo único', 1]);
+
+        $leccionId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO curso_lecciones (id, modulo_id, titulo, orden) VALUES (?, ?, ?, ?)'
+        )->execute([$leccionId, $moduloId, 'Lección única', 1]);
+
+        $this->controlador()->publicar($this->ctx('abogado', ['id' => $cursoId]));
+
+        $stmt = $this->bd->pdo()->prepare(
+            "SELECT COUNT(*) FROM auditoria WHERE entidad = 'curso' AND accion = 'publicar' AND entidad_id = ?"
+        );
+        $stmt->execute([$cursoId]);
+
+        self::assertSame(1, (int) $stmt->fetchColumn());
+    }
+
+    #[Test]
+    public function despublicarUnCursoInexistenteNoEscribeAuditoriaNiExplota(): void
+    {
+        $idFalso = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+
+        $r = $this->controlador()->despublicar($this->ctx('abogado', ['id' => $idFalso]));
+
+        self::assertStringContainsString('no existe', strtolower(urldecode($r->cabeceras['Location'])));
+
+        $total = (int) $this->bd->pdo()->query(
+            "SELECT COUNT(*) FROM auditoria WHERE entidad_id = '{$idFalso}'"
+        )->fetchColumn();
+
+        self::assertSame(0, $total);
+    }
+
+    #[Test]
+    public function unRolSinCursosEditarNoPuedeGuardar(): void
+    {
+        $this->expectException(SinPermisoException::class);
+
+        $this->controlador()->guardar($this->ctx('asistente', [
+            'id' => '', 'categoria_id' => '', 'titulo' => 'No debería crearse',
+            'resumen' => 'r', 'descripcion' => 'd', 'lo_que_aprendera' => 'x',
+            'nivel' => 'basico', 'precio_cop' => '100000', 'orden' => '0',
+        ]));
+    }
 }

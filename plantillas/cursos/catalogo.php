@@ -42,10 +42,10 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
 <main class="mx-auto max-w-5xl px-5 py-12 md:px-7">
     <?php if ($categorias !== []): ?>
     <nav aria-label="Categorías" class="mb-8 flex flex-wrap gap-3">
-        <a href="/cursos" class="menu-enlace<?= $categoriaActual === null ? ' nav-activo' : '' ?>">Todos</a>
+        <a href="/cursos" class="menu-enlace" <?= $categoriaActual === null ? 'data-activo' : '' ?>>Todos</a>
         <?php foreach ($categorias as $cat): ?>
         <a href="/cursos?categoria=<?= $e((string) $cat['slug']) ?>"
-           class="menu-enlace<?= $categoriaActual === $cat['slug'] ? ' nav-activo' : '' ?>">
+           class="menu-enlace" <?= $categoriaActual === $cat['slug'] ? 'data-activo' : '' ?>>
             <?= $e((string) $cat['nombre']) ?>
         </a>
         <?php endforeach; ?>
@@ -58,10 +58,15 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
     <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <?php foreach ($cursos as $curso): ?>
         <a href="/cursos/<?= $e((string) $curso['slug']) ?>" class="doble-bisel block p-5">
+            <?php if (!empty($curso['imagen_portada'])): ?>
+            <img src="/img/cursos/<?= $e((string) $curso['imagen_portada']) ?>"
+                 alt="<?= $e((string) $curso['titulo']) ?>"
+                 class="mb-4 aspect-video w-full rounded object-cover" loading="lazy" decoding="async">
+            <?php endif; ?>
             <p class="text-xs uppercase tracking-widest text-acero"><?= $e((string) $curso['categoria_nombre']) ?></p>
             <h2 class="mt-2 text-lg font-semibold"><?= $e((string) $curso['titulo']) ?></h2>
             <p class="mt-2 text-sm text-acero"><?= $e((string) $curso['resumen']) ?></p>
-            <p class="mt-4 font-mono text-ambar">
+            <p class="mt-4 font-mono text-oro">
                 $<?= $e(number_format((int) $curso['precio_cop'], 0, ',', '.')) ?> COP
             </p>
         </a>

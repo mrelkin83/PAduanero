@@ -155,4 +155,18 @@ final class CursosTest extends CasoBaseBd
         self::assertStringContainsString('Módulo 1: fundamentos', $html);
         self::assertStringContainsString('Lección 1: el arancel', $html);
     }
+
+    #[Test]
+    public function laFichaDeUnBorradorNuncaEsIndexablePeroLaDeUnPublicadoSiSegunLaConfiguracion(): void
+    {
+        $cat = $this->categoria();
+        $this->curso($cat, ['slug' => 'borrador-noindex', 'estado' => 'borrador']);
+        $this->curso($cat, ['slug' => 'publicado-indexable', 'estado' => 'publicado']);
+
+        $htmlBorrador = $this->cursos->ficha('borrador-noindex')->cuerpo;
+        $htmlPublicado = $this->cursos->ficha('publicado-indexable')->cuerpo;
+
+        self::assertStringContainsString('noindex', $htmlBorrador);
+        self::assertStringNotContainsString('noindex', $htmlPublicado);
+    }
 }
