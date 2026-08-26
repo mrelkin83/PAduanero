@@ -151,6 +151,18 @@ final class Panel
 
             'GET /auditoria' => $modulos['auditoria']->listar($ctx),
 
+            'GET /cursos' => $modulos['cursos']->listar($ctx),
+            'GET /cursos/editar' => $modulos['cursos']->editar($ctx),
+            'POST /cursos/guardar' => $modulos['cursos']->guardar($ctx),
+            'POST /cursos/publicar' => $modulos['cursos']->publicar($ctx),
+            'POST /cursos/despublicar' => $modulos['cursos']->despublicar($ctx),
+            'POST /cursos/modulos/agregar' => $modulos['cursos']->agregarModulo($ctx),
+            'POST /cursos/modulos/eliminar' => $modulos['cursos']->eliminarModulo($ctx),
+            'POST /cursos/lecciones/agregar' => $modulos['cursos']->agregarLeccion($ctx),
+            'POST /cursos/lecciones/eliminar' => $modulos['cursos']->eliminarLeccion($ctx),
+            'GET /cursos/categorias' => $modulos['cursos']->categorias($ctx),
+            'POST /cursos/categorias/guardar' => $modulos['cursos']->guardarCategoria($ctx),
+
             'GET /whatsapp' => $modulos['whatsapp']->ver($ctx),
             'GET /whatsapp/modelos' => $modulos['whatsapp']->modelos($ctx),
             'POST /whatsapp/modelos/sincronizar' => $modulos['whatsapp']->sincronizarModelos($ctx),
@@ -197,6 +209,10 @@ final class Panel
                 $this->c->obtener(Config::class),
             ),
             'tarifas' => new TarifasControlador(
+                $this->c->obtener(BD::class),
+                $this->c->obtener(AuditoriaRepo::class),
+            ),
+            'cursos' => new PanelCursosControlador(
                 $this->c->obtener(BD::class),
                 $this->c->obtener(AuditoriaRepo::class),
             ),

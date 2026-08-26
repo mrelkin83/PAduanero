@@ -27,6 +27,7 @@ $menu = [
     ['/panel', 'Tablero', 'tablero.ver'],
     ['/panel/contenido', 'Contenido', 'contenido.editar'],
     ['/panel/tarifas', 'Tarifas', 'agenda.ver'],
+    ['/panel/cursos', 'Cursos', 'cursos.ver'],
     ['/panel/whatsapp', 'WhatsApp', 'ia.proveedores.ver'],
     ['/panel/whatsapp/citas', 'Citas', 'agenda.ver'],
     ['/panel/whatsapp/conversaciones', 'Conversaciones', 'casos.ver'],

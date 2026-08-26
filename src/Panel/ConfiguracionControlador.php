@@ -24,6 +24,7 @@ final class ConfiguracionControlador extends ControladorBase
         'legal' => 'Legal',
         'notificaciones' => 'Notificaciones',
         'landing' => 'Landing',
+        'cursos' => 'Cursos',
     ];
 
     public function __construct(private readonly Config $config)
