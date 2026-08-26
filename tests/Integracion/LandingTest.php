@@ -469,6 +469,16 @@ final class LandingTest extends CasoBaseBd
     }
 
     #[Test]
+    public function elEnlaceDeCursosSoloApareceConElInterruptorEncendido(): void
+    {
+        self::assertStringNotContainsString('href="/cursos"', $this->landing->render());
+
+        $this->config->set('cursos_activo', true, 'tester');
+
+        self::assertStringContainsString('href="/cursos"', $this->landing->render());
+    }
+
+    #[Test]
     public function unTestimonioAnonimoNoSePublicaAunqueEsteAutorizado(): void
     {
         // Sin nombre no distingue a este despacho de uno inventado, que es

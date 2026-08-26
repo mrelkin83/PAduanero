@@ -83,6 +83,12 @@ final class Landing
                 'url' => rtrim((string) $this->config->get('chatwoot_widget_url', ''), '/'),
             ],
             'topeEventos' => (int) $this->config->get('landing_eventos_por_sesion', 60),
+            // Solo controla el enlace del menú, no las rutas /cursos en sí
+            // (spec §5) — igual que cualquier otro valor de `configuraciones`
+            // que lee esta plantilla, el cambio tarda hasta
+            // `landing_cache_segundos` en reflejarse (comportamiento ya
+            // existente, no nuevo de este campo).
+            'cursosActivo' => (bool) $this->config->get('cursos_activo', false),
         ])->cuerpo;
     }
 

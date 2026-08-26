@@ -13,6 +13,7 @@ use App\Soporte\Vista;
  * @var array{numero:string,mensaje:string} $whatsapp
  * @var array{token:string,url:string} $chatwoot
  * @var int $topeEventos
+ * @var bool $cursosActivo
  */
 
 $e = Vista::e(...);
@@ -219,6 +220,12 @@ $menu = array_values(array_filter(
         <?php endif; ?>
 
         <div class="<?= $menu === [] ? 'ml-auto' : 'ml-auto md:ml-0' ?> flex items-center gap-2 md:gap-4">
+            <?php /* Segundo enlace de salida, deliberado (spec §5 y §6): ya
+                     no hay un solo objetivo de conversión, hay dos —
+                     asesoría 1:1 y venta de cursos. */ ?>
+            <?php if ($cursosActivo): ?>
+            <a href="/cursos" data-evento="cursos_inicio" class="menu-enlace hidden sm:inline">Cursos</a>
+            <?php endif; ?>
             <a href="/perfil" data-evento="perfil_inicio" class="boton-diagnostico-global">
                 Diagnóstico <span class="hidden sm:inline">&nbsp;Gratuito</span>
             </a>
