@@ -63,13 +63,22 @@ $items = $bloque->lista('items');
                 </div>
             </div>
 
-            <?php /* Los items se distribuyen asimétricamente en desktop, y apilan fluidos en móvil */ ?>
-            <?php 
-                $bentoClasses = [
-                    'md:col-span-7 md:row-span-1',
-                    'md:col-span-4 md:row-span-1',
-                    'md:col-span-3 md:row-span-1'
-                ];
+            <?php /* Los items se distribuyen asimétricamente en desktop, y apilan fluidos en móvil.
+                     El retrato ocupa 5 columnas en 2 filas; a los items les quedan 7 columnas
+                     por fila. El reparto depende de cuántos items hay para que siempre llenen
+                     esas 7 columnas exactas: con menos tarjetas de las que el patrón de 3 espera
+                     ("07+4+3") quedaba una franja vacía a la derecha de la última fila. */ ?>
+            <?php
+                $totalItems = count($items);
+                $bentoClasses = match (true) {
+                    $totalItems <= 1 => ['md:col-span-7 md:row-span-2'],
+                    $totalItems === 2 => ['md:col-span-7 md:row-span-1', 'md:col-span-7 md:row-span-1'],
+                    default => [
+                        'md:col-span-7 md:row-span-1',
+                        'md:col-span-4 md:row-span-1',
+                        'md:col-span-3 md:row-span-1',
+                    ],
+                };
             ?>
             <?php foreach ($items as $i => $item): ?>
                 <?php
