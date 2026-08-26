@@ -224,4 +224,45 @@ final class PanelCursosTest extends CasoBaseBd
             $this->bd->pdo()->query("SELECT estado FROM cursos WHERE id = '{$cursoId}'")->fetchColumn(),
         );
     }
+
+    #[Test]
+    public function crearUnaCategoriaLeAsignaUnSlug(): void
+    {
+        $r = $this->controlador()->guardarCategoria($this->ctx('abogado', [
+            'id' => '', 'nombre' => 'Comercio Exterior', 'orden' => '0', 'activa' => '1',
+        ]));
+
+        self::assertSame(302, $r->estado);
+
+        $fila = $this->bd->pdo()->query(
+            "SELECT slug FROM categorias_curso WHERE nombre = 'Comercio Exterior'"
+        )->fetch();
+
+        self::assertSame('comercio-exterior', $fila['slug']);
+    }
+
+    #[Test]
+    public function editarUnaCategoriaExistenteNoLeCambiaElSlug(): void
+    {
+        $id = $this->categoriaId('Aduanero');
+
+        $this->controlador()->guardarCategoria($this->ctx('abogado', [
+            'id' => $id, 'nombre' => 'Aduanero avanzado', 'orden' => '2', 'activa' => '1',
+        ]));
+
+        $fila = $this->bd->pdo()->query("SELECT nombre, slug FROM categorias_curso WHERE id = '{$id}'")->fetch();
+
+        self::assertSame('Aduanero avanzado', $fila['nombre']);
+        self::assertSame('aduanero', $fila['slug']);
+    }
+
+    #[Test]
+    public function unaCategoriaSinNombreNoSeGuarda(): void
+    {
+        $r = $this->controlador()->guardarCategoria($this->ctx('abogado', [
+            'id' => '', 'nombre' => '', 'orden' => '0', 'activa' => '1',
+        ]));
+
+        self::assertStringContainsString('obligatorio', urldecode($r->cabeceras['Location']));
+    }
 }

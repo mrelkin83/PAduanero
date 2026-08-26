@@ -211,6 +211,54 @@ final class PanelCursosControlador extends ControladorBase
         return $this->redirigirCon($this->rutaEdicion($id), 'ok', 'Curso pasado a borrador.');
     }
 
+    public function categorias(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.ver');
+
+        $categorias = $this->bd->pdo()->query(
+            'SELECT * FROM categorias_curso ORDER BY orden, nombre'
+        )->fetchAll();
+
+        return $this->vista('panel/cursos_categorias', [
+            'ctx' => $ctx,
+            'categorias' => $categorias,
+            'avisos' => $this->avisos($ctx),
+        ]);
+    }
+
+    public function guardarCategoria(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $id = $ctx->campo('id');
+        $nombre = $ctx->campo('nombre');
+        $orden = $ctx->campo('orden', '0');
+        $activa = (int) ($ctx->campo('activa') === '1');
+
+        if ($nombre === '') {
+            return $this->redirigirCon('/panel/cursos/categorias', 'error', 'El nombre es obligatorio.');
+        }
+
+        if ($id === '') {
+            $slug = $this->slugUnico($this->slugificar($nombre), 'categorias_curso');
+            $nuevoId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+
+            $this->bd->pdo()->prepare(
+                'INSERT INTO categorias_curso (id, nombre, slug, orden, activa) VALUES (?, ?, ?, ?, ?)'
+            )->execute([$nuevoId, $nombre, $slug, (int) $orden, $activa]);
+
+            $this->auditoria->registrar('categoria_curso', $nuevoId, 'crear', $ctx->actor(), ['nombre' => $nombre], $ctx->ip());
+        } else {
+            $this->bd->pdo()->prepare(
+                'UPDATE categorias_curso SET nombre = ?, orden = ?, activa = ? WHERE id = ?'
+            )->execute([$nombre, (int) $orden, $activa, $id]);
+
+            $this->auditoria->registrar('categoria_curso', $id, 'actualizar', $ctx->actor(), ['nombre' => $nombre], $ctx->ip());
+        }
+
+        return $this->redirigirCon('/panel/cursos/categorias', 'ok', 'Categoría guardada.');
+    }
+
     private function rutaEdicion(string $id): string
     {
         return $id === '' ? '/panel/cursos/editar' : '/panel/cursos/editar?id=' . urlencode($id);
