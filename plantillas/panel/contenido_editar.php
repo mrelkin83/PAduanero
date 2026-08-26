@@ -23,7 +23,8 @@ $titulo = 'Editar: ' . (string) $bloque['clave'];
 $rotulo = static function (string $clave): string {
     $mapa = [
         'cta' => 'Botón (texto)', 'cta_texto' => 'Botón (texto)', 'cta_url' => 'Botón (enlace)',
-        'url' => 'Enlace', 'imagen' => 'Imagen (ruta en /img)', 'items' => 'Elementos',
+        'url' => 'Enlace', 'imagen' => 'Imagen (ruta en /img)', 'logo' => 'Logo de la empresa (ruta en /img)',
+        'items' => 'Elementos',
         'pasos' => 'Pasos', 'texto' => 'Texto', 'autor' => 'Autor', 'cargo' => 'Cargo',
         'empresa' => 'Empresa', 'titulo' => 'Título', 'subtitulo' => 'Subtítulo',
         'descripcion' => 'Descripción', 'nota' => 'Nota', 'valor' => 'Valor',

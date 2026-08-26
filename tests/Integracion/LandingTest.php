@@ -392,6 +392,100 @@ final class LandingTest extends CasoBaseBd
         self::assertStringContainsString('Ejemplo · sin publicar', $html);
     }
 
+    #[Test]
+    public function elLogoDeUnTestimonioAutorizadoEnlazaASuUrl(): void
+    {
+        // El logo es un botón hacia el sitio de la empresa (0029): con
+        // testimonio autorizado y url presentes, tiene que ser un enlace de
+        // verdad, no un adorno.
+        $this->ponerBloque('testimonios', [
+            'items' => [[
+                'texto' => 'Contestó el mismo día y explicó todo en español.',
+                'autor' => 'Nombre Apellido',
+                'empresa' => 'Importadora Ejemplo',
+                'autorizado' => true,
+                'logo' => 'importadora-ejemplo.png',
+                'url' => 'https://importadora-ejemplo.com',
+            ]],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString(
+            '<a href="https://importadora-ejemplo.com"',
+            $html,
+        );
+        self::assertStringContainsString('src="/img/importadora-ejemplo.png"', $html);
+    }
+
+    #[Test]
+    public function elLogoSinUrlSePintaSinEnlace(): void
+    {
+        // «Un botón que no lleva a ninguna parte es peor que no ponerlo»
+        // (0029): sin url el logo se pinta, pero no dentro de un <a>.
+        $this->ponerBloque('testimonios', [
+            'items' => [[
+                'texto' => 'Contestó el mismo día y explicó todo en español.',
+                'autor' => 'Nombre Apellido',
+                'empresa' => 'Importadora Ejemplo',
+                'autorizado' => true,
+                'logo' => 'importadora-ejemplo.png',
+                // sin `url`
+            ]],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString('src="/img/importadora-ejemplo.png"', $html);
+        self::assertDoesNotMatchRegularExpression(
+            '#<a[^>]*>\s*<img[^>]*src="/img/importadora-ejemplo\.png"#',
+            $html,
+        );
+    }
+
+    #[Test]
+    public function elLogoDeUnEjemploNuncaEnlazaAunqueTengaUrl(): void
+    {
+        // La misma regla que protege los testimonios de relleno: un ejemplo
+        // no puede parecer una reseña real, y un logo enlazado sí lo
+        // parecería.
+        $this->ponerBloque('testimonios', [
+            'items' => [[
+                'texto' => 'Contestó el mismo día.',
+                'autor' => 'Nombre pendiente',
+                'pendiente' => true,
+                'logo' => 'ejemplo.png',
+                'url' => 'https://no-deberia-salir.example',
+                // sin `autorizado`
+            ]],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString('src="/img/ejemplo.png"', $html);
+        self::assertStringNotContainsString('no-deberia-salir.example', $html);
+    }
+
+    #[Test]
+    public function elNombreDeArchivoDelLogoSeSaneaConBasename(): void
+    {
+        // Defensa contra traversal: si el campo `logo` trae una ruta con
+        // directorios, solo el nombre de archivo llega al `src`.
+        $this->ponerBloque('testimonios', [
+            'items' => [[
+                'texto' => 'Contestó el mismo día y explicó todo en español.',
+                'autor' => 'Nombre Apellido',
+                'autorizado' => true,
+                'logo' => '../../etc/passwd',
+            ]],
+        ]);
+
+        $html = $this->construir()->render();
+
+        self::assertStringContainsString('src="/img/passwd"', $html);
+        self::assertStringNotContainsString('../', $html);
+    }
+
     // ── El pie (0019) ────────────────────────────────────────────────────
     //
     // El contacto del pie sale del bloque `pie` y sigue la regla de 0014:

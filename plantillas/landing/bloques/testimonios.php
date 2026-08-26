@@ -115,6 +115,8 @@ if ($items === []) {
                 $cargo = trim((string) ($item['cargo'] ?? ''));
                 $empresa = trim((string) ($item['empresa'] ?? ''));
                 $pie = implode(' · ', array_filter([$cargo, $empresa]));
+                $logo = trim((string) ($item['logo'] ?? ''));
+                $logoUrl = trim((string) ($item['url'] ?? ''));
                 $delay = 100 + ($i * 100);
                 ?>
                 <?php $pendiente = $item['pendiente'] === true; ?>
@@ -131,13 +133,34 @@ if ($items === []) {
                         <?= $e($item['texto']) ?>
                     </blockquote>
 
-                    <figcaption class="mt-8 md:mt-12 relative z-10 border-t border-linea/30 pt-6 md:pt-8 flex flex-col">
-                        <p class="text-[1.1rem] md:text-xl font-medium tracking-tight text-white md:group-hover:text-oro-claro transition-colors duration-500 <?= $pendiente ? 'pendiente' : '' ?>">
-                            <?= $e($item['autor']) ?>
-                        </p>
+                    <figcaption class="mt-8 md:mt-12 relative z-10 border-t border-linea/30 pt-6 md:pt-8 flex items-end justify-between gap-6">
+                        <div class="flex flex-col min-w-0">
+                            <p class="text-[1.1rem] md:text-xl font-medium tracking-tight text-white md:group-hover:text-oro-claro transition-colors duration-500 <?= $pendiente ? 'pendiente' : '' ?>">
+                                <?= $e($item['autor']) ?>
+                            </p>
 
-                        <?php if ($pie !== ''): ?>
-                        <p class="rotulo text-acero mt-3 md:mt-4"><?= $e($pie) ?></p>
+                            <?php if ($pie !== ''): ?>
+                            <p class="rotulo text-acero mt-3 md:mt-4"><?= $e($pie) ?></p>
+                            <?php endif; ?>
+                        </div>
+
+                        <?php if ($logo !== ''): ?>
+                        <?php
+                        /* El logo enlaza al sitio o red de la empresa, nunca en un
+                           ejemplo (0015) ni sin url: un botón que no lleva a
+                           ninguna parte es peor que no ponerlo. */
+                        $etiquetaLogo = $empresa !== '' ? 'Sitio de ' . $empresa : 'Sitio de la empresa';
+                        ?>
+                        <?php if (!$pendiente && $logoUrl !== ''): ?>
+                        <a href="<?= $e($logoUrl) ?>" target="_blank" rel="noopener noreferrer"
+                           class="shrink-0 opacity-80 md:hover:opacity-100 transition-opacity duration-300" aria-label="<?= $e($etiquetaLogo) ?>">
+                            <img src="/img/<?= $e(basename($logo)) ?>" alt="<?= $e($empresa) ?>" width="120" height="40"
+                                 class="h-9 md:h-10 w-auto max-w-[8rem] object-contain" loading="lazy" decoding="async">
+                        </a>
+                        <?php else: ?>
+                        <img src="/img/<?= $e(basename($logo)) ?>" alt="<?= $e($empresa) ?>" width="120" height="40"
+                             class="shrink-0 h-9 md:h-10 w-auto max-w-[8rem] object-contain opacity-80" loading="lazy" decoding="async">
+                        <?php endif; ?>
                         <?php endif; ?>
                     </figcaption>
                 </figure>
