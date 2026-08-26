@@ -36,10 +36,16 @@ $waBase = 'https://wa.me/' . rawurlencode($whatsapp['numero'])
 <link rel="canonical" href="<?= $e($meta['url']) ?>/">
 
 <meta property="og:type" content="website">
+<meta property="og:url" content="<?= $e($meta['url']) ?>/">
 <meta property="og:title" content="<?= $e($meta['titulo']) ?>">
 <meta property="og:description" content="<?= $e($meta['descripcion']) ?>">
 <meta property="og:image" content="<?= $e($meta['url']) ?>/img/pedro-hero.jpg">
 <meta property="og:locale" content="es_CO">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="<?= $e($meta['titulo']) ?>">
+<meta name="twitter:description" content="<?= $e($meta['descripcion']) ?>">
+<meta name="twitter:image" content="<?= $e($meta['url']) ?>/img/pedro-hero.jpg">
 
 <link rel="icon" href="/img/icono.svg" type="image/svg+xml">
 

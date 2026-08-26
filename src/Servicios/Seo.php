@@ -61,6 +61,14 @@ final class Seo
     {
         $base = $this->urlBase();
 
+        // `lastmod` de `/` y `/perfil` sale del propio contenido editable:
+        // el mtime más reciente de los bloques que cada página pinta. No hay
+        // fecha de publicación propia que llevar aparte — sería una segunda
+        // verdad que se desincroniza del panel en la primera edición que se
+        // le olvide reflejar ahí.
+        $home = $this->ultimaModificacion(['hero', 'credenciales', 'casos', 'proceso', 'cta_final', 'confianza', 'testimonios', 'pie']);
+        $perfil = $this->ultimaModificacion(['perfil', 'perfil_intro', 'perfil_resultado', 'perfil_fuera_alcance', 'pie']);
+
         $urls = [
             // Las imágenes solo van en `/`: son las que la landing sirve
             // fijas (hero, credenciales, proceso, cierre) y con alt
@@ -69,6 +77,7 @@ final class Seo
             // terreno alcanzable ya, a diferencia del paquete de mapa.
             [
                 'loc' => $base . '/', 'prioridad' => '1.0', 'cambio' => 'weekly',
+                'lastmod' => $home,
                 'imagenes' => [
                     $base . '/img/pedro-hero.jpg',
                     $base . '/img/pedro-perfil.jpg',
@@ -80,7 +89,7 @@ final class Seo
             // secundaria: sus preguntas son literalmente las búsquedas por
             // las que este despacho quiere aparecer («me llegó un acta de
             // aprehensión»), y es la única URL del sitio que las contiene.
-            ['loc' => $base . '/perfil', 'prioridad' => '0.9', 'cambio' => 'monthly'],
+            ['loc' => $base . '/perfil', 'prioridad' => '0.9', 'cambio' => 'monthly', 'lastmod' => $perfil],
             // Las legales, con la prioridad de lo que nadie busca pero debe
             // poder encontrarse. La de privacidad además la valida Google
             // para publicar la app OAuth del calendario.
@@ -207,6 +216,24 @@ final class Seo
         }
 
         return $datos;
+    }
+
+    /**
+     * `YYYY-MM-DD` del bloque modificado más recientemente entre `claves`,
+     * o `null` si ninguno existe.
+     *
+     * @param list<string> $claves
+     */
+    private function ultimaModificacion(array $claves): ?string
+    {
+        $marcadores = implode(',', array_fill(0, count($claves), '?'));
+        $stmt = $this->bd->pdo()->prepare(
+            "SELECT MAX(actualizado_en) FROM landing_bloques WHERE clave IN ($marcadores)"
+        );
+        $stmt->execute($claves);
+        $maximo = $stmt->fetchColumn();
+
+        return is_string($maximo) && $maximo !== '' ? substr($maximo, 0, 10) : null;
     }
 
     /**
