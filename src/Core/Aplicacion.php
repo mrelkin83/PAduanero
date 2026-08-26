@@ -178,6 +178,15 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Servicios\Cursos::class,
+            static fn (Contenedor $c): \App\Servicios\Cursos => new \App\Servicios\Cursos(
+                $c->obtener(BD::class),
+                $c->obtener(Config::class),
+                $urlBase,
+            ),
+        );
+
+        $this->contenedor->registrar(
             \App\Servicios\PaginaLegal::class,
             static fn (Contenedor $c): \App\Servicios\PaginaLegal => new \App\Servicios\PaginaLegal(
                 $c->obtener(Config::class),
@@ -217,6 +226,18 @@ final class Aplicacion
 
         $this->router->get('/perfil', function (): Respuesta {
             return $this->contenedor->obtener(\App\Servicios\Perfil::class)->responder();
+        });
+
+        $this->router->get('/cursos', function (Peticion $p): Respuesta {
+            $categoria = $p->consulta['categoria'] ?? null;
+
+            return $this->contenedor->obtener(\App\Servicios\Cursos::class)->catalogo(
+                is_string($categoria) && $categoria !== '' ? $categoria : null,
+            );
+        });
+
+        $this->router->get('/cursos/{slug}', function (Peticion $p): Respuesta {
+            return $this->contenedor->obtener(\App\Servicios\Cursos::class)->ficha($p->parametros['slug']);
         });
 
         // Las páginas legales. Las exige el propio proyecto (el motor de
