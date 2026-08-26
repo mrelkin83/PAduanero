@@ -6,12 +6,22 @@ declare(strict_types=1);
  * Índice de situaciones — el elemento distintivo de la página.
  *
  * Se compone como el índice de un arancel: filas monoespaciadas separadas
- * por filetes finos, en dos columnas por rama. El lector busca SU situación
- * en la lista, y encontrarla es justo el paso previo a escribir. Por eso el
- * botón queda al final del bloque y no antes.
+ * por filetes finos. El lector busca SU situación en la lista, y encontrarla
+ * es justo el paso previo a escribir. Por eso el botón queda al final del
+ * bloque y no antes.
  *
  * Sin numerar: estas situaciones no son una secuencia, son un catálogo.
  * Numerarlas sugeriría un orden que no existe.
+ *
+ * Cada categoría reparte sus filas en columnas de texto (`.indice-columnas`,
+ * CSS `column-width`) en vez de depender de cuántas categorías haya al
+ * lado: hasta el 2026-08-25 hubo dos —aduanero y tributario— en un
+ * `grid-cols-2` de tarjetas; al retirarse tributario, esa maqueta dejaba una
+ * sola tarjeta angosta flotando en un vacío que crecía sin límite en un
+ * monitor ancho. Con columnas de texto el navegador decide cuántas caben
+ * según el hueco real, así que el bloque se ve proporcionado tanto si hay
+ * una categoría como si vuelve a haber varias — sin que haya que volver a
+ * tocar este layout el día que eso cambie.
  *
  * @var \App\Modelos\Bloque $bloque
  * @var string $waBase
@@ -21,6 +31,16 @@ declare(strict_types=1);
 $columnas = [
     'aduanero' => ['Aduanero y comercio exterior', 'A'],
 ];
+
+// Solo las categorías con filas entran al layout: una categoría sin datos
+// no debe reservarle una tarjeta vacía a la cuadrícula.
+$activas = [];
+foreach ($columnas as $clave => [$encabezado, $letra]) {
+    $items = $bloque->lista($clave);
+    if ($items !== []) {
+        $activas[$clave] = [$encabezado, $letra, $items];
+    }
+}
 ?>
 <section id="situaciones" class="py-20 md:py-[8rem] relative isolate">
     <div class="absolute inset-0 bg-gradient-to-b from-transparent via-oro/5 to-transparent pointer-events-none"></div>
@@ -41,21 +61,23 @@ $columnas = [
             <?php endif; ?>
         </div>
 
-        <?php /* Una sola columna hoy (solo queda `aduanero`): a grid-cols-2 sin
-                 forzarlo, con `max-w-2xl` para que la tarjeta no se estire
-                 a lo ancho del contenedor cuando no tiene pareja al lado. */ ?>
-        <div class="mt-12 md:mt-24 grid gap-6 md:gap-8 md:grid-cols-2 items-start <?= count($columnas) === 1 ? 'max-w-2xl' : '' ?>">
-            <?php foreach ($columnas as $clave => [$encabezado, $letra]): ?>
-                <?php $items = $bloque->lista($clave); ?>
-                <?php if ($items === []) { continue; } ?>
-
+        <?php /* Una sola categoría hoy: la tarjeta usa un ancho generoso
+                 (max-w-5xl) para que sus columnas de texto tengan hueco de
+                 sobra donde repartirse. Con dos o más, vuelve la cuadrícula
+                 lado a lado y cada tarjeta reparte las suyas en el espacio
+                 más angosto que le toque — la misma regla CSS sirve para
+                 los dos casos. */ ?>
+        <div class="mt-12 md:mt-24 grid gap-6 md:gap-8 items-start mx-auto <?= count($activas) > 1
+            ? 'md:grid-cols-2 max-w-[84rem]'
+            : 'max-w-5xl' ?>">
+            <?php foreach ($activas as $clave => [$encabezado, $letra, $items]): ?>
                 <div class="doble-bisel p-6 md:p-12 md:hover:bg-white/5 transition-colors duration-500 revelar group" style="--retardo: <?= $clave === 'aduanero' ? '100ms' : '200ms' ?>">
                     <h3 class="flex flex-col gap-2 md:gap-4 mb-8 md:mb-10 pb-6 md:pb-8 border-b border-linea/50 relative">
                         <span class="text-5xl md:text-7xl font-light text-oro/20 md:group-hover:text-oro/40 transition-colors duration-500 absolute -top-2 md:-top-4 right-0 pointer-events-none"><?= $e($letra) ?></span>
                         <span class="text-xl md:text-2xl font-medium tracking-tight text-white pr-12"><?= $e($encabezado) ?></span>
                     </h3>
 
-                    <ul class="space-y-0.5 md:space-y-1">
+                    <ul class="indice-columnas">
                         <?php foreach ($items as $item): ?>
                         <li class="indice-fila group/item text-[0.95rem] md:text-lg py-3 md:py-4 border-t border-linea/30 first:border-0 relative overflow-hidden transition-all duration-500">
                             <span class="relative z-10 block md:group-hover/item:pl-4 transition-all duration-500 md:group-hover/item:text-oro-claro"><?= $e(is_string($item) ? $item : '') ?></span>

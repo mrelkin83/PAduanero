@@ -850,6 +850,25 @@
     padding-left: 0.5rem;
   }
 
+  /* El índice se reparte en columnas de texto, no en un `grid` de N
+     tarjetas: con una sola rama viva (2026-08-25, se retiró tributario) un
+     `grid-cols-2` pensado para dos categorías dejaba una tarjeta angosta
+     flotando en un vacío que crecía sin límite en un monitor ancho. Con
+     `column-width` el navegador decide cuántas columnas caben — una en el
+     teléfono, dos o tres según el hueco real — así que la misma tarjeta se
+     ve proporcionada de un móvil de 320 px a un monitor ultrancho, sin un
+     punto de quiebre fijo del que alguien tenga que acordarse. El límite en
+     3 evita que un contenedor muy ancho fragmente 9 líneas en columnas de
+     una sola fila. */
+  .indice-columnas {
+    columns: 16rem 3;
+    column-gap: 2.5rem;
+  }
+  .indice-columnas .indice-fila {
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+  }
+
   /* La numeración de las listas jurídicas: mono y en oro. */
   .indice-num {
     flex-shrink: 0;
