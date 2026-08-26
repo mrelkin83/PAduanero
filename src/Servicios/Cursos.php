@@ -39,6 +39,77 @@ final class Cursos
         ]);
     }
 
+    public function ficha(string $slug): Respuesta
+    {
+        $curso = $this->buscarPorSlug($slug);
+
+        if ($curso === null) {
+            return Respuesta::texto('Curso no encontrado.', 404);
+        }
+
+        return Respuesta::vista('cursos/ficha', [
+            'curso' => $curso,
+            'modulos' => $this->temario($curso['id']),
+            'meta' => $this->meta($curso['titulo'], $curso['resumen'], '/cursos/' . $slug),
+        ]);
+    }
+
+    /** @return array<string,mixed>|null */
+    private function buscarPorSlug(string $slug): ?array
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT c.*, cat.nombre AS categoria_nombre
+               FROM cursos c JOIN categorias_curso cat ON cat.id = c.categoria_id
+              WHERE c.slug = ?'
+        );
+        $stmt->execute([$slug]);
+        $fila = $stmt->fetch();
+
+        if ($fila === false) {
+            return null;
+        }
+
+        $fila['lo_que_aprendera'] = json_decode((string) $fila['lo_que_aprendera'], true) ?: [];
+
+        return $fila;
+    }
+
+    /** @return list<array{titulo:string,lecciones:list<array<string,mixed>>}> */
+    private function temario(string $cursoId): array
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT id, titulo, orden FROM curso_modulos WHERE curso_id = ? ORDER BY orden'
+        );
+        $stmt->execute([$cursoId]);
+        $modulos = $stmt->fetchAll();
+
+        if ($modulos === []) {
+            return [];
+        }
+
+        $marcas = implode(',', array_fill(0, count($modulos), '?'));
+        $idsModulos = array_column($modulos, 'id');
+
+        $stmt = $this->bd->pdo()->prepare(
+            "SELECT modulo_id, titulo, duracion_min, orden, vista_previa_gratis
+               FROM curso_lecciones WHERE modulo_id IN ({$marcas}) ORDER BY orden"
+        );
+        $stmt->execute($idsModulos);
+
+        $leccionesPorModulo = [];
+        foreach ($stmt->fetchAll() as $leccion) {
+            $leccionesPorModulo[$leccion['modulo_id']][] = $leccion;
+        }
+
+        return array_map(
+            static fn (array $modulo): array => [
+                'titulo' => $modulo['titulo'],
+                'lecciones' => $leccionesPorModulo[$modulo['id']] ?? [],
+            ],
+            $modulos,
+        );
+    }
+
     /** @return list<array<string,mixed>> */
     private function publicados(?string $categoriaSlug): array
     {
