@@ -28,6 +28,7 @@ $rotulo = static function (string $clave): string {
         'empresa' => 'Empresa', 'titulo' => 'Título', 'subtitulo' => 'Subtítulo',
         'descripcion' => 'Descripción', 'nota' => 'Nota', 'valor' => 'Valor',
         'etiqueta' => 'Etiqueta', 'nombre' => 'Nombre', 'direccion' => 'Dirección',
+        'telefonos' => 'Teléfonos',
     ];
 
     return $mapa[$clave] ?? ucfirst(str_replace('_', ' ', $clave));

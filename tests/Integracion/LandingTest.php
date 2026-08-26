@@ -402,7 +402,7 @@ final class LandingTest extends CasoBaseBd
     {
         $this->ponerBloque('pie', [
             'correo' => 'info@pedroabogadoaduanero.com',
-            'telefono' => '+57 601 555 5555',
+            'telefonos' => ['+57 601 555 5555', '+57 601 555 5556', ''],
             'redes' => [
                 ['nombre' => 'LinkedIn', 'url' => 'https://www.linkedin.com/in/ejemplo'],
             ],
@@ -412,6 +412,7 @@ final class LandingTest extends CasoBaseBd
 
         self::assertStringContainsString('mailto:info@pedroabogadoaduanero.com', $html);
         self::assertStringContainsString('tel:+576015555555', $html);
+        self::assertStringContainsString('tel:+576015555556', $html);
         self::assertStringContainsString('https://www.linkedin.com/in/ejemplo', $html);
     }
 
@@ -424,7 +425,7 @@ final class LandingTest extends CasoBaseBd
         // escribe una persona y `javascript:` también es una URL.
         $this->ponerBloque('pie', [
             'correo' => '',
-            'telefono' => '',
+            'telefonos' => ['', '', ''],
             'redes' => [
                 ['nombre' => 'LinkedIn', 'url' => ''],
                 ['nombre' => 'Instagram', 'url' => 'javascript:alert(1)'],

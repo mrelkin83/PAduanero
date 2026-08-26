@@ -22,6 +22,9 @@ use App\Soporte\Vista;
  * igual, solo que sin la columna de contacto: la regla de 0014, omitir en
  * silencio lo que no tiene dato, aplicada al pie entero.
  *
+ * `telefonos` (0023) es una lista de hasta tres, no un solo campo: cada
+ * número es su propio enlace `tel:`, y los vacíos se omiten uno por uno.
+ *
  * @var \App\Modelos\Bloque|null $pie
  */
 
@@ -29,8 +32,17 @@ $e = Vista::e(...);
 $pie ??= null;
 
 $correo = $pie?->texto('correo') ?? '';
-$telefono = $pie?->texto('telefono') ?? '';
 $direccion = $pie?->texto('direccion') ?? '';
+
+// Cada teléfono es su propio enlace `tel:`: meter dos números en un solo
+// campo de texto libre producía un `tel:` con los dos pegados y sin sentido.
+$telefonos = [];
+foreach ($pie?->lista('telefonos') ?? [] as $telefono) {
+    $telefono = is_string($telefono) ? trim($telefono) : '';
+    if ($telefono !== '') {
+        $telefonos[] = $telefono;
+    }
+}
 
 // Solo las redes con nombre Y url: una URL sin rótulo o un rótulo sin
 // destino son huecos, no enlaces.
@@ -46,7 +58,7 @@ foreach ($pie?->lista('redes') ?? [] as $red) {
     }
 }
 
-$hayContacto = $correo !== '' || $telefono !== '' || $direccion !== '' || $redes !== [];
+$hayContacto = $correo !== '' || $telefonos !== [] || $direccion !== '' || $redes !== [];
 ?>
 <footer class="border-t border-linea py-16 md:py-20">
     <div class="mx-auto max-w-[78rem] px-6 md:px-20">
@@ -91,9 +103,9 @@ $hayContacto = $correo !== '' || $telefono !== '' || $direccion !== '' || $redes
                     <?php if ($correo !== ''): ?>
                     <li><a href="mailto:<?= $e($correo) ?>" class="menu-enlace"><?= $e($correo) ?></a></li>
                     <?php endif; ?>
-                    <?php if ($telefono !== ''): ?>
+                    <?php foreach ($telefonos as $telefono): ?>
                     <li><a href="tel:<?= $e(preg_replace('/[^+\d]/', '', $telefono) ?? '') ?>" class="menu-enlace"><?= $e($telefono) ?></a></li>
-                    <?php endif; ?>
+                    <?php endforeach; ?>
                     <?php if ($direccion !== ''): ?>
                     <li><address class="not-italic"><?= $e($direccion) ?></address></li>
                     <?php endif; ?>
