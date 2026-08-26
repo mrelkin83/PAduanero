@@ -187,7 +187,7 @@ abstract class CasoBaseBd extends TestCase
             'credenciales', 'sesiones', 'usuarios', 'intentos_acceso',
             'configuraciones_historial', 'secuencias', 'eventos_landing',
             'kb_chunks', 'kb_documentos', 'consumo_ia', 'sincronizaciones_modelos',
-            'prompts',
+            'prompts', 'curso_lecciones', 'curso_modulos', 'cursos', 'categorias_curso',
         ] as $tabla) {
             $pdo->exec('TRUNCATE TABLE `' . $tabla . '`');
         }
