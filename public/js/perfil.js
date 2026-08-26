@@ -262,10 +262,7 @@
     function largo() {
         if (rama) { return visibles().length; }
 
-        return Math.max(
-            parseInt(form.dataset.largoAduanero, 10) || 0,
-            parseInt(form.dataset.largoTributario, 10) || 0
-        );
+        return parseInt(form.dataset.largoAduanero, 10) || 0;
     }
 
     function elegida(paso) {
@@ -412,9 +409,9 @@
 
         registrar('perfil_paso', '/perfil/' + paso.dataset.paso);
 
-        // El paso 1 fija la rama, y cambiarla invalida lo contestado en la
-        // otra: no se puede llegar al resultado con la mitad de las
-        // respuestas de aduanero y la mitad de tributario.
+        // El paso 1 fija la rama, y cambiarla invalida lo contestado antes:
+        // no se puede llegar al resultado con respuestas de dos ramas
+        // distintas mezcladas.
         if (input.dataset.rama !== undefined) {
             if (rama && rama !== input.dataset.rama) { limpiarDesde(1); }
             rama = input.dataset.rama;

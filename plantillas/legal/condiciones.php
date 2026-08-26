@@ -28,8 +28,8 @@ $cuerpoLegal = static function () use ($e, $whatsapp): void { ?>
         <h2 class="titular-menor">1. Qué es este sitio</h2>
         <p class="cuerpo mt-4">
             Esta página informa sobre los servicios del despacho de Pedro, abogado
-            especialista en derecho aduanero y comercio exterior y en derecho
-            tributario. Su contenido es informativo.
+            especialista en derecho aduanero y comercio exterior. Su contenido es
+            informativo.
         </p>
     </section>
 

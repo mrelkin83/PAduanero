@@ -1,6 +1,6 @@
-# Sitio público — Pedro, abogado aduanero y tributario
+# Sitio público — Pedro, abogado aduanero
 
-Un abogado especialista en derecho aduanero y tributario quiere captar clientes
+Un abogado especialista en derecho aduanero y comercio exterior quiere captar clientes
 que **ya tienen un problema con la DIAN**. Este repositorio es su sitio:
 
 ```

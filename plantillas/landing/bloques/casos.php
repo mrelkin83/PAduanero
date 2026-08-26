@@ -20,7 +20,6 @@ declare(strict_types=1);
 
 $columnas = [
     'aduanero' => ['Aduanero y comercio exterior', 'A'],
-    'tributario' => ['Tributario', 'B'],
 ];
 ?>
 <section id="situaciones" class="py-20 md:py-[8rem] relative isolate">
@@ -42,7 +41,10 @@ $columnas = [
             <?php endif; ?>
         </div>
 
-        <div class="mt-12 md:mt-24 grid gap-6 md:gap-8 md:grid-cols-2 items-start">
+        <?php /* Una sola columna hoy (solo queda `aduanero`): a grid-cols-2 sin
+                 forzarlo, con `max-w-2xl` para que la tarjeta no se estire
+                 a lo ancho del contenedor cuando no tiene pareja al lado. */ ?>
+        <div class="mt-12 md:mt-24 grid gap-6 md:gap-8 md:grid-cols-2 items-start <?= count($columnas) === 1 ? 'max-w-2xl' : '' ?>">
             <?php foreach ($columnas as $clave => [$encabezado, $letra]): ?>
                 <?php $items = $bloque->lista($clave); ?>
                 <?php if ($items === []) { continue; } ?>

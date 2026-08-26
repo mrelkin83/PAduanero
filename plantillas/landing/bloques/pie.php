@@ -74,7 +74,7 @@ $hayContacto = $correo !== '' || $telefonos !== [] || $direccion !== '' || $rede
                 <img src="/img/logo-pedro.png" alt="" width="72" height="72" class="mb-5 h-18 w-18" loading="lazy" decoding="async">
                 <p class="marca">Pedro</p>
                 <p class="rotulo mt-4 text-acero">
-                    Abogado aduanero y tributario
+                    Abogado aduanero
                 </p>
                 <p class="cuerpo mt-8 max-w-md text-[0.8125rem]">
                     Esta página informa sobre los servicios del despacho. No constituye
@@ -107,7 +107,7 @@ $hayContacto = $correo !== '' || $telefonos !== [] || $direccion !== '' || $rede
                     <li><a href="tel:<?= $e(preg_replace('/[^+\d]/', '', $telefono) ?? '') ?>" class="menu-enlace"><?= $e($telefono) ?></a></li>
                     <?php endforeach; ?>
                     <?php if ($direccion !== ''): ?>
-                    <li><address class="not-italic"><?= $e($direccion) ?></address></li>
+                    <li><address class="not-italic menu-enlace"><?= $e($direccion) ?></address></li>
                     <?php endif; ?>
                     <?php foreach ($redes as $red): ?>
                     <li>

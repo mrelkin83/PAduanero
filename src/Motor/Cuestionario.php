@@ -53,9 +53,10 @@ final class Cuestionario
     /**
      * Los pasos, en orden.
      *
-     * `rama` null significa que el paso lo ve todo el mundo; `aduanero` o
-     * `tributario`, que solo lo ve quien vino por esa bifurcación. La
-     * bifurcación la fija el paso 1 con el `rama` de la opción elegida.
+     * `rama` null significa que el paso lo ve todo el mundo; `aduanero`,
+     * que solo lo ve quien vino por esa rama. (Hasta el 2026-08-25 existió
+     * también una rama `tributario`; se retiró junto con esa área de
+     * práctica — CLAUDE.md §5, §7.)
      *
      * @return list<array{
      *   id: string,

@@ -29,7 +29,7 @@ use App\Soporte\Vista;
  */
 
 $imagen = $bloque->texto('imagen', '/img/pedro-hero.jpg');
-$alt = $bloque->texto('alt', 'Pedro, abogado especialista en derecho aduanero y tributario');
+$alt = $bloque->texto('alt', 'Pedro, abogado especialista en derecho aduanero y comercio exterior');
 
 /* Las cifras se siembran en `landing_bloques` (migración 0013) para que se
    editen desde el panel; el valor por defecto está aquí para que el bloque
@@ -70,7 +70,7 @@ if ($cifras === []) {
     <div class="relative z-10 w-full mx-auto max-w-[78rem] px-6 -mt-16 pb-16 md:mt-0 md:px-20 md:pt-40 md:pb-0">
 
         <div class="max-w-3xl">
-            <p class="rotulo mb-4 md:mb-6">Aduanero · Tributario · DIAN</p>
+            <p class="rotulo mb-4 md:mb-6">Aduanero · Comercio exterior · DIAN</p>
 
             <h1 class="titular mt-2 md:mt-8">
                 <?= $e($bloque->titulo) ?>

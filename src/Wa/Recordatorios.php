@@ -117,7 +117,7 @@ final class Recordatorios
                 $this->correo->enviar(
                     $correoCliente,
                     'Recordatorio: su asesoría es hoy a las ' . $hora,
-                    'Le recordamos su asesoría con Pedro, abogado aduanero y tributario: '
+                    'Le recordamos su asesoría con Pedro, abogado aduanero: '
                     . 'hoy a las ' . $hora . '.'
                     . ($meet !== '' ? "\n\nEnlace de la videollamada: " . $meet : '')
                     . "\n\nEste es un mensaje automático; si necesita reprogramar, responda por WhatsApp.",

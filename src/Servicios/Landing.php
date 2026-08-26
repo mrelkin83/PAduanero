@@ -67,7 +67,7 @@ final class Landing
             'meta' => [
                 'titulo' => (string) $this->config->get(
                     'landing_meta_titulo',
-                    'Abogado aduanero y tributario',
+                    'Abogado aduanero',
                 ),
                 'descripcion' => (string) $this->config->get('landing_meta_descripcion', ''),
                 'indexable' => (bool) $this->config->get('landing_indexable', true),

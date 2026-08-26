@@ -164,7 +164,7 @@ final class Seo
         $datos = [
             '@context' => 'https://schema.org',
             '@type' => 'LegalService',
-            'name' => 'Pedro · Abogado aduanero y tributario',
+            'name' => 'Pedro · Abogado aduanero',
             'description' => (string) $this->config->get('landing_meta_descripcion', ''),
             'url' => $base . '/',
             'image' => $base . '/img/pedro-perfil.jpg',
@@ -173,7 +173,6 @@ final class Seo
             'knowsAbout' => [
                 'Derecho aduanero',
                 'Comercio exterior',
-                'Derecho tributario',
                 'Procedimiento administrativo ante la DIAN',
             ],
         ];

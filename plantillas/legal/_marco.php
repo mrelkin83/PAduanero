@@ -28,7 +28,7 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= $e($meta['titulo']) ?> · Pedro, abogado aduanero y tributario</title>
+<title><?= $e($meta['titulo']) ?> · Pedro, abogado aduanero</title>
 <meta name="description" content="<?= $e($meta['descripcion']) ?>">
 <?php if (!$meta['indexable']): ?>
 <meta name="robots" content="noindex, nofollow">

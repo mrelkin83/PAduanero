@@ -33,9 +33,9 @@ $cuerpoLegal = static function () use ($e, $whatsapp): void { ?>
         <h2 class="titular-menor">1. Quién es el responsable</h2>
         <p class="cuerpo mt-4">
             El responsable del tratamiento es el abogado titular de este despacho
-            («Pedro»), especialista en derecho aduanero y tributario, con domicilio
-            en Colombia. Canales de contacto para todo lo relacionado con datos
-            personales:
+            («Pedro»), especialista en derecho aduanero y comercio exterior, con
+            domicilio en Colombia. Canales de contacto para todo lo relacionado
+            con datos personales:
         </p>
         <ul class="cuerpo mt-4 list-disc space-y-2 pl-6">
             <li>Correo: <a href="mailto:pedroabogadoaduanero@gmail.com" class="menu-enlace">pedroabogadoaduanero@gmail.com</a></li>

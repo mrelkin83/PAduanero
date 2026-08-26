@@ -1,6 +1,6 @@
 {
   "name": "pedro/aduanero",
-  "description": "Plataforma digital — Pedro, abogado aduanero y tributario",
+  "description": "Plataforma digital — Pedro, abogado aduanero",
   "type": "project",
   "license": "proprietary",
   "require": {

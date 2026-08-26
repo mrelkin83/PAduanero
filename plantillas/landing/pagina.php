@@ -202,7 +202,7 @@ $menu = array_values(array_filter(
                  y el `aria-label` conserva la firma completa. El archivo es
                  `logo-pedro.png` (192 px, generado desde el original de 2 MB:
                  nunca servir ese aquí — presupuesto §6.1). */ ?>
-        <a href="#contenido" class="flex shrink-0 items-center" aria-label="Pedro, abogado aduanero y tributario">
+        <a href="#contenido" class="flex shrink-0 items-center" aria-label="Pedro, abogado aduanero">
             <img src="/img/logo-pedro.png" alt="" width="40" height="40" class="h-10 w-10" decoding="async">
             <span class="sr-only">Pedro</span>
         </a>

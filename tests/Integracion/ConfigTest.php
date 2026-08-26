@@ -42,7 +42,7 @@ final class ConfigTest extends CasoBaseBd
     {
         self::assertTrue($this->config->get('motor_modo_sombra'));
         self::assertSame(45, $this->config->get('minutos_reserva_pago'));
-        self::assertSame(['aduanero', 'tributario'], $this->config->get('areas_practica'));
+        self::assertSame(['aduanero'], $this->config->get('areas_practica'));
     }
 
     #[Test]

@@ -1,4 +1,4 @@
-# CLAUDE.md — Sitio público de Pedro, abogado aduanero y tributario
+# CLAUDE.md — Sitio público de Pedro, abogado aduanero
 
 > Documento maestro. Toda sesión sobre este repositorio debe leerlo completo
 > antes de escribir código. Los cambios de esquema, dependencias, API o
@@ -195,8 +195,10 @@ en vez de por convención, se hace así. El caso que queda vivo es
 
 ## 4. El diagnóstico público — ADR-017
 
-`/perfil` es un cuestionario de seis pasos, con dos ramas (aduanera y
-tributaria), que termina componiendo el mensaje prellenado de WhatsApp.
+`/perfil` es un cuestionario de seis pasos, con la rama aduanera, que
+termina componiendo el mensaje prellenado de WhatsApp. (Hasta el
+2026-08-25 hubo también una rama tributaria: se retiró junto con esa
+área de práctica — §5, §7.)
 
 Era el triage del motor adelantado a la landing. Sin motor detrás, es
 **todo el triage que hay**: quien lo termina llega al WhatsApp de Pedro con
@@ -258,26 +260,25 @@ ningún error.
 
 ## 5. Catálogo de tipos de caso
 
-Pedro es **especialista en derecho aduanero y comercio exterior** y
-**especialista en derecho tributario**. Lo usa `Catalogo`, y de ahí sale el
-cuestionario.
+Pedro es **especialista en derecho aduanero y comercio exterior**. Lo usa
+`Catalogo`, y de ahí sale el cuestionario.
 
 **Aduanero:** `aprehension_mercancia` · `decomiso` · `cancelacion_levante` ·
 `firmeza_declaracion` · `clasificacion_arancelaria` · `valoracion_aduanera` ·
 `origen_tlc` · `operativo_polfa` · `contrabando_tecnico` · `deposito_habilitado` ·
-`transporte_transito` · `devolucion_mercancia` · `agencia_aduanas_sancion`
-
-**Tributario:** `requerimiento_especial` · `liquidacion_oficial_revision` ·
-`fiscalizacion_renta` · `fiscalizacion_iva` · `sancion_tributaria` ·
-`devolucion_compensacion` · `retencion_fuente` · `precios_transferencia`
+`transporte_transito` · `devolucion_mercancia` · `agencia_aduanas_sancion` ·
+`cuestionamiento_solvencia_economica` · `demoras_contenedor`
 
 **Comunes:** `requerimiento_ordinario` · `proceso_sancionatorio` ·
 `recurso_reconsideracion` · `nulidad_restablecimiento` · `fiscalizacion` · `otro`
 
 Catálogo cerrado. **Esta lista es la normativa.**
 
-**Pendiente de confirmación de Pedro:** que la lista tributaria refleje lo que
-efectivamente quiere atender.
+**2026-08-25 — se retiró `TRIBUTARIO` del catálogo** (eran ocho tipos:
+`requerimiento_especial`, `liquidacion_oficial_revision`,
+`fiscalizacion_renta`, `fiscalizacion_iva`, `sancion_tributaria`,
+`devolucion_compensacion`, `retencion_fuente`, `precios_transferencia`).
+Decisión del PO: el despacho pasa a ser 100% aduanero. Ver §7.
 
 ---
 
@@ -329,8 +330,8 @@ Cerradas. Ya están sembradas en la base; no hay que preguntarlas de nuevo.
 | Precio | **$400.000 COP** |
 | WhatsApp del negocio | `573159923676` |
 | Imágenes | Disco `public/img/` · URL `/img` |
-| Perfil | Especialista en Derecho Tributario · Especialista en Derecho Aduanero y Comercio Exterior · más de 15 años de experiencia |
-| Áreas de práctica | Aduanero **y** tributario |
+| Perfil | Especialista en Derecho Aduanero y Comercio Exterior · más de 15 años de experiencia |
+| Áreas de práctica | Aduanero (2026-08-25: se retiró tributario — decisión del PO, despacho 100% aduanero) |
 | Marca | **«Pedro.»** — no «ADUANA ELITE», que es lo que rotula la maqueta |
 
 Nombres de archivo de las fotos:
@@ -353,7 +354,6 @@ técnico antes de nombrar el precio, nunca al revés.
 
 - [ ] Revisión del copy de landing y diagnóstico bajo el marco de publicidad
       del abogado (Ley 1123 de 2007).
-- [ ] Confirmación del catálogo tributario (§5).
 - [ ] **Política de tratamiento de datos — ya no es hipotética.** El motor de
       WhatsApp (§0.2) persiste teléfono, nombre, correo y motivo de consulta.
       Es requisito para poner `wa_config.activo = 1`.

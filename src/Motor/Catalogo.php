@@ -41,18 +41,6 @@ final class Catalogo
     ];
 
     /** @var list<string> */
-    public const TRIBUTARIO = [
-        'requerimiento_especial',
-        'liquidacion_oficial_revision',
-        'fiscalizacion_renta',
-        'fiscalizacion_iva',
-        'sancion_tributaria',
-        'devolucion_compensacion',
-        'retencion_fuente',
-        'precios_transferencia',
-    ];
-
-    /** @var list<string> Valen para cualquiera de las dos ramas. */
     public const COMUNES = [
         'requerimiento_ordinario',
         'proceso_sancionatorio',
@@ -77,12 +65,12 @@ final class Catalogo
 
     public const URGENCIAS = ['critica', 'alta', 'media', 'baja'];
 
-    public const AREAS = ['aduanero', 'tributario', 'mixto'];
+    public const AREAS = ['aduanero'];
 
     /** @return list<string> */
     public static function tipos(): array
     {
-        return [...self::ADUANERO, ...self::TRIBUTARIO, ...self::COMUNES];
+        return [...self::ADUANERO, ...self::COMUNES];
     }
 
     public static function esTipoValido(string $tipo): bool
@@ -105,15 +93,7 @@ final class Catalogo
      */
     public static function areaDe(string $tipo): ?string
     {
-        if (in_array($tipo, self::ADUANERO, true)) {
-            return 'aduanero';
-        }
-
-        if (in_array($tipo, self::TRIBUTARIO, true)) {
-            return 'tributario';
-        }
-
-        return null;
+        return in_array($tipo, self::ADUANERO, true) ? 'aduanero' : null;
     }
 
     public static function esCritico(string $tipo): bool
