@@ -187,6 +187,23 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Wa\ConexionCompartida::class,
+            static fn (Contenedor $c): \App\Wa\ConexionCompartida => new \App\Wa\ConexionCompartida(
+                $c->obtener(BD::class),
+                $c->obtener(Cifrado::class),
+                $c->obtener(Logger::class),
+                $raiz,
+            ),
+        );
+
+        $this->contenedor->registrar(
+            \App\Repositorios\CompraCursoRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\CompraCursoRepo => new \App\Repositorios\CompraCursoRepo(
+                $c->obtener(BD::class),
+            ),
+        );
+
+        $this->contenedor->registrar(
             \App\Servicios\PaginaLegal::class,
             static fn (Contenedor $c): \App\Servicios\PaginaLegal => new \App\Servicios\PaginaLegal(
                 $c->obtener(Config::class),
@@ -220,6 +237,10 @@ final class Aplicacion
     /** El panel llega en la Etapa 3; hasta entonces solo landing y salud. */
     private function registrarRutas(): void
     {
+        // Mismo cálculo que en registrarServicios(): esta es una función
+        // aparte y no comparte sus variables locales.
+        $urlBase = rtrim(Entorno::obtener('APP_URL', '') ?? '', '/');
+
         $this->router->get('/', function (): Respuesta {
             return $this->contenedor->obtener(Landing::class)->responder();
         });
@@ -238,6 +259,44 @@ final class Aplicacion
 
         $this->router->get('/cursos/{slug}', function (Peticion $p): Respuesta {
             return $this->contenedor->obtener(\App\Servicios\Cursos::class)->ficha($p->parametros['slug']);
+        });
+
+        $this->router->get('/cursos/{slug}/comprar', function (Peticion $p): Respuesta {
+            $conexion = $this->contenedor->obtener(\App\Wa\ConexionCompartida::class);
+
+            return (new \App\Cuenta\ComprasControlador(
+                $this->contenedor->obtener(\App\Servicios\Cursos::class),
+                $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
+                $conexion->wompi(),
+                $urlBase,
+            ))->formulario($p, (string) $p->parametros['slug']);
+        });
+
+        $this->router->post('/cursos/{slug}/comprar', function (Peticion $p): Respuesta {
+            $csrf = new \App\Core\Csrf((Entorno::obtener('APP_ENV', 'produccion') ?? '') !== 'desarrollo');
+            if (!$csrf->validar($p)) {
+                return Respuesta::texto('Sesión de formulario expirada. Vuelva a intentarlo.', 419);
+            }
+
+            $conexion = $this->contenedor->obtener(\App\Wa\ConexionCompartida::class);
+
+            return (new \App\Cuenta\ComprasControlador(
+                $this->contenedor->obtener(\App\Servicios\Cursos::class),
+                $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
+                $conexion->wompi(),
+                $urlBase,
+            ))->procesar($p, (string) $p->parametros['slug']);
+        });
+
+        $this->router->get('/cursos/{slug}/gracias', function (Peticion $p): Respuesta {
+            $conexion = $this->contenedor->obtener(\App\Wa\ConexionCompartida::class);
+
+            return (new \App\Cuenta\ComprasControlador(
+                $this->contenedor->obtener(\App\Servicios\Cursos::class),
+                $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
+                $conexion->wompi(),
+                $urlBase,
+            ))->gracias($p, (string) $p->parametros['slug']);
         });
 
         // Las páginas legales. Las exige el propio proyecto (el motor de

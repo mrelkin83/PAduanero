@@ -39,6 +39,16 @@ final class Cursos
         ]);
     }
 
+    /** @return array<string,mixed>|null datos crudos del curso, sin decodificar lo_que_aprendera */
+    public function porSlug(string $slug): ?array
+    {
+        $stmt = $this->bd->pdo()->prepare('SELECT * FROM cursos WHERE slug = ?');
+        $stmt->execute([$slug]);
+        $fila = $stmt->fetch();
+
+        return $fila === false ? null : $fila;
+    }
+
     public function ficha(string $slug): Respuesta
     {
         $curso = $this->buscarPorSlug($slug);
