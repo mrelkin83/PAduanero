@@ -8,7 +8,9 @@ use App\Core\BD;
 use App\Core\Peticion;
 use App\Core\Respuesta;
 use App\Soporte\Cifrado;
+use App\Soporte\Entorno;
 use App\Soporte\Logger;
+use App\Soporte\Smtp;
 use ElkinLinan\WhatsappAiEngine\Channel\EvolutionClient;
 use ElkinLinan\WhatsappAiEngine\Core\AgentManager;
 use ElkinLinan\WhatsappAiEngine\Core\AiOrchestrator;
@@ -430,6 +432,27 @@ final class WebhookControlador
         }
 
         $this->responder200Ya();
+
+        $repoCompras = new \App\Repositorios\CompraCursoRepo($this->bd);
+        $compraCurso = $repoCompras->pendientePorReferencia((string) $v['referencia'], (string) ($v['payment_link_id'] ?? ''));
+
+        if ($compraCurso !== null) {
+            if ($v['estado'] === 'PAYMENT_VERIFIED') {
+                $confirmador = new \App\Cuenta\ConfirmadorCompra(
+                    $repoCompras,
+                    new \App\Repositorios\CompradorEnlaceRepo($this->bd),
+                    new ConexionCompartida($this->bd, $this->cifrado, $this->logApp, $this->raiz),
+                    $this->bd,
+                    Smtp::desdeEntorno(),
+                    (string) (Entorno::obtener('APP_URL', '') ?? ''),
+                );
+                $confirmador->confirmar($compraCurso['id']);
+            } else {
+                $repoCompras->marcarFallida($compraCurso['id']);
+            }
+
+            return new Respuesta('', 200);
+        }
 
         try {
             $adapter = Engine::dominio();
