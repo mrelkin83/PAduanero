@@ -87,6 +87,33 @@ final class WebhookPagoCursoTest extends CasoBaseBd
         ], JSON_UNESCAPED_UNICODE) ?: '';
     }
 
+    /**
+     * WebhookControlador::responder200Ya() hace @ob_end_flush() cuando
+     * fastcgi_finish_request() no existe (el caso de PHPUnit en CLI) — eso
+     * cierra el buffer de salida que PHPUnit usa internamente y dispara su
+     * detector de "risky test" (failOnRisky=true en phpunit.xml). Es
+     * comportamiento preexistente de responder200Ya(), no algo que este
+     * plan cambió; se envuelve la llamada en un buffer propio para que sea
+     * ESE el que se cierre, no el de PHPUnit.
+     */
+    private function pagoSinRuido(WebhookControlador $controlador, Peticion $peticion): \App\Core\Respuesta
+    {
+        $nivelInicial = ob_get_level();
+        ob_start();
+        try {
+            return $controlador->pago($peticion);
+        } finally {
+            // responder200Ya() ya hace su propio ob_end_flush() en CLI (no
+            // existe fastcgi_finish_request), lo que consume el buffer que
+            // se abrió arriba. Solo se cierra aquí si, por lo que sea, ese
+            // buffer sigue abierto — nunca de más, para no llevarse por
+            // delante el buffer que PHPUnit gestiona internamente.
+            while (ob_get_level() > $nivelInicial) {
+                ob_end_clean();
+            }
+        }
+    }
+
     #[Test]
     public function unPagoDeCursoAprobadoConfirmaLaCompraSinTocarElCaminoDeCitas(): void
     {
@@ -109,7 +136,7 @@ final class WebhookPagoCursoTest extends CasoBaseBd
             parametros: ['token' => $token],
         );
 
-        $r = $controlador->pago($peticion);
+        $r = $this->pagoSinRuido($controlador, $peticion);
 
         self::assertSame(200, $r->estado);
         self::assertSame('pagada', $repoCompras->porId($compraId)['estado']);
@@ -130,7 +157,7 @@ final class WebhookPagoCursoTest extends CasoBaseBd
 
         $controlador = new WebhookControlador($this->bd, $this->cifrado, new Logger(sys_get_temp_dir() . '/pa-webhook.log', 'error'), dirname(__DIR__, 2));
 
-        $controlador->pago(new Peticion(
+        $this->pagoSinRuido($controlador, new Peticion(
             metodo: 'POST',
             ruta: "/api/wa/pago/{$token}",
             cuerpoCrudo: $cuerpo,
@@ -154,7 +181,7 @@ final class WebhookPagoCursoTest extends CasoBaseBd
 
         $controlador = new WebhookControlador($this->bd, $this->cifrado, new Logger(sys_get_temp_dir() . '/pa-webhook.log', 'error'), dirname(__DIR__, 2));
 
-        $r = $controlador->pago(new Peticion(
+        $r = $this->pagoSinRuido($controlador, new Peticion(
             metodo: 'POST',
             ruta: "/api/wa/pago/{$token}",
             cuerpoCrudo: $cuerpo,
