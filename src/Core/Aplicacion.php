@@ -204,6 +204,37 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Repositorios\CompradorRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\CompradorRepo => new \App\Repositorios\CompradorRepo(
+                $c->obtener(BD::class),
+                $c->obtener(Cifrado::class),
+            ),
+        );
+
+        $this->contenedor->registrar(
+            \App\Repositorios\CompradorSesionRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\CompradorSesionRepo => new \App\Repositorios\CompradorSesionRepo(
+                $c->obtener(BD::class),
+            ),
+        );
+
+        $this->contenedor->registrar(
+            \App\Repositorios\CompradorEnlaceRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\CompradorEnlaceRepo => new \App\Repositorios\CompradorEnlaceRepo(
+                $c->obtener(BD::class),
+            ),
+        );
+
+        $this->contenedor->registrar(
+            \App\Servicios\AutenticacionComprador::class,
+            static fn (Contenedor $c): \App\Servicios\AutenticacionComprador => new \App\Servicios\AutenticacionComprador(
+                $c->obtener(\App\Repositorios\CompradorRepo::class),
+                $c->obtener(\App\Repositorios\CompradorSesionRepo::class),
+                $c->obtener(\App\Repositorios\IntentoAccesoRepo::class),
+            ),
+        );
+
+        $this->contenedor->registrar(
             \App\Servicios\PaginaLegal::class,
             static fn (Contenedor $c): \App\Servicios\PaginaLegal => new \App\Servicios\PaginaLegal(
                 $c->obtener(Config::class),
@@ -297,6 +328,75 @@ final class Aplicacion
                 $conexion->wompi(),
                 $urlBase,
             ))->gracias($p, (string) $p->parametros['slug']);
+        });
+
+        $accesoControlador = fn (): \App\Cuenta\AccesoControlador => new \App\Cuenta\AccesoControlador(
+            $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),
+            $this->contenedor->obtener(\App\Repositorios\CompradorRepo::class),
+            $this->contenedor->obtener(\App\Repositorios\CompradorSesionRepo::class),
+            $this->contenedor->obtener(\App\Repositorios\CompradorEnlaceRepo::class),
+            $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
+            \App\Soporte\Smtp::desdeEntorno(),
+            $urlBase,
+        );
+
+        $this->router->get('/mis-cursos/completar', function (Peticion $p) use ($accesoControlador): Respuesta {
+            return $accesoControlador()->completarMostrar($p);
+        });
+        $this->router->post('/mis-cursos/completar', function (Peticion $p) use ($accesoControlador): Respuesta {
+            $csrf = new \App\Core\Csrf((Entorno::obtener('APP_ENV', 'produccion') ?? '') !== 'desarrollo');
+            if (!$csrf->validar($p)) {
+                return Respuesta::texto('Sesión de formulario expirada. Vuelva a intentarlo.', 419);
+            }
+
+            return $accesoControlador()->completarProcesar($p);
+        });
+
+        $this->router->get('/entrar', function (Peticion $p) use ($accesoControlador): Respuesta {
+            return $accesoControlador()->entrarMostrar($p);
+        });
+        $this->router->post('/entrar', function (Peticion $p) use ($accesoControlador): Respuesta {
+            $csrf = new \App\Core\Csrf((Entorno::obtener('APP_ENV', 'produccion') ?? '') !== 'desarrollo');
+            if (!$csrf->validar($p)) {
+                return Respuesta::texto('Sesión de formulario expirada. Vuelva a intentarlo.', 419);
+            }
+
+            return $accesoControlador()->entrarProcesar($p);
+        });
+
+        $this->router->post('/salir', function (Peticion $p) use ($accesoControlador): Respuesta {
+            return $accesoControlador()->salir($p);
+        });
+
+        $this->router->get('/recuperar', function (Peticion $p) use ($accesoControlador): Respuesta {
+            return $accesoControlador()->recuperarMostrar($p);
+        });
+        $this->router->post('/recuperar', function (Peticion $p) use ($accesoControlador): Respuesta {
+            $csrf = new \App\Core\Csrf((Entorno::obtener('APP_ENV', 'produccion') ?? '') !== 'desarrollo');
+            if (!$csrf->validar($p)) {
+                return Respuesta::texto('Sesión de formulario expirada. Vuelva a intentarlo.', 419);
+            }
+
+            return $accesoControlador()->recuperarProcesar($p);
+        });
+
+        $this->router->get('/recuperar/confirmar', function (Peticion $p) use ($accesoControlador): Respuesta {
+            return $accesoControlador()->recuperarConfirmarMostrar($p);
+        });
+        $this->router->post('/recuperar/confirmar', function (Peticion $p) use ($accesoControlador): Respuesta {
+            $csrf = new \App\Core\Csrf((Entorno::obtener('APP_ENV', 'produccion') ?? '') !== 'desarrollo');
+            if (!$csrf->validar($p)) {
+                return Respuesta::texto('Sesión de formulario expirada. Vuelva a intentarlo.', 419);
+            }
+
+            return $accesoControlador()->recuperarConfirmarProcesar($p);
+        });
+
+        $this->router->get('/mis-cursos', function (Peticion $p): Respuesta {
+            return (new \App\Cuenta\MisCursosControlador(
+                $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),
+                $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
+            ))->mostrar($p);
         });
 
         // Las páginas legales. Las exige el propio proyecto (el motor de
