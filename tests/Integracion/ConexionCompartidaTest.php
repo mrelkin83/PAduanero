@@ -49,4 +49,16 @@ final class ConexionCompartidaTest extends CasoBaseBd
 
         self::assertTrue(true);
     }
+
+    protected function tearDown(): void
+    {
+        // wa_config no está en las semillas restauradas por CasoBaseBd
+        // (ver TABLAS_SEMILLA y limpiar()): sin este reset, la llave pública
+        // que deja conLlavePublicaConfiguradaWompiDevuelveUnAdaptador() se
+        // filtraría a la siguiente clase de la misma corrida. Mismo hazard
+        // que documenta PanelWhatsappTest::setUp().
+        $this->bd->pdo()->exec("UPDATE wa_config SET wompi_public_key = NULL WHERE id = 1");
+
+        parent::tearDown();
+    }
 }
