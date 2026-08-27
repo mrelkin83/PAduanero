@@ -13,8 +13,8 @@ $e = Vista::e(...);
 $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
 
 $mensaje = match ($estadoMostrado) {
-    'pagada', 'APPROVED' => 'Pago recibido. En unos minutos le llegará un correo para crear su acceso.',
-    'fallida', 'DECLINED', 'ERROR' => 'El pago no se completó. Puede intentarlo de nuevo desde la ficha del curso.',
+    'pagada', 'PAYMENT_VERIFIED' => 'Pago recibido. En unos minutos le llegará un correo para crear su acceso.',
+    'fallida', 'PAYMENT_REJECTED', 'PAYMENT_REFUNDED' => 'El pago no se completó. Puede intentarlo de nuevo desde la ficha del curso.',
     default => 'Estamos confirmando su pago. Si ya pagó, en unos minutos le llegará un correo con los siguientes pasos.',
 };
 ?>

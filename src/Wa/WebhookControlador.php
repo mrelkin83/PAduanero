@@ -437,7 +437,9 @@ final class WebhookControlador
         $compraCurso = $repoCompras->pendientePorReferencia((string) $v['referencia'], (string) ($v['payment_link_id'] ?? ''));
 
         if ($compraCurso !== null) {
-            if ($v['estado'] === 'PAYMENT_VERIFIED') {
+            $estadoWompi = (string) $v['estado'];
+
+            if ($estadoWompi === 'PAYMENT_VERIFIED') {
                 $confirmador = new \App\Cuenta\ConfirmadorCompra(
                     $repoCompras,
                     new \App\Repositorios\CompradorEnlaceRepo($this->bd),
@@ -447,9 +449,16 @@ final class WebhookControlador
                     (string) (Entorno::obtener('APP_URL', '') ?? ''),
                 );
                 $confirmador->confirmar($compraCurso['id']);
-            } else {
+            } elseif (in_array($estadoWompi, ['PAYMENT_REJECTED', 'PAYMENT_REFUNDED'], true)) {
+                // Terminal negativo: DECLINED/ERROR (rechazado) o VOIDED
+                // (reembolsado) — no hay pago posterior que esperar.
                 $repoCompras->marcarFallida($compraCurso['id']);
             }
+            // else: PAYMENT_VALIDATING / PAYMENT_PENDING / PAYMENT_INITIATED
+            // — estado intermedio (típico de PSE/Nequi/Bancolombia). Se deja
+            // la compra en 'pendiente' para que pendientePorReferencia() la
+            // siga encontrando cuando llegue el evento terminal — marcarla
+            // 'fallida' aquí perdía el pago aprobado que llegaba después.
 
             return new Respuesta('', 200);
         }

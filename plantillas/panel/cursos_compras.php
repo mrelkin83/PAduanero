@@ -39,6 +39,13 @@ $contenido = static function () use ($e, $ctx, $compras): void {
                     </button>
                 </form>
                 <?php endif; ?>
+                <?php if ($editable && $c['estado'] === 'pagada' && $c['comprador_id'] === null): ?>
+                <form method="post" action="/panel/cursos/compras/reenviar">
+                    <?= $ctx->csrf->campoOculto() ?>
+                    <input type="hidden" name="id" value="<?= $e((string) $c['id']) ?>">
+                    <button type="submit" class="text-sm underline">Reenviar acceso</button>
+                </form>
+                <?php endif; ?>
             </td>
         </tr>
         <?php endforeach; ?>

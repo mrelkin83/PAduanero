@@ -74,6 +74,25 @@ final class AccesoControladorTest extends CasoBaseBd
     }
 
     #[Test]
+    public function unTokenDeRegistroVencidoOfreceWhatsappNoRecuperarClave(): void
+    {
+        $r = $this->controlador->completarMostrar($this->peticion('/mis-cursos/completar', [], ['token' => 'no-existe']));
+
+        self::assertSame(410, $r->estado);
+        self::assertStringContainsString('wa.me', $r->cuerpo);
+        self::assertStringNotContainsString('/recuperar"', $r->cuerpo);
+    }
+
+    #[Test]
+    public function unTokenDeResetVencidoOfreceRecuperarClave(): void
+    {
+        $r = $this->controlador->recuperarConfirmarMostrar($this->peticion('/recuperar/confirmar', [], ['token' => 'no-existe']));
+
+        self::assertSame(410, $r->estado);
+        self::assertStringContainsString('/recuperar"', $r->cuerpo);
+    }
+
+    #[Test]
     public function completarRegistroConCorreoNuevoCreaLaCuentaYVinculaLaCompra(): void
     {
         $compraId = $this->cursoYCompra('nueva@ejemplo.com');
@@ -149,6 +168,24 @@ final class AccesoControladorTest extends CasoBaseBd
 
         self::assertSame(302, $r->estado);
         self::assertSame('/mis-cursos', $r->cabeceras['Location']);
+    }
+
+    #[Test]
+    public function entrarVinculaUnaSegundaCompraPagadaConElMismoCorreoQueSeQuedoHuerfana(): void
+    {
+        $this->compradores->crear('Ana', 'Gómez', 'CC', '1010101010', '3001234567', 'segunda-compra@ejemplo.com', 'clave123');
+
+        $compraId = $this->cursoYCompra('segunda-compra@ejemplo.com');
+        $this->compras->marcarPagada($compraId);
+        // Deliberadamente sin vincularComprador(): así llega alguien que
+        // pagó como invitado y luego entra sin pasar por el enlace del correo.
+
+        $this->controlador->entrarProcesar($this->peticion('/entrar', [
+            'correo' => 'segunda-compra@ejemplo.com', 'password' => 'clave123',
+        ]));
+
+        $comprador = $this->compradores->porCorreo('segunda-compra@ejemplo.com');
+        self::assertSame($comprador->id, $this->compras->porId($compraId)['comprador_id']);
     }
 
     #[Test]

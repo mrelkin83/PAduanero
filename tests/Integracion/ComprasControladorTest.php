@@ -183,4 +183,21 @@ final class ComprasControladorTest extends CasoBaseBd
         // cambia el estado guardado.
         self::assertSame('pendiente', $this->compras->porId($compraId)['estado']);
     }
+
+    #[Test]
+    public function graciasConUnPagoRechazadoMuestraElMensajeDeNoCompletado(): void
+    {
+        $cursoId = $this->crearCursoPublicado();
+        $compraId = $this->compras->crear($cursoId, 'Ana', 'ana@ejemplo.com', 250000);
+        $this->compras->guardarReferencia($compraId, 'ref-1', 'ext-1');
+        $this->wompi->respuestaConsultar = ['ok' => true, 'estado' => 'PAYMENT_REJECTED', 'monto' => 0.0, 'transaccion_id' => '', 'metodo' => '', 'error' => ''];
+
+        $r = $this->controlador()->gracias(
+            $this->peticion('/cursos/curso-comprable/gracias', [], ['compra' => $compraId]),
+            'curso-comprable',
+        );
+
+        self::assertSame(200, $r->estado);
+        self::assertStringContainsString('no se completó', $r->cuerpo);
+    }
 }

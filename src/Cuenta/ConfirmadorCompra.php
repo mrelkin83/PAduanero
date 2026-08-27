@@ -71,4 +71,39 @@ final class ConfirmadorCompra
             );
         }
     }
+
+    /**
+     * Reenvía el enlace de acceso de una compra YA pagada — para cuando el
+     * correo original no llegó (SMTP caído en ese momento, fue a spam) y
+     * nadie completó el registro todavía. No repite el aviso de WhatsApp a
+     * Pedro: eso ya ocurrió cuando se confirmó el pago la primera vez.
+     */
+    public function reenviarAcceso(string $compraId): bool
+    {
+        $compra = $this->compras->porId($compraId);
+
+        if ($compra === null || $compra['estado'] !== 'pagada' || $compra['comprador_id'] !== null) {
+            return false;
+        }
+
+        if ($this->smtp === null) {
+            return false;
+        }
+
+        $stmt = $this->bd->pdo()->prepare('SELECT titulo FROM cursos WHERE id = ?');
+        $stmt->execute([$compra['curso_id']]);
+        $tituloCurso = (string) $stmt->fetchColumn();
+
+        $token = $this->enlaces->crear('completar_registro', null, $compraId, self::MINUTOS_VIGENCIA_ENLACE);
+        $enlaceUrl = rtrim($this->urlBase, '/') . '/mis-cursos/completar?token=' . $token;
+
+        return $this->smtp->enviar(
+            (string) $compra['correo'],
+            'Su acceso al curso: ' . $tituloCurso,
+            "Hola {$compra['nombre']},\n\n"
+                . "Le reenviamos el acceso al curso \"{$tituloCurso}\".\n\n"
+                . "Complete su registro (o inicie sesión si ya tiene cuenta) en este enlace:\n{$enlaceUrl}\n\n"
+                . "Este enlace es válido por 48 horas.\n",
+        );
+    }
 }

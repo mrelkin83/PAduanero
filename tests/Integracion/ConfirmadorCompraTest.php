@@ -7,6 +7,7 @@ namespace Pruebas\Integracion;
 use App\Cuenta\ConfirmadorCompra;
 use App\Repositorios\CompraCursoRepo;
 use App\Repositorios\CompradorEnlaceRepo;
+use App\Repositorios\CompradorRepo;
 use App\Soporte\Cifrado;
 use App\Soporte\Logger;
 use App\Wa\ConexionCompartida;
@@ -105,5 +106,37 @@ final class ConfirmadorCompraTest extends CasoBaseBd
         $this->confirmador->confirmar($this->compraPendiente());
 
         self::assertTrue(true);
+    }
+
+    #[Test]
+    public function reenviarAccesoEnUnaCompraPagadaSinRegistrarMandaOtroCorreo(): void
+    {
+        $compraId = $this->compraPendiente();
+        $this->confirmador->confirmar($compraId);
+
+        // El confirmador de este test se construye con smtp=null (línea 36),
+        // así que reenviarAcceso() debe degradar a false sin tronar.
+        self::assertFalse($this->confirmador->reenviarAcceso($compraId));
+    }
+
+    #[Test]
+    public function reenviarAccesoEnUnaCompraNoPagadaNoHaceNada(): void
+    {
+        $compraId = $this->compraPendiente();
+
+        self::assertFalse($this->confirmador->reenviarAcceso($compraId));
+    }
+
+    #[Test]
+    public function reenviarAccesoEnUnaCompraYaVinculadaAUnCompradorNoHaceNada(): void
+    {
+        $compraId = $this->compraPendiente();
+        $this->confirmador->confirmar($compraId);
+
+        $compradores = new CompradorRepo($this->bd, Cifrado::desdeEntorno());
+        $compradorId = $compradores->crear('Ana', 'Gómez', 'CC', '1010101010', '3001234567', 'ana@ejemplo.com', 'clave123');
+        $this->compras->vincularComprador($compraId, $compradorId);
+
+        self::assertFalse($this->confirmador->reenviarAcceso($compraId));
     }
 }

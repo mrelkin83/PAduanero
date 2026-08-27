@@ -164,6 +164,7 @@ final class Panel
             'POST /cursos/categorias/guardar' => $modulos['cursos']->guardarCategoria($ctx),
             'GET /cursos/compras' => $modulos['cursos']->compras($ctx),
             'POST /cursos/compras/aprobar' => $modulos['cursos']->aprobarCompra($ctx),
+            'POST /cursos/compras/reenviar' => $modulos['cursos']->reenviarAcceso($ctx),
 
             'GET /whatsapp' => $modulos['whatsapp']->ver($ctx),
             'GET /whatsapp/modelos' => $modulos['whatsapp']->modelos($ctx),

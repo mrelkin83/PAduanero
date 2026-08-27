@@ -34,7 +34,7 @@ final class AccesoControlador
     {
         $datos = $this->resolverEnlaceCompletar((string) ($peticion->consulta['token'] ?? ''));
         if ($datos === null) {
-            return Respuesta::vista('cuenta/enlace_invalido', [], 410);
+            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'completar_registro'], 410);
         }
 
         return Respuesta::vista('cuenta/completar', [
@@ -51,7 +51,7 @@ final class AccesoControlador
         $datos = $this->resolverEnlaceCompletar($token);
 
         if ($datos === null) {
-            return Respuesta::vista('cuenta/enlace_invalido', [], 410);
+            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'completar_registro'], 410);
         }
 
         $correo = $datos['correo'];
@@ -115,7 +115,16 @@ final class AccesoControlador
             ]);
         }
 
-        $token = $this->auth->abrirSesion($resultado['comprador'], $peticion->ip, $peticion->cabecera('user-agent'));
+        $comprador = $resultado['comprador'];
+
+        // Compras pagadas con el mismo correo que nadie vinculó todavía —
+        // por ejemplo, compró un segundo curso como invitado y esta vez
+        // entró por /entrar en vez de usar el enlace del correo.
+        foreach ($this->compras->pagadasSinVincularPorCorreo($comprador->correo) as $compraId) {
+            $this->compras->vincularComprador($compraId, $comprador->id);
+        }
+
+        $token = $this->auth->abrirSesion($comprador, $peticion->ip, $peticion->cabecera('user-agent'));
 
         return $this->conCookieDeSesion($token, '/mis-cursos');
     }
@@ -170,7 +179,7 @@ final class AccesoControlador
         $token = (string) ($peticion->consulta['token'] ?? '');
 
         if ($this->enlaces->vigente($token, 'reset_password') === null) {
-            return Respuesta::vista('cuenta/enlace_invalido', [], 410);
+            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'reset_password'], 410);
         }
 
         return Respuesta::vista('cuenta/recuperar_confirmar', [
@@ -185,7 +194,7 @@ final class AccesoControlador
         $enlace = $this->enlaces->vigente($token, 'reset_password');
 
         if ($enlace === null || $enlace['comprador_id'] === null) {
-            return Respuesta::vista('cuenta/enlace_invalido', [], 410);
+            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'reset_password'], 410);
         }
 
         $password = (string) ($peticion->formulario['password'] ?? '');

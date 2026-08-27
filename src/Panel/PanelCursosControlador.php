@@ -415,6 +415,18 @@ final class PanelCursosControlador extends ControladorBase
         return $this->redirigirCon('/panel/cursos/compras', 'ok', 'Compra aprobada. Se envió el correo de registro.');
     }
 
+    public function reenviarAcceso(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $id = $ctx->campo('id');
+        $enviado = $this->confirmador->reenviarAcceso($id);
+
+        return $enviado
+            ? $this->redirigirCon('/panel/cursos/compras', 'ok', 'Se reenvió el correo de acceso.')
+            : $this->redirigirCon('/panel/cursos/compras', 'error', 'No se pudo reenviar: revise que la compra esté pagada, sin registro completado todavía, y que haya SMTP configurado.');
+    }
+
     private function rutaEdicion(string $id): string
     {
         return $id === '' ? '/panel/cursos/editar' : '/panel/cursos/editar?id=' . urlencode($id);

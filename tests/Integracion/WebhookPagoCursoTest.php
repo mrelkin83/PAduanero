@@ -168,6 +168,36 @@ final class WebhookPagoCursoTest extends CasoBaseBd
     }
 
     #[Test]
+    public function unPagoIntermedioNoMarcaFallidaYElAprobadoPosteriorSiConfirma(): void
+    {
+        $eventsSecret = 'secreto-de-prueba-4';
+        $token = $this->configurarWompi($eventsSecret);
+
+        $cursoId = $this->curso();
+        $repoCompras = new \App\Repositorios\CompraCursoRepo($this->bd);
+        $compraId = $repoCompras->crear($cursoId, 'Ana Gómez', 'ana@ejemplo.com', 250000);
+        $repoCompras->guardarReferencia($compraId, 'ref-pendiente-luego-aprobada', 'link-789');
+
+        $controlador = new WebhookControlador($this->bd, $this->cifrado, new Logger(sys_get_temp_dir() . '/pa-webhook.log', 'error'), dirname(__DIR__, 2));
+
+        // 1) Llega PENDING (PSE/Nequi en camino) — no debe marcar fallida.
+        $cuerpoPendiente = $this->payloadFirmado($eventsSecret, 'ref-pendiente-luego-aprobada', 'link-789', 'PENDING');
+        $this->pagoSinRuido($controlador, new Peticion(
+            metodo: 'POST', ruta: "/api/wa/pago/{$token}", cuerpoCrudo: $cuerpoPendiente, parametros: ['token' => $token],
+        ));
+
+        self::assertSame('pendiente', $repoCompras->porId($compraId)['estado']);
+
+        // 2) Llega el APPROVED real — debe seguir encontrando la compra y confirmarla.
+        $cuerpoAprobado = $this->payloadFirmado($eventsSecret, 'ref-pendiente-luego-aprobada', 'link-789', 'APPROVED');
+        $this->pagoSinRuido($controlador, new Peticion(
+            metodo: 'POST', ruta: "/api/wa/pago/{$token}", cuerpoCrudo: $cuerpoAprobado, parametros: ['token' => $token],
+        ));
+
+        self::assertSame('pagada', $repoCompras->porId($compraId)['estado']);
+    }
+
+    #[Test]
     public function unaReferenciaQueNoEsDeNingunaCompraDeCursoSigueElCaminoDeCitasSinTronar(): void
     {
         $eventsSecret = 'secreto-de-prueba-3';

@@ -105,4 +105,15 @@ final class CompraCursoRepo
 
         return $stmt->fetchAll();
     }
+
+    /** @return list<string> ids de compras pagadas de ese correo, sin comprador vinculado todavía */
+    public function pagadasSinVincularPorCorreo(string $correo): array
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            "SELECT id FROM compras_curso WHERE LOWER(correo) = LOWER(?) AND estado = 'pagada' AND comprador_id IS NULL"
+        );
+        $stmt->execute([$correo]);
+
+        return array_map('strval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+    }
 }
