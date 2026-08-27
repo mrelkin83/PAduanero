@@ -365,6 +365,11 @@ final class Aplicacion
         });
 
         $this->router->post('/salir', function (Peticion $p) use ($accesoControlador): Respuesta {
+            $csrf = new \App\Core\Csrf((Entorno::obtener('APP_ENV', 'produccion') ?? '') !== 'desarrollo');
+            if (!$csrf->validar($p)) {
+                return Respuesta::texto('Sesión de formulario expirada. Vuelva a intentarlo.', 419);
+            }
+
             return $accesoControlador()->salir($p);
         });
 

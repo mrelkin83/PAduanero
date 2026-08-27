@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Core\Csrf;
+use App\Soporte\Entorno;
 use App\Soporte\Vista;
 
 /**
@@ -11,6 +13,7 @@ use App\Soporte\Vista;
 
 $e = Vista::e(...);
 $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
+$csrf = new Csrf((Entorno::obtener('APP_ENV', 'produccion') ?? '') !== 'desarrollo');
 ?>
 <!doctype html>
 <html lang="es-CO">
@@ -31,6 +34,7 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
         </a>
         <p class="ml-auto text-sm text-acero"><?= $e($comprador->nombreCompleto()) ?></p>
         <form method="post" action="/salir">
+            <?= $csrf->campoOculto() ?>
             <button type="submit" class="menu-enlace">Salir</button>
         </form>
     </div>
