@@ -197,6 +197,18 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Cuenta\ConfirmadorCompra::class,
+            static fn (Contenedor $c): \App\Cuenta\ConfirmadorCompra => new \App\Cuenta\ConfirmadorCompra(
+                $c->obtener(\App\Repositorios\CompraCursoRepo::class),
+                $c->obtener(\App\Repositorios\CompradorEnlaceRepo::class),
+                $c->obtener(\App\Wa\ConexionCompartida::class),
+                $c->obtener(BD::class),
+                \App\Soporte\Smtp::desdeEntorno(),
+                $urlBase,
+            ),
+        );
+
+        $this->contenedor->registrar(
             \App\Repositorios\CompraCursoRepo::class,
             static fn (Contenedor $c): \App\Repositorios\CompraCursoRepo => new \App\Repositorios\CompraCursoRepo(
                 $c->obtener(BD::class),

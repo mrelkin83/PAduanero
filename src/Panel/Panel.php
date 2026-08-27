@@ -162,6 +162,8 @@ final class Panel
             'POST /cursos/lecciones/eliminar' => $modulos['cursos']->eliminarLeccion($ctx),
             'GET /cursos/categorias' => $modulos['cursos']->categorias($ctx),
             'POST /cursos/categorias/guardar' => $modulos['cursos']->guardarCategoria($ctx),
+            'GET /cursos/compras' => $modulos['cursos']->compras($ctx),
+            'POST /cursos/compras/aprobar' => $modulos['cursos']->aprobarCompra($ctx),
 
             'GET /whatsapp' => $modulos['whatsapp']->ver($ctx),
             'GET /whatsapp/modelos' => $modulos['whatsapp']->modelos($ctx),
@@ -215,6 +217,8 @@ final class Panel
             'cursos' => new PanelCursosControlador(
                 $this->c->obtener(BD::class),
                 $this->c->obtener(AuditoriaRepo::class),
+                $this->c->obtener(\App\Repositorios\CompraCursoRepo::class),
+                $this->c->obtener(\App\Cuenta\ConfirmadorCompra::class),
             ),
             'usuarios' => new UsuariosControlador(
                 $this->c->obtener(UsuarioRepo::class),

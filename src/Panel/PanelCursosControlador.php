@@ -18,6 +18,8 @@ final class PanelCursosControlador extends ControladorBase
     public function __construct(
         private readonly BD $bd,
         private readonly AuditoriaRepo $auditoria,
+        private readonly \App\Repositorios\CompraCursoRepo $compras,
+        private readonly \App\Cuenta\ConfirmadorCompra $confirmador,
     ) {
     }
 
@@ -377,6 +379,40 @@ final class PanelCursosControlador extends ControladorBase
         $this->auditoria->registrar('curso_leccion', $id, 'eliminar', $ctx->actor(), [], $ctx->ip());
 
         return $this->redirigirCon($this->rutaEdicion((string) $cursoId), 'ok', 'Lección eliminada.');
+    }
+
+    public function compras(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.ver');
+
+        $filas = $this->bd->pdo()->query(
+            "SELECT cc.*, c.titulo FROM compras_curso cc
+               JOIN cursos c ON c.id = cc.curso_id
+              ORDER BY cc.creado_en DESC"
+        )->fetchAll();
+
+        return $this->vista('panel/cursos_compras', [
+            'ctx' => $ctx,
+            'compras' => $filas,
+            'avisos' => $this->avisos($ctx),
+        ]);
+    }
+
+    public function aprobarCompra(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $id = $ctx->campo('id');
+        $compra = $this->compras->porId($id);
+
+        if ($compra === null) {
+            return $this->redirigirCon('/panel/cursos/compras', 'error', 'Esa compra no existe.');
+        }
+
+        $this->confirmador->confirmar($id);
+        $this->auditoria->registrar('compra_curso', $id, 'aprobar_manual', $ctx->actor(), [], $ctx->ip());
+
+        return $this->redirigirCon('/panel/cursos/compras', 'ok', 'Compra aprobada. Se envió el correo de registro.');
     }
 
     private function rutaEdicion(string $id): string

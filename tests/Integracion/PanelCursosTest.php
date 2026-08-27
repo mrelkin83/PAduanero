@@ -62,7 +62,24 @@ final class PanelCursosTest extends CasoBaseBd
 
     private function controlador(): PanelCursosControlador
     {
-        return new PanelCursosControlador($this->bd, $this->auditoria);
+        return new PanelCursosControlador(
+            $this->bd,
+            $this->auditoria,
+            new \App\Repositorios\CompraCursoRepo($this->bd),
+            new \App\Cuenta\ConfirmadorCompra(
+                new \App\Repositorios\CompraCursoRepo($this->bd),
+                new \App\Repositorios\CompradorEnlaceRepo($this->bd),
+                new \App\Wa\ConexionCompartida(
+                    $this->bd,
+                    \App\Soporte\Cifrado::desdeEntorno(),
+                    new \App\Soporte\Logger(sys_get_temp_dir() . '/pa-panel-cursos.log', 'error'),
+                    dirname(__DIR__, 2),
+                ),
+                $this->bd,
+                null,
+                'https://pedroabogadoaduanero.com',
+            ),
+        );
     }
 
     private function categoriaId(string $nombre = 'Aduanero'): string
@@ -417,5 +434,67 @@ final class PanelCursosTest extends CasoBaseBd
             'resumen' => 'r', 'descripcion' => 'd', 'lo_que_aprendera' => 'x',
             'nivel' => 'basico', 'precio_cop' => '100000', 'orden' => '0',
         ]));
+    }
+
+    // ── Compras ──
+
+    private function compraDePruebaPara(string $slug): string
+    {
+        $catId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare('INSERT INTO categorias_curso (id, nombre, slug) VALUES (?, ?, ?)')
+            ->execute([$catId, 'Aduanero', 'aduanero-' . $slug]);
+        $cursoId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO cursos (id, categoria_id, titulo, slug, resumen, descripcion, lo_que_aprendera, precio_cop, estado)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$cursoId, $catId, 'Curso panel', $slug, 'r', 'd', '[]', 250000, 'publicado']);
+
+        return (new \App\Repositorios\CompraCursoRepo($this->bd))->crear($cursoId, 'Ana Gómez', 'ana@ejemplo.com', 250000);
+    }
+
+    #[Test]
+    public function elAsistenteNoVeLasCompras(): void
+    {
+        $this->expectException(SinPermisoException::class);
+        $this->controlador()->compras($this->ctx('asistente'));
+    }
+
+    #[Test]
+    public function laListaDeComprasMuestraElNombreDelComprador(): void
+    {
+        $this->compraDePruebaPara('curso-panel-1');
+
+        $html = $this->controlador()->compras($this->ctx('abogado'))->cuerpo;
+
+        self::assertStringContainsString('Ana Gómez', $html);
+    }
+
+    #[Test]
+    public function aprobarAManoMarcaLaCompraPagadaYAuditaLaAccion(): void
+    {
+        $compraId = $this->compraDePruebaPara('curso-panel-2');
+
+        $r = $this->controlador()->aprobarCompra($this->ctx('abogado', ['id' => $compraId]));
+
+        self::assertSame(302, $r->estado);
+
+        $repo = new \App\Repositorios\CompraCursoRepo($this->bd);
+        self::assertSame('pagada', $repo->porId($compraId)['estado']);
+
+        $auditadas = (int) $this->bd->pdo()->query(
+            "SELECT COUNT(*) FROM auditoria WHERE entidad = 'compra_curso' AND accion = 'aprobar_manual'"
+        )->fetchColumn();
+        self::assertSame(1, $auditadas);
+    }
+
+    #[Test]
+    public function aprobarUnaCompraInexistenteNoTruena(): void
+    {
+        $r = $this->controlador()->aprobarCompra($this->ctx('abogado', [
+            'id' => (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn(),
+        ]));
+
+        self::assertSame(302, $r->estado);
+        self::assertStringContainsString('no+existe', $r->cabeceras['Location']);
     }
 }
