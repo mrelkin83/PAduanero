@@ -133,7 +133,7 @@ class WompiAdapter implements PaymentAdapterInterface
         return (int)round($monto * 100);
     }
 
-    public function crearCobro(float $monto, string $referencia, string $descripcion, array $cliente = []): array
+    public function crearCobro(float $monto, string $referencia, string $descripcion, array $cliente = [], ?string $redirectUrl = null): array
     {
         $out = ['ok' => false, 'enlace' => '', 'referencia' => $referencia,
                 'estado' => 'PAYMENT_PENDING', 'error' => ''];
@@ -156,6 +156,9 @@ class WompiAdapter implements PaymentAdapterInterface
             'amount_in_cents'         => $centavos,
             'reference'               => $referencia,
         ];
+        if ($redirectUrl !== null && $redirectUrl !== '') {
+            $cuerpo['redirect_url'] = $redirectUrl;
+        }
         $r = Http::json('POST', $this->base() . '/payment_links',
             ['Authorization: Bearer ' . $this->privateKey], $cuerpo, 45);
 
