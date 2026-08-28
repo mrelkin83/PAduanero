@@ -79,6 +79,7 @@ final class PanelCursosTest extends CasoBaseBd
                 null,
                 'https://pedroabogadoaduanero.com',
             ),
+            new \App\Repositorios\CursoMaterialRepo($this->bd),
         );
     }
 
@@ -188,6 +189,23 @@ final class PanelCursosTest extends CasoBaseBd
         ]));
 
         return (string) $this->bd->pdo()->query('SELECT id FROM cursos ORDER BY creado_en DESC LIMIT 1')->fetchColumn();
+    }
+
+    private function leccionDePrueba(): string
+    {
+        $cursoId = $this->crearCursoCompleto($this->categoriaId());
+
+        $moduloId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO curso_modulos (id, curso_id, titulo, orden) VALUES (?, ?, ?, ?)'
+        )->execute([$moduloId, $cursoId, 'Módulo de prueba', 1]);
+
+        $leccionId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO curso_lecciones (id, modulo_id, titulo, orden) VALUES (?, ?, ?, ?)'
+        )->execute([$leccionId, $moduloId, 'Lección de prueba', 1]);
+
+        return $leccionId;
     }
 
     #[Test]
@@ -496,5 +514,51 @@ final class PanelCursosTest extends CasoBaseBd
 
         self::assertSame(302, $r->estado);
         self::assertStringContainsString('no+existe', $r->cabeceras['Location']);
+    }
+
+    // ── Contenido de la lección ──
+
+    #[Test]
+    public function editarLeccionMuestraElFormularioConLosDatosActuales(): void
+    {
+        $leccionId = $this->leccionDePrueba();
+        $this->bd->pdo()->prepare('UPDATE curso_lecciones SET video_bunny_id = ?, contenido_texto = ? WHERE id = ?')
+            ->execute(['video-abc', 'Texto de la lección.', $leccionId]);
+
+        $html = $this->controlador()->editarLeccion($this->ctx('abogado', [], ['id' => $leccionId]))->cuerpo;
+
+        self::assertStringContainsString('video-abc', $html);
+        self::assertStringContainsString('Texto de la lección.', $html);
+    }
+
+    #[Test]
+    public function guardarLeccionActualizaVideoYTexto(): void
+    {
+        $leccionId = $this->leccionDePrueba();
+
+        $r = $this->controlador()->guardarLeccion($this->ctx('abogado', [
+            'id' => $leccionId, 'titulo' => 'Lección actualizada', 'duracion_min' => '15',
+            'video_bunny_id' => 'video-nuevo', 'contenido_texto' => 'Contenido nuevo.',
+        ]));
+
+        self::assertSame(302, $r->estado);
+        $stmt = $this->bd->pdo()->prepare('SELECT * FROM curso_lecciones WHERE id = ?');
+        $stmt->execute([$leccionId]);
+        $fila = $stmt->fetch();
+        self::assertSame('Lección actualizada', $fila['titulo']);
+        self::assertSame('video-nuevo', $fila['video_bunny_id']);
+        self::assertSame('Contenido nuevo.', $fila['contenido_texto']);
+    }
+
+    #[Test]
+    public function guardarLeccionSinTituloNoGuardaNada(): void
+    {
+        $leccionId = $this->leccionDePrueba();
+
+        $this->controlador()->guardarLeccion($this->ctx('abogado', ['id' => $leccionId, 'titulo' => '']));
+
+        $stmt = $this->bd->pdo()->prepare('SELECT titulo FROM curso_lecciones WHERE id = ?');
+        $stmt->execute([$leccionId]);
+        self::assertNotSame('', $stmt->fetchColumn());
     }
 }

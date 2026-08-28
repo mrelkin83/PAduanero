@@ -216,6 +216,13 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Repositorios\CursoMaterialRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\CursoMaterialRepo => new \App\Repositorios\CursoMaterialRepo(
+                $c->obtener(BD::class),
+            ),
+        );
+
+        $this->contenedor->registrar(
             \App\Repositorios\CompradorRepo::class,
             static fn (Contenedor $c): \App\Repositorios\CompradorRepo => new \App\Repositorios\CompradorRepo(
                 $c->obtener(BD::class),

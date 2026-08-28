@@ -160,6 +160,8 @@ final class Panel
             'POST /cursos/modulos/eliminar' => $modulos['cursos']->eliminarModulo($ctx),
             'POST /cursos/lecciones/agregar' => $modulos['cursos']->agregarLeccion($ctx),
             'POST /cursos/lecciones/eliminar' => $modulos['cursos']->eliminarLeccion($ctx),
+            'GET /cursos/lecciones/editar' => $modulos['cursos']->editarLeccion($ctx),
+            'POST /cursos/lecciones/guardar' => $modulos['cursos']->guardarLeccion($ctx),
             'GET /cursos/categorias' => $modulos['cursos']->categorias($ctx),
             'POST /cursos/categorias/guardar' => $modulos['cursos']->guardarCategoria($ctx),
             'GET /cursos/compras' => $modulos['cursos']->compras($ctx),
@@ -220,6 +222,7 @@ final class Panel
                 $this->c->obtener(AuditoriaRepo::class),
                 $this->c->obtener(\App\Repositorios\CompraCursoRepo::class),
                 $this->c->obtener(\App\Cuenta\ConfirmadorCompra::class),
+                $this->c->obtener(\App\Repositorios\CursoMaterialRepo::class),
             ),
             'usuarios' => new UsuariosControlador(
                 $this->c->obtener(UsuarioRepo::class),

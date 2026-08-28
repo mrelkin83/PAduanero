@@ -133,6 +133,8 @@ $contenido = static function () use ($e, $ctx, $curso, $modulos, $categorias, $e
                         <?= $leccion['duracion_min'] !== null ? ' · ' . $e((string) $leccion['duracion_min']) . ' min' : '' ?>
                         <?= (int) $leccion['vista_previa_gratis'] === 1 ? ' · vista previa gratis' : '' ?>
                     </span>
+                    <span class="flex items-center gap-3">
+                    <a href="/panel/cursos/lecciones/editar?id=<?= $e((string) $leccion['id']) ?>" class="underline">Editar contenido</a>
                     <?php if ($editable): ?>
                     <form method="post" action="/panel/cursos/lecciones/eliminar">
                         <?= $ctx->csrf->campoOculto() ?>
@@ -140,6 +142,7 @@ $contenido = static function () use ($e, $ctx, $curso, $modulos, $categorias, $e
                         <button type="submit" class="underline">Eliminar</button>
                     </form>
                     <?php endif; ?>
+                    </span>
                 </li>
                 <?php endforeach; ?>
             </ul>

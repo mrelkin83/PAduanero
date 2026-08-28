@@ -20,6 +20,7 @@ final class PanelCursosControlador extends ControladorBase
         private readonly AuditoriaRepo $auditoria,
         private readonly \App\Repositorios\CompraCursoRepo $compras,
         private readonly \App\Cuenta\ConfirmadorCompra $confirmador,
+        private readonly \App\Repositorios\CursoMaterialRepo $materiales,
     ) {
     }
 
@@ -379,6 +380,76 @@ final class PanelCursosControlador extends ControladorBase
         $this->auditoria->registrar('curso_leccion', $id, 'eliminar', $ctx->actor(), [], $ctx->ip());
 
         return $this->redirigirCon($this->rutaEdicion((string) $cursoId), 'ok', 'Lección eliminada.');
+    }
+
+    public function editarLeccion(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.ver');
+
+        $id = (string) ($ctx->peticion->consulta['id'] ?? '');
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT cl.*, cm.curso_id FROM curso_lecciones cl
+               JOIN curso_modulos cm ON cm.id = cl.modulo_id
+              WHERE cl.id = ?'
+        );
+        $stmt->execute([$id]);
+        $leccion = $stmt->fetch();
+
+        if ($leccion === false) {
+            return $this->redirigirCon('/panel/cursos', 'error', 'Esa lección no existe.');
+        }
+
+        return $this->vista('panel/cursos_leccion_editar', [
+            'ctx' => $ctx,
+            'leccion' => $leccion,
+            'materiales' => $this->materiales->deLeccion($id),
+            'avisos' => $this->avisos($ctx),
+        ]);
+    }
+
+    public function guardarLeccion(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $id = $ctx->campo('id');
+        $titulo = $ctx->campo('titulo');
+        $duracion = $ctx->campo('duracion_min');
+        $videoBunnyId = $ctx->campo('video_bunny_id');
+        $contenidoTexto = $ctx->campo('contenido_texto');
+        $vistaPrevia = (int) ($ctx->campo('vista_previa_gratis') === '1');
+
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT cm.curso_id FROM curso_lecciones cl
+               JOIN curso_modulos cm ON cm.id = cl.modulo_id
+              WHERE cl.id = ?'
+        );
+        $stmt->execute([$id]);
+        $cursoId = $stmt->fetchColumn();
+
+        if ($cursoId === false) {
+            return $this->redirigirCon('/panel/cursos', 'error', 'Esa lección no existe.');
+        }
+
+        if ($titulo === '') {
+            return $this->redirigirCon('/panel/cursos/lecciones/editar?id=' . urlencode($id), 'error', 'La lección necesita un título.');
+        }
+
+        $duracionMin = preg_match('/^\d+$/', $duracion) === 1 ? (int) $duracion : null;
+
+        $this->bd->pdo()->prepare(
+            'UPDATE curso_lecciones
+                SET titulo = ?, duracion_min = ?, vista_previa_gratis = ?, video_bunny_id = ?, contenido_texto = ?
+              WHERE id = ?'
+        )->execute([
+            $titulo, $duracionMin, $vistaPrevia,
+            $videoBunnyId !== '' ? $videoBunnyId : null,
+            $contenidoTexto !== '' ? $contenidoTexto : null,
+            $id,
+        ]);
+
+        $this->auditoria->registrar('curso_leccion', $id, 'actualizar', $ctx->actor(), ['titulo' => $titulo], $ctx->ip());
+
+        return $this->redirigirCon('/panel/cursos/lecciones/editar?id=' . urlencode($id), 'ok', 'Lección actualizada.');
     }
 
     public function compras(Contexto $ctx): Respuesta
