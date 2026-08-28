@@ -423,6 +423,16 @@ final class Aplicacion
             ))->mostrar($p);
         });
 
+        $this->router->get('/mis-cursos/{slug}', function (Peticion $p): Respuesta {
+            return (new \App\Cuenta\AulaControlador(
+                $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),
+                $this->contenedor->obtener(\App\Servicios\Cursos::class),
+                $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
+                new \App\Cuenta\AccesoLeccion($this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class)),
+                $this->contenedor->obtener(BD::class),
+            ))->aula($p, (string) $p->parametros['slug']);
+        });
+
         // Las páginas legales. Las exige el propio proyecto (el motor de
         // WhatsApp trata datos personales) y además Google, que solo publica
         // la app OAuth del calendario si hay una política enlazada.
