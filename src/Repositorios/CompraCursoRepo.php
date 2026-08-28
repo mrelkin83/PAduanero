@@ -92,6 +92,19 @@ final class CompraCursoRepo
             ->execute([$compradorId, $id]);
     }
 
+    public function tienePagada(string $compradorId, string $cursoId): bool
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            "SELECT EXISTS(
+                SELECT 1 FROM compras_curso
+                 WHERE comprador_id = ? AND curso_id = ? AND estado = 'pagada'
+             )"
+        );
+        $stmt->execute([$compradorId, $cursoId]);
+
+        return (bool) $stmt->fetchColumn();
+    }
+
     /** @return list<array<string,mixed>> compras pagadas de un comprador, con datos del curso */
     public function pagadasDeComprador(string $compradorId): array
     {

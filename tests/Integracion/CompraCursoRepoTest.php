@@ -129,4 +129,55 @@ final class CompraCursoRepoTest extends CasoBaseBd
 
         self::assertSame('fallida', $this->repo->porId($id)['estado']);
     }
+
+    #[Test]
+    public function tienePagadaEsTrueSoloSiEseCompradorPagoEseCurso(): void
+    {
+        $cursoId = $this->curso();
+
+        $stmt = $this->bd->pdo()->prepare('SELECT categoria_id FROM cursos WHERE id = ?');
+        $stmt->execute([$cursoId]);
+        $catId = (string) $stmt->fetchColumn();
+        $otroCursoId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO cursos (id, categoria_id, titulo, slug, resumen, descripcion, lo_que_aprendera, precio_cop, estado)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$otroCursoId, $catId, 'Otro curso', 'otro-curso-tiene-pagada', 'r', 'd', '[]', 250000, 'publicado']);
+
+        $compradorId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $otroCompradorId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO compradores (id, nombres, apellidos, tipo_documento, numero_documento_cifrado, celular, correo, password_hash)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$compradorId, 'Ana', 'Gómez', 'CC', 'x', '300', 'ana@ejemplo.com', 'hash']);
+        $this->bd->pdo()->prepare(
+            'INSERT INTO compradores (id, nombres, apellidos, tipo_documento, numero_documento_cifrado, celular, correo, password_hash)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$otroCompradorId, 'Carlos', 'López', 'CC', 'y', '301', 'carlos@ejemplo.com', 'hash']);
+
+        $compraId = $this->repo->crear($cursoId, 'Ana', 'ana@ejemplo.com', 250000);
+        $this->repo->marcarPagada($compraId);
+        $this->repo->vincularComprador($compraId, $compradorId);
+
+        self::assertTrue($this->repo->tienePagada($compradorId, $cursoId));
+        self::assertFalse($this->repo->tienePagada($compradorId, $otroCursoId));
+        self::assertFalse($this->repo->tienePagada($otroCompradorId, $cursoId));
+    }
+
+    #[Test]
+    public function tienePagadaEsFalseSiLaCompraNoEstaPagada(): void
+    {
+        $cursoId = $this->curso();
+        $compradorId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO compradores (id, nombres, apellidos, tipo_documento, numero_documento_cifrado, celular, correo, password_hash)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$compradorId, 'Ana', 'Gómez', 'CC', 'x', '300', 'ana@ejemplo.com', 'hash']);
+
+        $compraId = $this->repo->crear($cursoId, 'Ana', 'ana@ejemplo.com', 250000);
+        $this->repo->vincularComprador($compraId, $compradorId);
+        // Deliberadamente sin marcarPagada(): sigue en 'pendiente'.
+
+        self::assertFalse($this->repo->tienePagada($compradorId, $cursoId));
+    }
 }
