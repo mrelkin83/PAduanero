@@ -34,6 +34,15 @@ final readonly class Respuesta
         return new self($html, $estado, ['Content-Type' => 'text/html; charset=utf-8']);
     }
 
+    public static function archivo(string $contenido, string $nombreDescarga, string $mime): self
+    {
+        return new self($contenido, 200, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'attachment; filename="' . $nombreDescarga . '"',
+            'Content-Length' => (string) strlen($contenido),
+        ]);
+    }
+
     /** @param array<string,mixed> $datos */
     public static function vista(string $plantilla, array $datos = [], int $estado = 200): self
     {
