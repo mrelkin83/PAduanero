@@ -452,6 +452,59 @@ final class PanelCursosControlador extends ControladorBase
         return $this->redirigirCon('/panel/cursos/lecciones/editar?id=' . urlencode($id), 'ok', 'Lección actualizada.');
     }
 
+    public function agregarMaterial(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $leccionId = $ctx->campo('leccion_id');
+        $nombre = $ctx->campo('nombre');
+        $rutaVuelta = '/panel/cursos/lecciones/editar?id=' . urlencode($leccionId);
+
+        if ($nombre === '') {
+            return $this->redirigirCon($rutaVuelta, 'error', 'El material necesita un nombre.');
+        }
+
+        $carpeta = dirname(__DIR__, 2) . '/storage/cursos/materiales/' . $leccionId;
+        $subida = \App\Soporte\SubidaMaterial::guardar($ctx->archivo('archivo'), $carpeta);
+
+        if ($subida['error'] !== '') {
+            return $this->redirigirCon($rutaVuelta, 'error', $subida['error']);
+        }
+        if (!$subida['ok']) {
+            return $this->redirigirCon($rutaVuelta, 'error', 'Seleccione un archivo.');
+        }
+
+        $id = $this->materiales->crear($leccionId, $nombre, $subida['archivo'], $subida['extension'], $subida['tamanioBytes']);
+        $this->auditoria->registrar('curso_material', $id, 'crear', $ctx->actor(), ['nombre' => $nombre], $ctx->ip());
+
+        return $this->redirigirCon($rutaVuelta, 'ok', 'Material subido.');
+    }
+
+    public function eliminarMaterial(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $id = $ctx->campo('id');
+        $leccionId = $ctx->campo('leccion_id');
+        $rutaVuelta = '/panel/cursos/lecciones/editar?id=' . urlencode($leccionId);
+
+        $material = $this->materiales->porId($id);
+        if ($material === null) {
+            return $this->redirigirCon($rutaVuelta, 'error', 'Ese material no existe.');
+        }
+
+        $ruta = dirname(__DIR__, 2) . '/storage/cursos/materiales/' . $material['leccion_id']
+            . '/' . $material['archivo'] . '.' . $material['extension'];
+        if (is_file($ruta)) {
+            @unlink($ruta);
+        }
+
+        $this->materiales->eliminar($id);
+        $this->auditoria->registrar('curso_material', $id, 'eliminar', $ctx->actor(), [], $ctx->ip());
+
+        return $this->redirigirCon($rutaVuelta, 'ok', 'Material eliminado.');
+    }
+
     public function compras(Contexto $ctx): Respuesta
     {
         $ctx->permisos->exigir($ctx->usuario, 'cursos.ver');

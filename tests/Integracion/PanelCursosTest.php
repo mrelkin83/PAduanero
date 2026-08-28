@@ -43,8 +43,11 @@ final class PanelCursosTest extends CasoBaseBd
         );
     }
 
-    /** @param array<string,mixed> $formulario */
-    private function ctx(string $rol, array $formulario = [], array $consulta = []): Contexto
+    /**
+     * @param array<string,mixed> $formulario
+     * @param array<string,mixed> $archivos entrada cruda de $_FILES, por nombre de campo
+     */
+    private function ctx(string $rol, array $formulario = [], array $consulta = [], array $archivos = []): Contexto
     {
         return new Contexto(
             new Peticion(
@@ -53,6 +56,7 @@ final class PanelCursosTest extends CasoBaseBd
                 consulta: $consulta,
                 formulario: $formulario,
                 ip: '190.85.1.1',
+                archivos: $archivos,
             ),
             $this->usuario($rol),
             $this->permisos,
@@ -560,5 +564,89 @@ final class PanelCursosTest extends CasoBaseBd
         $stmt = $this->bd->pdo()->prepare('SELECT titulo FROM curso_lecciones WHERE id = ?');
         $stmt->execute([$leccionId]);
         self::assertNotSame('', $stmt->fetchColumn());
+    }
+
+    // ── Materiales de la lección ──
+    //
+    // agregarMaterial() no recibe un $mover inyectable (a diferencia de las
+    // pruebas unitarias de SubidaMaterial): usa move_uploaded_file por
+    // defecto, que siempre falla fuera de una petición HTTP real — misma
+    // limitación documentada en SubidaImagen. No hay en este archivo un
+    // precedente de subida de imagen ya probada con éxito en integración
+    // (el flujo de portada de curso en guardar() tampoco expone un $mover),
+    // así que estas pruebas cubren solo los caminos de error del formulario;
+    // el camino de éxito queda para la verificación manual de la Tarea 14.
+
+    #[Test]
+    public function agregarMaterialConExtensionNoPermitidaFalla(): void
+    {
+        $leccionId = $this->leccionDePrueba();
+        $tmp = tempnam(sys_get_temp_dir(), 'pa-mat-test-');
+        file_put_contents($tmp, 'contenido cualquiera');
+
+        $r = $this->controlador()->agregarMaterial($this->ctx('abogado', ['leccion_id' => $leccionId, 'nombre' => 'Ejecutable'], [], [
+            'archivo' => ['name' => 'instalador.exe', 'type' => 'application/octet-stream', 'tmp_name' => $tmp, 'error' => UPLOAD_ERR_OK, 'size' => filesize($tmp)],
+        ]));
+
+        @unlink($tmp);
+
+        self::assertSame(302, $r->estado);
+        self::assertStringContainsString('no permitido', urldecode($r->cabeceras['Location']));
+        self::assertCount(0, (new \App\Repositorios\CursoMaterialRepo($this->bd))->deLeccion($leccionId));
+    }
+
+    #[Test]
+    public function agregarMaterialSinArchivoSeleccionadoFalla(): void
+    {
+        $leccionId = $this->leccionDePrueba();
+
+        $r = $this->controlador()->agregarMaterial($this->ctx('abogado', ['leccion_id' => $leccionId, 'nombre' => 'Plantilla']));
+
+        self::assertSame(302, $r->estado);
+        self::assertStringContainsString('archivo', strtolower(urldecode($r->cabeceras['Location'])));
+        self::assertCount(0, (new \App\Repositorios\CursoMaterialRepo($this->bd))->deLeccion($leccionId));
+    }
+
+    #[Test]
+    public function agregarMaterialSinNombreFalla(): void
+    {
+        $leccionId = $this->leccionDePrueba();
+
+        $r = $this->controlador()->agregarMaterial($this->ctx('abogado', ['leccion_id' => $leccionId, 'nombre' => '']));
+
+        self::assertSame(302, $r->estado);
+        self::assertStringContainsString('nombre', strtolower(urldecode($r->cabeceras['Location'])));
+        self::assertCount(0, (new \App\Repositorios\CursoMaterialRepo($this->bd))->deLeccion($leccionId));
+    }
+
+    #[Test]
+    public function eliminarMaterialLoBorraDeDiscoYDeLaBaseDeDatos(): void
+    {
+        $leccionId = $this->leccionDePrueba();
+        $carpeta = dirname(__DIR__, 2) . '/storage/cursos/materiales/' . $leccionId;
+        @mkdir($carpeta, 0775, true);
+        file_put_contents($carpeta . '/abc123.pdf', 'contenido');
+
+        $materiales = new \App\Repositorios\CursoMaterialRepo($this->bd);
+        $id = $materiales->crear($leccionId, 'A borrar', 'abc123', 'pdf', 9);
+
+        $r = $this->controlador()->eliminarMaterial($this->ctx('abogado', ['id' => $id, 'leccion_id' => $leccionId]));
+
+        self::assertSame(302, $r->estado);
+        self::assertNull($materiales->porId($id));
+        self::assertFileDoesNotExist($carpeta . '/abc123.pdf');
+
+        @rmdir($carpeta);
+    }
+
+    #[Test]
+    public function eliminarMaterialInexistenteNoTruena(): void
+    {
+        $idFalso = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+
+        $r = $this->controlador()->eliminarMaterial($this->ctx('abogado', ['id' => $idFalso, 'leccion_id' => '']));
+
+        self::assertSame(302, $r->estado);
+        self::assertStringContainsString('no+existe', $r->cabeceras['Location']);
     }
 }

@@ -162,6 +162,8 @@ final class Panel
             'POST /cursos/lecciones/eliminar' => $modulos['cursos']->eliminarLeccion($ctx),
             'GET /cursos/lecciones/editar' => $modulos['cursos']->editarLeccion($ctx),
             'POST /cursos/lecciones/guardar' => $modulos['cursos']->guardarLeccion($ctx),
+            'POST /cursos/lecciones/materiales/agregar' => $modulos['cursos']->agregarMaterial($ctx),
+            'POST /cursos/lecciones/materiales/eliminar' => $modulos['cursos']->eliminarMaterial($ctx),
             'GET /cursos/categorias' => $modulos['cursos']->categorias($ctx),
             'POST /cursos/categorias/guardar' => $modulos['cursos']->guardarCategoria($ctx),
             'GET /cursos/compras' => $modulos['cursos']->compras($ctx),
