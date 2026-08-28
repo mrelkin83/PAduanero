@@ -11,10 +11,12 @@ use App\Cuenta\AulaControlador;
 use App\Repositorios\CompraCursoRepo;
 use App\Repositorios\CompradorRepo;
 use App\Repositorios\CompradorSesionRepo;
+use App\Repositorios\CursoMaterialRepo;
 use App\Repositorios\IntentoAccesoRepo;
 use App\Servicios\AutenticacionComprador;
 use App\Servicios\ConfigMysql;
 use App\Servicios\Cursos;
+use App\Soporte\BunnyStream;
 use App\Soporte\Cifrado;
 use PHPUnit\Framework\Attributes\Test;
 use Pruebas\CasoBaseBd;
@@ -54,6 +56,8 @@ final class AulaControladorTest extends CasoBaseBd
             $this->compras,
             new AccesoLeccion($this->compras),
             $this->bd,
+            new BunnyStream('', ''),
+            new CursoMaterialRepo($this->bd),
         );
     }
 
@@ -126,5 +130,55 @@ final class AulaControladorTest extends CasoBaseBd
         self::assertStringContainsString('Lección uno', $r->cuerpo);
 
         unset($_COOKIE[AccesoControlador::COOKIE]);
+    }
+
+    private function leccionEnCurso(string $cursoId, bool $preview = false): string
+    {
+        $moduloId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare('INSERT INTO curso_modulos (id, curso_id, titulo, orden) VALUES (?, ?, ?, ?)')
+            ->execute([$moduloId, $cursoId, 'Módulo', 0]);
+        $leccionId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO curso_lecciones (id, modulo_id, titulo, orden, vista_previa_gratis, contenido_texto)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute([$leccionId, $moduloId, 'Lección con contenido', 0, $preview ? 1 : 0, 'El contenido de la lección.']);
+
+        return $leccionId;
+    }
+
+    #[Test]
+    public function unaLeccionDePreviewSeVeSinSesion(): void
+    {
+        $cursoId = $this->curso('curso-preview-leccion');
+        $leccionId = $this->leccionEnCurso($cursoId, preview: true);
+
+        $r = $this->controlador->leccion($this->peticion(), 'curso-preview-leccion', $leccionId);
+
+        self::assertSame(200, $r->estado);
+        self::assertStringContainsString('El contenido de la lección.', $r->cuerpo);
+    }
+
+    #[Test]
+    public function unaLeccionNoPreviewSinSesionRedirigeAEntrar(): void
+    {
+        $cursoId = $this->curso('curso-no-preview-leccion');
+        $leccionId = $this->leccionEnCurso($cursoId, preview: false);
+
+        $r = $this->controlador->leccion($this->peticion(), 'curso-no-preview-leccion', $leccionId);
+
+        self::assertSame(302, $r->estado);
+        self::assertSame('/entrar', $r->cabeceras['Location']);
+    }
+
+    #[Test]
+    public function unaLeccionQueNoPerteneceAlCursoDeLaUrlDa404(): void
+    {
+        $cursoId = $this->curso('curso-a-leccion');
+        $otroCursoId = $this->curso('curso-b-leccion');
+        $leccionDeOtroCurso = $this->leccionEnCurso($otroCursoId, preview: true);
+
+        $r = $this->controlador->leccion($this->peticion(), 'curso-a-leccion', $leccionDeOtroCurso);
+
+        self::assertSame(404, $r->estado);
     }
 }

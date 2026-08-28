@@ -20,6 +20,29 @@ final class Vista
         return htmlspecialchars($texto ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
+    /**
+     * Texto plano → párrafos escapados. Los saltos de línea dobles separan
+     * párrafo; los simples se mantienen dentro del mismo `<p>` como `<br>`.
+     * El texto en sí SIEMPRE pasa por `e()` primero — nunca se interpreta
+     * como HTML, sin importar quién lo escribió (ver ADR de contenido de
+     * lecciones, spec del sub-proyecto 3).
+     */
+    public static function parrafos(?string $texto): string
+    {
+        $texto = trim($texto ?? '');
+        if ($texto === '') {
+            return '';
+        }
+
+        $bloques = preg_split('/\n{2,}/', $texto) ?: [$texto];
+        $html = '';
+        foreach ($bloques as $bloque) {
+            $html .= '<p>' . nl2br(self::e(trim($bloque)), false) . '</p>';
+        }
+
+        return $html;
+    }
+
     /** Escape para incrustar en un atributo de JavaScript o un data-*. */
     public static function json(mixed $valor): string
     {

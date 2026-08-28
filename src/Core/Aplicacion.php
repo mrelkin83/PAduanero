@@ -430,7 +430,21 @@ final class Aplicacion
                 $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
                 new \App\Cuenta\AccesoLeccion($this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class)),
                 $this->contenedor->obtener(BD::class),
+                \App\Soporte\BunnyStream::desdeEntorno(),
+                $this->contenedor->obtener(\App\Repositorios\CursoMaterialRepo::class),
             ))->aula($p, (string) $p->parametros['slug']);
+        });
+
+        $this->router->get('/mis-cursos/{slug}/leccion/{leccionId}', function (Peticion $p): Respuesta {
+            return (new \App\Cuenta\AulaControlador(
+                $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),
+                $this->contenedor->obtener(\App\Servicios\Cursos::class),
+                $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
+                new \App\Cuenta\AccesoLeccion($this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class)),
+                $this->contenedor->obtener(BD::class),
+                \App\Soporte\BunnyStream::desdeEntorno(),
+                $this->contenedor->obtener(\App\Repositorios\CursoMaterialRepo::class),
+            ))->leccion($p, (string) $p->parametros['slug'], (string) $p->parametros['leccionId']);
         });
 
         // Las páginas legales. Las exige el propio proyecto (el motor de

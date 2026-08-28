@@ -19,6 +19,8 @@ final class AulaControlador
         private readonly CompraCursoRepo $compras,
         private readonly AccesoLeccion $acceso,
         private readonly BD $bd,
+        private readonly \App\Soporte\BunnyStream $bunny,
+        private readonly \App\Repositorios\CursoMaterialRepo $materiales,
     ) {
     }
 
@@ -38,6 +40,49 @@ final class AulaControlador
             'curso' => $curso,
             'modulos' => $this->temario($curso['id']),
         ]);
+    }
+
+    public function leccion(Peticion $peticion, string $slug, string $leccionId): Respuesta
+    {
+        $curso = $this->cursos->porSlug($slug);
+        if ($curso === null) {
+            return Respuesta::texto('No encontrado.', 404);
+        }
+
+        $leccion = $this->leccionDelCurso($curso['id'], $leccionId);
+        if ($leccion === null) {
+            return Respuesta::texto('No encontrado.', 404);
+        }
+
+        $comprador = $this->compradorActual();
+        if (!$this->acceso->puedeVer($comprador, $leccion, $curso['id'])) {
+            return $comprador === null
+                ? new Respuesta('', 302, ['Location' => '/entrar'])
+                : new Respuesta('', 302, ['Location' => '/mis-cursos']);
+        }
+
+        return Respuesta::vista('cuenta/leccion', [
+            'curso' => $curso,
+            'leccion' => $leccion,
+            'materiales' => $this->materiales->deLeccion($leccionId),
+            'urlVideo' => ($leccion['video_bunny_id'] !== null && $this->bunny->disponible())
+                ? $this->bunny->urlEmbed((string) $leccion['video_bunny_id'])
+                : null,
+        ]);
+    }
+
+    /** @return array<string,mixed>|null */
+    private function leccionDelCurso(string $cursoId, string $leccionId): ?array
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT cl.* FROM curso_lecciones cl
+               JOIN curso_modulos cm ON cm.id = cl.modulo_id
+              WHERE cl.id = ? AND cm.curso_id = ?'
+        );
+        $stmt->execute([$leccionId, $cursoId]);
+        $fila = $stmt->fetch();
+
+        return $fila === false ? null : $fila;
     }
 
     /** @return \App\Modelos\Comprador|null */
