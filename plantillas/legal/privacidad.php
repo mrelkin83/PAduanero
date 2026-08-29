@@ -25,7 +25,7 @@ use App\Soporte\Vista;
  */
 
 $e = Vista::e(...);
-$actualizada = '22 de agosto de 2026';
+$actualizada = '29 de agosto de 2026';
 
 $cuerpoLegal = static function () use ($e, $whatsapp): void { ?>
 
@@ -59,6 +59,14 @@ $cuerpoLegal = static function () use ($e, $whatsapp): void { ?>
             escribir por WhatsApp para agendar una asesoría: su nombre, su número de
             teléfono, su correo electrónico y el motivo de su consulta.
         </p>
+        <p class="cuerpo mt-4">
+            Si compra uno de los cursos de este sitio, también tratamos los datos
+            que registra al crear su cuenta de acceso: nombres, apellidos, tipo y
+            número de documento de identidad (el número se guarda cifrado, nunca en
+            texto claro), celular y correo electrónico. Ese documento se usa para
+            expedir a su nombre el certificado de finalización cuando termina el
+            curso.
+        </p>
     </section>
 
     <section class="mt-12">
@@ -67,6 +75,8 @@ $cuerpoLegal = static function () use ($e, $whatsapp): void { ?>
             <li>Coordinar, agendar y prestar la asesoría solicitada.</li>
             <li>Enviarle la invitación de calendario con el enlace de la reunión.</li>
             <li>Comunicarnos con usted sobre su cita: confirmaciones, cambios, recordatorios.</li>
+            <li>Darle acceso al curso que compró y llevar el registro de qué lecciones ha visto.</li>
+            <li>Expedir a su nombre el certificado de finalización del curso.</li>
             <li>Cumplir los deberes legales, contables y profesionales del despacho.</li>
         </ul>
         <p class="cuerpo mt-4">
@@ -80,8 +90,10 @@ $cuerpoLegal = static function () use ($e, $whatsapp): void { ?>
         <p class="cuerpo mt-4">
             Solo con los proveedores estrictamente necesarios para prestar el
             servicio: Google, para crear el evento de calendario con invitación a su
-            correo, y la pasarela de pagos, cuando la asesoría se paga en línea.
-            Cada uno trata los datos conforme a sus propias políticas.
+            correo; la pasarela de pagos, cuando la asesoría o un curso se pagan en
+            línea; y, si compra un curso, el proveedor de videohospedaje que sirve
+            las lecciones. Cada uno trata los datos conforme a sus propias
+            políticas.
         </p>
         <p class="cuerpo mt-4">
             Lo que usted consulte al abogado queda además amparado por el secreto
@@ -90,7 +102,20 @@ $cuerpoLegal = static function () use ($e, $whatsapp): void { ?>
     </section>
 
     <section class="mt-12">
-        <h2 class="titular-menor">5. Cuánto tiempo se conservan</h2>
+        <h2 class="titular-menor">5. El certificado de finalización es parcialmente público</h2>
+        <p class="cuerpo mt-4">
+            Si termina un curso, expedimos un certificado con un código de
+            verificación único. Cualquier persona que tenga ese código puede
+            consultar en <a href="/certificados/verificar" class="menu-enlace">/certificados/verificar</a>
+            su nombre completo, el curso y la fecha de emisión — nunca su número de
+            documento, que solo aparece impreso en el PDF que usted descarga. El
+            código no se puede adivinar ni se publica en ningún listado: solo lo
+            conoce quien reciba el certificado de su parte.
+        </p>
+    </section>
+
+    <section class="mt-12">
+        <h2 class="titular-menor">6. Cuánto tiempo se conservan</h2>
         <p class="cuerpo mt-4">
             Mientras sean necesarios para la finalidad con la que se recogieron y
             mientras los deberes legales y profesionales del abogado exijan
@@ -99,7 +124,7 @@ $cuerpoLegal = static function () use ($e, $whatsapp): void { ?>
     </section>
 
     <section class="mt-12">
-        <h2 class="titular-menor">6. Sus derechos</h2>
+        <h2 class="titular-menor">7. Sus derechos</h2>
         <p class="cuerpo mt-4">
             Usted puede conocer, actualizar y rectificar sus datos; pedir prueba de
             la autorización; ser informado del uso que se les ha dado; revocar la
@@ -114,7 +139,7 @@ $cuerpoLegal = static function () use ($e, $whatsapp): void { ?>
     </section>
 
     <section class="mt-12">
-        <h2 class="titular-menor">7. Seguridad</h2>
+        <h2 class="titular-menor">8. Seguridad</h2>
         <p class="cuerpo mt-4">
             Los datos se guardan en infraestructura propia del despacho, con acceso
             restringido y las credenciales de los sistemas cifradas. Ninguna medida
@@ -124,7 +149,7 @@ $cuerpoLegal = static function () use ($e, $whatsapp): void { ?>
     </section>
 
     <section class="mt-12">
-        <h2 class="titular-menor">8. Marco legal y vigencia</h2>
+        <h2 class="titular-menor">9. Marco legal y vigencia</h2>
         <p class="cuerpo mt-4">
             Esta política se rige por el régimen colombiano de protección de datos
             personales — la Ley 1581 de 2012 y las normas que la reglamentan — y
