@@ -460,8 +460,14 @@ final class PanelCursosControlador extends ControladorBase
         $nombre = $ctx->campo('nombre');
         $rutaVuelta = '/panel/cursos/lecciones/editar?id=' . urlencode($leccionId);
 
-        if ($nombre === '') {
-            return $this->redirigirCon($rutaVuelta, 'error', 'El material necesita un nombre.');
+        $stmt = $this->bd->pdo()->prepare('SELECT id FROM curso_lecciones WHERE id = ?');
+        $stmt->execute([$leccionId]);
+        if ($stmt->fetch() === false) {
+            return $this->redirigirCon('/panel/cursos', 'error', 'Esa lección no existe.');
+        }
+
+        if ($nombre === '' || mb_strlen($nombre) > 150) {
+            return $this->redirigirCon($rutaVuelta, 'error', 'El material necesita un nombre de hasta 150 caracteres.');
         }
 
         $carpeta = dirname(__DIR__, 2) . '/storage/cursos/materiales/' . $leccionId;

@@ -620,6 +620,21 @@ final class PanelCursosTest extends CasoBaseBd
     }
 
     #[Test]
+    public function agregarMaterialConLeccionInexistenteNoSubeNiCreaNada(): void
+    {
+        $r = $this->controlador()->agregarMaterial($this->ctx('abogado', [
+            'leccion_id' => (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn(),
+            'nombre' => 'Plantilla',
+        ]));
+
+        self::assertSame(302, $r->estado);
+        self::assertStringContainsString('no+existe', $r->cabeceras['Location']);
+
+        $total = (int) $this->bd->pdo()->query('SELECT COUNT(*) FROM curso_materiales')->fetchColumn();
+        self::assertSame(0, $total);
+    }
+
+    #[Test]
     public function eliminarMaterialLoBorraDeDiscoYDeLaBaseDeDatos(): void
     {
         $leccionId = $this->leccionDePrueba();

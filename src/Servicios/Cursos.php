@@ -85,7 +85,7 @@ final class Cursos
 
         foreach ($modulos as $modulo) {
             foreach ($modulo['lecciones'] as $leccion) {
-                if ((int) $leccion['vista_previa_gratis'] === 1 && $leccion['video_bunny_id'] !== null) {
+                if (\App\Cuenta\AccesoLeccion::esVistaPrevia($leccion) && $leccion['video_bunny_id'] !== null) {
                     return $this->bunny->urlEmbed((string) $leccion['video_bunny_id']);
                 }
             }

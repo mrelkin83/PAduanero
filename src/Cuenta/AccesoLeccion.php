@@ -23,10 +23,16 @@ final class AccesoLeccion
     /** @param array<string,mixed> $leccion fila de curso_lecciones (al menos vista_previa_gratis) */
     public function puedeVer(?Comprador $comprador, array $leccion, string $cursoId): bool
     {
-        if ((int) $leccion['vista_previa_gratis'] === 1) {
+        if (self::esVistaPrevia($leccion)) {
             return true;
         }
 
         return $comprador !== null && $this->compras->tienePagada($comprador->id, $cursoId);
+    }
+
+    /** La condición que hace que una lección sea visible sin haber pagado. */
+    public static function esVistaPrevia(array $leccion): bool
+    {
+        return (int) $leccion['vista_previa_gratis'] === 1;
     }
 }
