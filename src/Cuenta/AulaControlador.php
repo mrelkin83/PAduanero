@@ -22,6 +22,7 @@ final class AulaControlador
         private readonly \App\Soporte\BunnyStream $bunny,
         private readonly \App\Repositorios\CursoMaterialRepo $materiales,
         private readonly ProgresoCurso $progreso,
+        private readonly \App\Repositorios\CertificadoRepo $certificados,
     ) {
     }
 
@@ -38,12 +39,14 @@ final class AulaControlador
         }
 
         $conteo = $this->progreso->conteo($comprador->id, $curso['id']);
+        $compraId = $this->compras->idDePagadaPorComprador($comprador->id, $curso['id']);
+        $certificado = $compraId !== null ? $this->certificados->porCompra($compraId) : null;
 
         return Respuesta::vista('cuenta/aula', [
             'curso' => $curso,
             'modulos' => $this->temario($curso['id']),
             'progreso' => $conteo,
-            'completo' => $this->progreso->estaCompleto($comprador->id, $curso['id']),
+            'tieneCertificado' => $certificado !== null,
         ]);
     }
 

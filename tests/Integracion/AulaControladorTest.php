@@ -50,6 +50,7 @@ final class AulaControladorTest extends CasoBaseBd
         );
         $cursos = new Cursos($this->bd, $config, self::URL, new BunnyStream('', ''));
 
+        $certificados = new \App\Repositorios\CertificadoRepo($this->bd);
         $this->controlador = new AulaControlador(
             $this->auth,
             $cursos,
@@ -58,7 +59,8 @@ final class AulaControladorTest extends CasoBaseBd
             $this->bd,
             new BunnyStream('', ''),
             new CursoMaterialRepo($this->bd),
-            new \App\Cuenta\ProgresoCurso($this->bd, new \App\Repositorios\CertificadoRepo($this->bd)),
+            new \App\Cuenta\ProgresoCurso($this->bd, $certificados),
+            $certificados,
         );
     }
 
@@ -313,6 +315,43 @@ final class AulaControladorTest extends CasoBaseBd
 
         self::assertStringContainsString('Descargar certificado', $r->cuerpo);
         self::assertStringContainsString('/mis-cursos/curso-aula-completo/certificado', $r->cuerpo);
+
+        unset($_COOKIE[AccesoControlador::COOKIE]);
+    }
+
+    #[Test]
+    public function elCertificadoSigueVisibleAunqueSeAgregueUnaLeccionNueva(): void
+    {
+        $cursoId = $this->curso('curso-certificado-persiste');
+        $moduloId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare('INSERT INTO curso_modulos (id, curso_id, titulo, orden) VALUES (?, ?, ?, ?)')
+            ->execute([$moduloId, $cursoId, 'Módulo', 0]);
+        $leccionId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare('INSERT INTO curso_lecciones (id, modulo_id, titulo, orden) VALUES (?, ?, ?, ?)')
+            ->execute([$leccionId, $moduloId, 'Lección', 0]);
+
+        $compradorId = $this->compradores->crear('Ana', 'Gómez', 'CC', '1010101010', '3001234567', 'ana-cert-persiste@ejemplo.com', 'clave123');
+        $compraId = $this->compras->crear($cursoId, 'Ana', 'ana-cert-persiste@ejemplo.com', 250000);
+        $this->compras->marcarPagada($compraId);
+        $this->compras->vincularComprador($compraId, $compradorId);
+
+        $certificados = new \App\Repositorios\CertificadoRepo($this->bd);
+        $certificados->crear($compraId, 'PA-TEST0001');
+
+        // Se agrega una lección nueva DESPUÉS de emitido el certificado: si el
+        // aula volviera a calcular estaCompleto() en vez de mirar si ya existe
+        // el certificado, el enlace desaparecería porque ahora faltaría una
+        // lección por ver.
+        $this->bd->pdo()->prepare('INSERT INTO curso_lecciones (id, modulo_id, titulo, orden) VALUES (UUID(), ?, ?, ?)')
+            ->execute([$moduloId, 'Lección agregada después', 1]);
+
+        $comprador = $this->compradores->porId($compradorId);
+        $_COOKIE[AccesoControlador::COOKIE] = $this->auth->abrirSesion($comprador, null, null);
+
+        $r = $this->controlador->aula($this->peticion(), 'curso-certificado-persiste');
+
+        self::assertStringContainsString('Descargar certificado', $r->cuerpo);
+        self::assertStringContainsString('/mis-cursos/curso-certificado-persiste/certificado', $r->cuerpo);
 
         unset($_COOKIE[AccesoControlador::COOKIE]);
     }

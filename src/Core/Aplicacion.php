@@ -444,6 +444,7 @@ final class Aplicacion
                     $this->contenedor->obtener(BD::class),
                     $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
                 ),
+                $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
             ))->aula($p, (string) $p->parametros['slug']);
         });
 
@@ -460,6 +461,7 @@ final class Aplicacion
                     $this->contenedor->obtener(BD::class),
                     $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
                 ),
+                $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
             ))->leccion($p, (string) $p->parametros['slug'], (string) $p->parametros['leccionId']);
         });
 
@@ -476,6 +478,7 @@ final class Aplicacion
                     $this->contenedor->obtener(BD::class),
                     $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
                 ),
+                $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
             ))->material(
                 $p,
                 (string) $p->parametros['slug'],

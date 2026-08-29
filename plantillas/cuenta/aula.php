@@ -8,7 +8,7 @@ use App\Soporte\Vista;
  * @var array<string,mixed> $curso
  * @var list<array{id:string,titulo:string,lecciones:list<array<string,mixed>>}> $modulos
  * @var array{vistas:int,total:int} $progreso
- * @var bool $completo
+ * @var bool $tieneCertificado
  */
 
 $e = Vista::e(...);
@@ -34,7 +34,7 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
 <main class="mx-auto max-w-3xl px-5 py-12 md:px-7">
     <h1 class="titular-seccion"><?= $e((string) $curso['titulo']) ?></h1>
 
-    <?php if ($completo): ?>
+    <?php if ($tieneCertificado): ?>
     <a href="/mis-cursos/<?= $e((string) $curso['slug']) ?>/certificado" class="boton-diagnostico-global mt-4 inline-block">
         Descargar certificado
     </a>
