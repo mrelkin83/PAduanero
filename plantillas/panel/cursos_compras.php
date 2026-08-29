@@ -19,7 +19,7 @@ $contenido = static function () use ($e, $ctx, $compras): void {
     <h2 class="rotulo">Compras de cursos</h2>
 
     <table class="tabla mt-4">
-        <thead><tr><th>Curso</th><th>Comprador</th><th>Correo</th><th>Precio</th><th>Estado</th><th></th></tr></thead>
+        <thead><tr><th>Curso</th><th>Comprador</th><th>Correo</th><th>Precio</th><th>Estado</th><th>Certificado</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($compras as $c): ?>
         <tr>
@@ -27,7 +27,8 @@ $contenido = static function () use ($e, $ctx, $compras): void {
             <td><?= $e((string) $c['nombre']) ?></td>
             <td><?= $e((string) $c['correo']) ?></td>
             <td class="font-mono">$<?= $e(number_format((int) $c['precio_cop'], 0, ',', '.')) ?></td>
-            <td><?= $e((string) $c['estado']) ?></td>
+            <td><?= (string) $c['estado'] ?></td>
+            <td class="font-mono text-xs"><?= $e((string) ($c['codigo_verificacion'] ?? '—')) ?></td>
             <td>
                 <?php if ($editable && $c['estado'] !== 'pagada'): ?>
                 <form method="post" action="/panel/cursos/compras/aprobar">
@@ -50,7 +51,7 @@ $contenido = static function () use ($e, $ctx, $compras): void {
         </tr>
         <?php endforeach; ?>
         <?php if ($compras === []): ?>
-        <tr><td colspan="6" class="text-acero">Todavía no hay compras.</td></tr>
+        <tr><td colspan="7" class="text-acero">Todavía no hay compras.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

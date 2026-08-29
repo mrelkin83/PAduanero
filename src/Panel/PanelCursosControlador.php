@@ -516,8 +516,10 @@ final class PanelCursosControlador extends ControladorBase
         $ctx->permisos->exigir($ctx->usuario, 'cursos.ver');
 
         $filas = $this->bd->pdo()->query(
-            "SELECT cc.*, c.titulo FROM compras_curso cc
+            "SELECT cc.*, c.titulo, cert.codigo_verificacion
+               FROM compras_curso cc
                JOIN cursos c ON c.id = cc.curso_id
+               LEFT JOIN certificados cert ON cert.compra_id = cc.id
               ORDER BY cc.creado_en DESC"
         )->fetchAll();
 

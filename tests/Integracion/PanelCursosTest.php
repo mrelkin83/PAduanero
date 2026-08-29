@@ -492,6 +492,19 @@ final class PanelCursosTest extends CasoBaseBd
     }
 
     #[Test]
+    public function laListaDeComprasMuestraElCodigoDeCertificadoSiExiste(): void
+    {
+        $compraId = $this->compraDePruebaPara('curso-panel-certificado');
+        $this->bd->pdo()->prepare(
+            "INSERT INTO certificados (compra_id, codigo_verificacion) VALUES (?, 'PA-PANELTEST')"
+        )->execute([$compraId]);
+
+        $html = $this->controlador()->compras($this->ctx('abogado'))->cuerpo;
+
+        self::assertStringContainsString('PA-PANELTEST', $html);
+    }
+
+    #[Test]
     public function aprobarAManoMarcaLaCompraPagadaYAuditaLaAccion(): void
     {
         $compraId = $this->compraDePruebaPara('curso-panel-2');
