@@ -37,9 +37,13 @@ final class AulaControlador
             return new Respuesta('', 302, ['Location' => '/mis-cursos']);
         }
 
+        $conteo = $this->progreso->conteo($comprador->id, $curso['id']);
+
         return Respuesta::vista('cuenta/aula', [
             'curso' => $curso,
             'modulos' => $this->temario($curso['id']),
+            'progreso' => $conteo,
+            'completo' => $this->progreso->estaCompleto($comprador->id, $curso['id']),
         ]);
     }
 

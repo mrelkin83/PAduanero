@@ -263,6 +263,61 @@ final class AulaControladorTest extends CasoBaseBd
     }
 
     #[Test]
+    public function elAulaMuestraElConteoDeProgreso(): void
+    {
+        $cursoId = $this->curso('curso-aula-progreso');
+        $moduloId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare('INSERT INTO curso_modulos (id, curso_id, titulo, orden) VALUES (?, ?, ?, ?)')
+            ->execute([$moduloId, $cursoId, 'Módulo', 0]);
+        $this->bd->pdo()->prepare('INSERT INTO curso_lecciones (id, modulo_id, titulo, orden) VALUES (UUID(), ?, ?, ?)')
+            ->execute([$moduloId, 'Lección', 0]);
+
+        $compradorId = $this->compradores->crear('Ana', 'Gómez', 'CC', '1010101010', '3001234567', 'ana-aula-prog@ejemplo.com', 'clave123');
+        $compraId = $this->compras->crear($cursoId, 'Ana', 'ana-aula-prog@ejemplo.com', 250000);
+        $this->compras->marcarPagada($compraId);
+        $this->compras->vincularComprador($compraId, $compradorId);
+
+        $comprador = $this->compradores->porId($compradorId);
+        $_COOKIE[AccesoControlador::COOKIE] = $this->auth->abrirSesion($comprador, null, null);
+
+        $r = $this->controlador->aula($this->peticion(), 'curso-aula-progreso');
+
+        self::assertStringContainsString('0 de 1', $r->cuerpo);
+        self::assertStringNotContainsString('Descargar certificado', $r->cuerpo);
+
+        unset($_COOKIE[AccesoControlador::COOKIE]);
+    }
+
+    #[Test]
+    public function elAulaMuestraElEnlaceDeDescargaCuandoYaEstaCompleto(): void
+    {
+        $cursoId = $this->curso('curso-aula-completo');
+        $moduloId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare('INSERT INTO curso_modulos (id, curso_id, titulo, orden) VALUES (?, ?, ?, ?)')
+            ->execute([$moduloId, $cursoId, 'Módulo', 0]);
+        $leccionId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare('INSERT INTO curso_lecciones (id, modulo_id, titulo, orden) VALUES (?, ?, ?, ?)')
+            ->execute([$leccionId, $moduloId, 'Lección', 0]);
+
+        $compradorId = $this->compradores->crear('Ana', 'Gómez', 'CC', '1010101010', '3001234567', 'ana-aula-comp@ejemplo.com', 'clave123');
+        $compraId = $this->compras->crear($cursoId, 'Ana', 'ana-aula-comp@ejemplo.com', 250000);
+        $this->compras->marcarPagada($compraId);
+        $this->compras->vincularComprador($compraId, $compradorId);
+
+        $comprador = $this->compradores->porId($compradorId);
+        $_COOKIE[AccesoControlador::COOKIE] = $this->auth->abrirSesion($comprador, null, null);
+
+        $this->controlador->leccion($this->peticion(), 'curso-aula-completo', $leccionId);
+
+        $r = $this->controlador->aula($this->peticion(), 'curso-aula-completo');
+
+        self::assertStringContainsString('Descargar certificado', $r->cuerpo);
+        self::assertStringContainsString('/mis-cursos/curso-aula-completo/certificado', $r->cuerpo);
+
+        unset($_COOKIE[AccesoControlador::COOKIE]);
+    }
+
+    #[Test]
     public function verUnaLeccionDePreviewSinHaberCompradoNoRegistraProgreso(): void
     {
         $cursoId = $this->curso('curso-preview-sin-progreso');

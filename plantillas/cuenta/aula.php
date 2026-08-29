@@ -7,6 +7,8 @@ use App\Soporte\Vista;
 /**
  * @var array<string,mixed> $curso
  * @var list<array{id:string,titulo:string,lecciones:list<array<string,mixed>>}> $modulos
+ * @var array{vistas:int,total:int} $progreso
+ * @var bool $completo
  */
 
 $e = Vista::e(...);
@@ -31,6 +33,14 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
 
 <main class="mx-auto max-w-3xl px-5 py-12 md:px-7">
     <h1 class="titular-seccion"><?= $e((string) $curso['titulo']) ?></h1>
+
+    <?php if ($completo): ?>
+    <a href="/mis-cursos/<?= $e((string) $curso['slug']) ?>/certificado" class="boton-diagnostico-global mt-4 inline-block">
+        Descargar certificado
+    </a>
+    <?php else: ?>
+    <p class="mt-2 text-sm text-acero"><?= $e((string) $progreso['vistas']) ?> de <?= $e((string) $progreso['total']) ?> lecciones vistas</p>
+    <?php endif; ?>
 
     <?php foreach ($modulos as $modulo): ?>
     <section class="doble-bisel mt-6 p-4">
