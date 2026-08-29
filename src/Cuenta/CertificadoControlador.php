@@ -40,12 +40,19 @@ final class CertificadoControlador
             return new Respuesta('', 302, ['Location' => '/mis-cursos/' . $slug]);
         }
 
-        $bytes = $this->pdf->generar(
-            $comprador->id,
-            (string) $curso['titulo'],
-            (string) $certificado['codigo_verificacion'],
-            substr((string) $certificado['emitido_en'], 0, 10),
-        );
+        try {
+            $bytes = $this->pdf->generar(
+                $comprador->id,
+                (string) $curso['titulo'],
+                (string) $certificado['codigo_verificacion'],
+                substr((string) $certificado['emitido_en'], 0, 10),
+            );
+        } catch (\Throwable) {
+            return Respuesta::texto(
+                'No se pudo generar el certificado en este momento. Vuelve a intentarlo en unos minutos.',
+                500,
+            );
+        }
 
         return Respuesta::archivo($bytes, 'certificado-' . $slug . '.pdf', 'application/pdf');
     }
