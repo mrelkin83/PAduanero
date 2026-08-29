@@ -7,11 +7,11 @@ use App\Soporte\Vista;
 /**
  * Política de tratamiento de datos personales — `/privacidad`.
  *
- * ⚠ PENDIENTE DE APROBACIÓN DE PEDRO. Este texto es un borrador de trabajo:
- * es contenido público que lleva la firma profesional del abogado, y el
- * CLAUDE.md exige su revisión antes de desplegar. Antes de producción falta
- * además completar la identificación del responsable (nombre completo y
- * documento o NIT), que solo Pedro puede confirmar.
+ * Copy aprobado por Pedro (2026-08-29), incluida la sección de cursos
+ * agregada ese mismo día. Sigue abierta la identificación completa del
+ * responsable (nombre completo y documento o NIT) en la sección 1 — hoy
+ * solo dice «el abogado titular de este despacho («Pedro»)» — porque solo
+ * él puede confirmar ese dato; no bloquea lo ya aprobado.
  *
  * Sobre la regla 2 del CLAUDE.md («la página nunca cita normas con número»):
  * esa regla protege al visitante de recibir lo que parezca asesoría. Esta
