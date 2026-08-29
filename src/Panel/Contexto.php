@@ -49,4 +49,16 @@ final class Contexto
 
         return is_string($valor) ? trim($valor) : $porDefecto;
     }
+
+    /**
+     * Entrada cruda de $_FILES para ese campo, o [] si no se envió nada.
+     *
+     * @return array{name?:string,type?:string,tmp_name?:string,error?:int,size?:int}
+     */
+    public function archivo(string $nombre): array
+    {
+        $valor = $this->peticion->archivos[$nombre] ?? [];
+
+        return is_array($valor) ? $valor : [];
+    }
 }

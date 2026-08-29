@@ -11,6 +11,7 @@ final readonly class Peticion
      * @param array<string,mixed>        $formulario
      * @param array<string,string>       $cabeceras
      * @param array<string,string>       $parametros  capturados de la ruta
+     * @param array<string,mixed>        $archivos    forma cruda de $_FILES
      */
     public function __construct(
         public string $metodo,
@@ -21,6 +22,7 @@ final readonly class Peticion
         public string $cuerpoCrudo = '',
         public array $parametros = [],
         public string $ip = '',
+        public array $archivos = [],
     ) {
     }
 
@@ -42,6 +44,7 @@ final readonly class Peticion
             cabeceras: self::cabeceras(),
             cuerpoCrudo: $cuerpo,
             ip: (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
+            archivos: $_FILES,
         );
     }
 
@@ -56,6 +59,7 @@ final readonly class Peticion
             $this->cuerpoCrudo,
             $parametros,
             $this->ip,
+            $this->archivos,
         );
     }
 
