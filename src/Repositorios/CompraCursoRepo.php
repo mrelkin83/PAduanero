@@ -109,7 +109,9 @@ final class CompraCursoRepo
     {
         $stmt = $this->bd->pdo()->prepare(
             "SELECT id FROM compras_curso
-              WHERE comprador_id = ? AND curso_id = ? AND estado = 'pagada'"
+              WHERE comprador_id = ? AND curso_id = ? AND estado = 'pagada'
+              ORDER BY pagado_en, id
+              LIMIT 1"
         );
         $stmt->execute([$compradorId, $cursoId]);
         $id = $stmt->fetchColumn();
