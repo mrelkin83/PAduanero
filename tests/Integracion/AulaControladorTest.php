@@ -181,4 +181,54 @@ final class AulaControladorTest extends CasoBaseBd
 
         self::assertSame(404, $r->estado);
     }
+
+    #[Test]
+    public function descargarUnMaterialSinAccesoRedirige(): void
+    {
+        $cursoId = $this->curso('curso-material-sin-acceso');
+        $leccionId = $this->leccionEnCurso($cursoId, preview: false);
+        $materiales = new \App\Repositorios\CursoMaterialRepo($this->bd);
+        $materialId = $materiales->crear($leccionId, 'Plantilla', 'abc', 'pdf', 10);
+
+        $r = $this->controlador->material($this->peticion(), 'curso-material-sin-acceso', $leccionId, $materialId);
+
+        self::assertSame(302, $r->estado);
+        self::assertSame('/entrar', $r->cabeceras['Location']);
+    }
+
+    #[Test]
+    public function descargarUnMaterialConAccesoDevuelveElArchivo(): void
+    {
+        $cursoId = $this->curso('curso-material-con-acceso');
+        $leccionId = $this->leccionEnCurso($cursoId, preview: true);
+        $carpeta = dirname(__DIR__, 2) . '/storage/cursos/materiales/' . $leccionId;
+        @mkdir($carpeta, 0775, true);
+        file_put_contents($carpeta . '/abc123.pdf', '%PDF-1.4 contenido');
+
+        $materiales = new \App\Repositorios\CursoMaterialRepo($this->bd);
+        $materialId = $materiales->crear($leccionId, 'Plantilla', 'abc123', 'pdf', 19);
+
+        $r = $this->controlador->material($this->peticion(), 'curso-material-con-acceso', $leccionId, $materialId);
+
+        self::assertSame(200, $r->estado);
+        self::assertSame('%PDF-1.4 contenido', $r->cuerpo);
+        self::assertStringContainsString('Plantilla.pdf', $r->cabeceras['Content-Disposition']);
+
+        unlink($carpeta . '/abc123.pdf');
+        rmdir($carpeta);
+    }
+
+    #[Test]
+    public function descargarUnMaterialDeOtraLeccionDa404(): void
+    {
+        $cursoId = $this->curso('curso-material-otra-leccion');
+        $leccionId = $this->leccionEnCurso($cursoId, preview: true);
+        $otraLeccionId = $this->leccionEnCurso($cursoId, preview: true);
+        $materiales = new \App\Repositorios\CursoMaterialRepo($this->bd);
+        $materialId = $materiales->crear($otraLeccionId, 'Plantilla', 'abc', 'pdf', 10);
+
+        $r = $this->controlador->material($this->peticion(), 'curso-material-otra-leccion', $leccionId, $materialId);
+
+        self::assertSame(404, $r->estado);
+    }
 }

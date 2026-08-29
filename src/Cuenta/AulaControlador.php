@@ -71,6 +71,54 @@ final class AulaControlador
         ]);
     }
 
+    private const MIMES_MATERIAL = [
+        'pdf' => 'application/pdf', 'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls' => 'application/vnd.ms-excel',
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'zip' => 'application/zip', 'jpg' => 'image/jpeg', 'png' => 'image/png',
+    ];
+
+    public function material(Peticion $peticion, string $slug, string $leccionId, string $materialId): Respuesta
+    {
+        $curso = $this->cursos->porSlug($slug);
+        if ($curso === null) {
+            return Respuesta::texto('No encontrado.', 404);
+        }
+
+        $leccion = $this->leccionDelCurso($curso['id'], $leccionId);
+        if ($leccion === null) {
+            return Respuesta::texto('No encontrado.', 404);
+        }
+
+        $material = $this->materiales->porId($materialId);
+        if ($material === null || $material['leccion_id'] !== $leccionId) {
+            return Respuesta::texto('No encontrado.', 404);
+        }
+
+        $comprador = $this->compradorActual();
+        if (!$this->acceso->puedeVer($comprador, $leccion, $curso['id'])) {
+            return $comprador === null
+                ? new Respuesta('', 302, ['Location' => '/entrar'])
+                : new Respuesta('', 302, ['Location' => '/mis-cursos']);
+        }
+
+        $ruta = dirname(__DIR__, 2) . '/storage/cursos/materiales/' . $leccionId
+            . '/' . $material['archivo'] . '.' . $material['extension'];
+
+        if (!is_file($ruta)) {
+            return Respuesta::texto('No encontrado.', 404);
+        }
+
+        $mime = self::MIMES_MATERIAL[$material['extension']] ?? 'application/octet-stream';
+
+        return Respuesta::archivo(
+            (string) file_get_contents($ruta),
+            $material['nombre'] . '.' . $material['extension'],
+            $mime,
+        );
+    }
+
     /** @return array<string,mixed>|null */
     private function leccionDelCurso(string $cursoId, string $leccionId): ?array
     {
