@@ -50,6 +50,18 @@ final class CertificadoControlador
         return Respuesta::archivo($bytes, 'certificado-' . $slug . '.pdf', 'application/pdf');
     }
 
+    public function verificarMostrar(Peticion $peticion): Respuesta
+    {
+        return Respuesta::vista('cuenta/certificado_verificar', []);
+    }
+
+    public function verificarBuscar(Peticion $peticion, string $codigo): Respuesta
+    {
+        return Respuesta::vista('cuenta/certificado_resultado', [
+            'certificado' => $this->certificados->porCodigo($codigo),
+        ]);
+    }
+
     /** @return \App\Modelos\Comprador|null */
     private function compradorActual(): ?\App\Modelos\Comprador
     {

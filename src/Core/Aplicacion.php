@@ -494,6 +494,26 @@ final class Aplicacion
             ))->descargar($p, (string) $p->parametros['slug']);
         });
 
+        $this->router->get('/certificados/verificar', function (Peticion $p): Respuesta {
+            return (new \App\Cuenta\CertificadoControlador(
+                $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),
+                $this->contenedor->obtener(\App\Servicios\Cursos::class),
+                $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
+                $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
+                new \App\Cuenta\CertificadoPdf($this->contenedor->obtener(\App\Repositorios\CompradorRepo::class)),
+            ))->verificarMostrar($p);
+        });
+
+        $this->router->get('/certificados/verificar/{codigo}', function (Peticion $p): Respuesta {
+            return (new \App\Cuenta\CertificadoControlador(
+                $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),
+                $this->contenedor->obtener(\App\Servicios\Cursos::class),
+                $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
+                $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
+                new \App\Cuenta\CertificadoPdf($this->contenedor->obtener(\App\Repositorios\CompradorRepo::class)),
+            ))->verificarBuscar($p, (string) $p->parametros['codigo']);
+        });
+
         // Las páginas legales. Las exige el propio proyecto (el motor de
         // WhatsApp trata datos personales) y además Google, que solo publica
         // la app OAuth del calendario si hay una política enlazada.

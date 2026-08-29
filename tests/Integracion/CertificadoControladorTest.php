@@ -127,4 +127,33 @@ final class CertificadoControladorTest extends CasoBaseBd
 
         unset($_COOKIE[AccesoControlador::COOKIE]);
     }
+
+    #[Test]
+    public function verificarConUnCodigoRealMuestraLosDatos(): void
+    {
+        $cursoId = $this->curso('curso-verificar-real');
+        $compradorId = $this->compradores->crear('Ana', 'Gómez', 'CC', '1010101010', '3001234567', 'ana-verif@ejemplo.com', 'clave123');
+        $compraId = $this->compras->crear($cursoId, 'Ana', 'ana-verif@ejemplo.com', 250000);
+        $this->compras->marcarPagada($compraId);
+        $this->compras->vincularComprador($compraId, $compradorId);
+        $this->certificados->crear($compraId, 'PA-VERIFICA1');
+
+        $r = $this->controlador->verificarBuscar(new Peticion(metodo: 'GET', ruta: '/certificados/verificar/PA-VERIFICA1'), 'PA-VERIFICA1');
+
+        self::assertSame(200, $r->estado);
+        self::assertStringContainsString('Ana', $r->cuerpo);
+        self::assertStringContainsString('Gómez', $r->cuerpo);
+        self::assertStringContainsString('Curso certificado descarga', $r->cuerpo);
+        self::assertStringNotContainsString('1010101010', $r->cuerpo);
+    }
+
+    #[Test]
+    public function verificarConUnCodigoInventadoDaElMismoMensajeNeutral(): void
+    {
+        $r1 = $this->controlador->verificarBuscar(new Peticion(metodo: 'GET', ruta: '/certificados/verificar/PA-NOEXISTE'), 'PA-NOEXISTE');
+        $r2 = $this->controlador->verificarBuscar(new Peticion(metodo: 'GET', ruta: '/certificados/verificar/PA-OTROMAS'), 'PA-OTROMAS');
+
+        self::assertSame($r1->estado, $r2->estado);
+        self::assertSame($r1->cuerpo, $r2->cuerpo);
+    }
 }
