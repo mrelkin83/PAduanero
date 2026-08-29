@@ -58,6 +58,7 @@ final class AulaControladorTest extends CasoBaseBd
             $this->bd,
             new BunnyStream('', ''),
             new CursoMaterialRepo($this->bd),
+            new \App\Cuenta\ProgresoCurso($this->bd, new \App\Repositorios\CertificadoRepo($this->bd)),
         );
     }
 
@@ -230,5 +231,52 @@ final class AulaControladorTest extends CasoBaseBd
         $r = $this->controlador->material($this->peticion(), 'curso-material-otra-leccion', $leccionId, $materialId);
 
         self::assertSame(404, $r->estado);
+    }
+
+    #[Test]
+    public function verUnaLeccionRegistraElProgresoDelCompradorQuePago(): void
+    {
+        $cursoId = $this->curso('curso-progreso-leccion');
+        $moduloId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare('INSERT INTO curso_modulos (id, curso_id, titulo, orden) VALUES (?, ?, ?, ?)')
+            ->execute([$moduloId, $cursoId, 'Módulo', 0]);
+        $leccionId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare('INSERT INTO curso_lecciones (id, modulo_id, titulo, orden) VALUES (?, ?, ?, ?)')
+            ->execute([$leccionId, $moduloId, 'Lección', 0]);
+
+        $compradorId = $this->compradores->crear('Ana', 'Gómez', 'CC', '1010101010', '3001234567', 'ana-vp@ejemplo.com', 'clave123');
+        $compraId = $this->compras->crear($cursoId, 'Ana', 'ana-vp@ejemplo.com', 250000);
+        $this->compras->marcarPagada($compraId);
+        $this->compras->vincularComprador($compraId, $compradorId);
+
+        $comprador = $this->compradores->porId($compradorId);
+        $_COOKIE[AccesoControlador::COOKIE] = $this->auth->abrirSesion($comprador, null, null);
+
+        $this->controlador->leccion($this->peticion(), 'curso-progreso-leccion', $leccionId);
+
+        $total = (int) $this->bd->pdo()->query(
+            "SELECT COUNT(*) FROM curso_progreso WHERE comprador_id = '{$compradorId}' AND leccion_id = '{$leccionId}'"
+        )->fetchColumn();
+        self::assertSame(1, $total);
+
+        unset($_COOKIE[AccesoControlador::COOKIE]);
+    }
+
+    #[Test]
+    public function verUnaLeccionDePreviewSinHaberCompradoNoRegistraProgreso(): void
+    {
+        $cursoId = $this->curso('curso-preview-sin-progreso');
+        $moduloId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare('INSERT INTO curso_modulos (id, curso_id, titulo, orden) VALUES (?, ?, ?, ?)')
+            ->execute([$moduloId, $cursoId, 'Módulo', 0]);
+        $leccionId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO curso_lecciones (id, modulo_id, titulo, orden, vista_previa_gratis) VALUES (?, ?, ?, ?, 1)'
+        )->execute([$leccionId, $moduloId, 'Lección preview', 0]);
+
+        $this->controlador->leccion($this->peticion(), 'curso-preview-sin-progreso', $leccionId);
+
+        $total = (int) $this->bd->pdo()->query('SELECT COUNT(*) FROM curso_progreso')->fetchColumn();
+        self::assertSame(0, $total);
     }
 }

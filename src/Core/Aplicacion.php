@@ -224,6 +224,13 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Repositorios\CertificadoRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\CertificadoRepo => new \App\Repositorios\CertificadoRepo(
+                $c->obtener(BD::class),
+            ),
+        );
+
+        $this->contenedor->registrar(
             \App\Repositorios\CompradorRepo::class,
             static fn (Contenedor $c): \App\Repositorios\CompradorRepo => new \App\Repositorios\CompradorRepo(
                 $c->obtener(BD::class),
@@ -433,6 +440,10 @@ final class Aplicacion
                 $this->contenedor->obtener(BD::class),
                 \App\Soporte\BunnyStream::desdeEntorno(),
                 $this->contenedor->obtener(\App\Repositorios\CursoMaterialRepo::class),
+                new \App\Cuenta\ProgresoCurso(
+                    $this->contenedor->obtener(BD::class),
+                    $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
+                ),
             ))->aula($p, (string) $p->parametros['slug']);
         });
 
@@ -445,6 +456,10 @@ final class Aplicacion
                 $this->contenedor->obtener(BD::class),
                 \App\Soporte\BunnyStream::desdeEntorno(),
                 $this->contenedor->obtener(\App\Repositorios\CursoMaterialRepo::class),
+                new \App\Cuenta\ProgresoCurso(
+                    $this->contenedor->obtener(BD::class),
+                    $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
+                ),
             ))->leccion($p, (string) $p->parametros['slug'], (string) $p->parametros['leccionId']);
         });
 
@@ -457,6 +472,10 @@ final class Aplicacion
                 $this->contenedor->obtener(BD::class),
                 \App\Soporte\BunnyStream::desdeEntorno(),
                 $this->contenedor->obtener(\App\Repositorios\CursoMaterialRepo::class),
+                new \App\Cuenta\ProgresoCurso(
+                    $this->contenedor->obtener(BD::class),
+                    $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
+                ),
             ))->material(
                 $p,
                 (string) $p->parametros['slug'],

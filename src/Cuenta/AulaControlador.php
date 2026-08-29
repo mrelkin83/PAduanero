@@ -21,6 +21,7 @@ final class AulaControlador
         private readonly BD $bd,
         private readonly \App\Soporte\BunnyStream $bunny,
         private readonly \App\Repositorios\CursoMaterialRepo $materiales,
+        private readonly ProgresoCurso $progreso,
     ) {
     }
 
@@ -59,6 +60,13 @@ final class AulaControlador
             return $comprador === null
                 ? new Respuesta('', 302, ['Location' => '/entrar'])
                 : new Respuesta('', 302, ['Location' => '/mis-cursos']);
+        }
+
+        if ($comprador !== null) {
+            $compraId = $this->compras->idDePagadaPorComprador($comprador->id, $curso['id']);
+            if ($compraId !== null) {
+                $this->progreso->registrarVista($comprador->id, $leccionId, $curso['id'], $compraId);
+            }
         }
 
         return Respuesta::vista('cuenta/leccion', [
