@@ -31,7 +31,7 @@ final class ComprasControladorTest extends CasoBaseBd
             sys_get_temp_dir() . "/pa-compras-sent-{$sufijo}",
             sys_get_temp_dir() . "/pa-compras-cfg-{$sufijo}.json",
         );
-        $this->cursosServicio = new Cursos($this->bd, $config, self::URL);
+        $this->cursosServicio = new Cursos($this->bd, $config, self::URL, new \App\Soporte\BunnyStream('', ''));
         $this->compras = new CompraCursoRepo($this->bd);
         $this->wompi = new PaymentAdapterFalso();
     }

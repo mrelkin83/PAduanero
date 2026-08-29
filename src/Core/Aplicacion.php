@@ -183,6 +183,7 @@ final class Aplicacion
                 $c->obtener(BD::class),
                 $c->obtener(Config::class),
                 $urlBase,
+                \App\Soporte\BunnyStream::desdeEntorno(),
             ),
         );
 

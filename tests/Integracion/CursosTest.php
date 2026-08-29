@@ -26,7 +26,7 @@ final class CursosTest extends CasoBaseBd
             sys_get_temp_dir() . "/pa-cursos-sent-{$sufijo}",
             sys_get_temp_dir() . "/pa-cursos-cfg-{$sufijo}.json",
         );
-        $this->cursos = new Cursos($this->bd, $this->config, self::URL);
+        $this->cursos = new Cursos($this->bd, $this->config, self::URL, new \App\Soporte\BunnyStream('', ''));
     }
 
     private function categoria(string $nombre = 'Aduanero'): string
@@ -168,5 +168,28 @@ final class CursosTest extends CasoBaseBd
 
         self::assertStringContainsString('noindex', $htmlBorrador);
         self::assertStringNotContainsString('noindex', $htmlPublicado);
+    }
+
+    #[Test]
+    public function laFichaIncrustaElVideoDeUnaLeccionDePreview(): void
+    {
+        $catId = $this->categoria();
+        $cursoId = $this->curso($catId, ['slug' => 'curso-con-preview-video', 'estado' => 'publicado']);
+        $moduloId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare('INSERT INTO curso_modulos (id, curso_id, titulo, orden) VALUES (?, ?, ?, ?)')
+            ->execute([$moduloId, $cursoId, 'Módulo', 0]);
+        $this->bd->pdo()->prepare(
+            'INSERT INTO curso_lecciones (id, modulo_id, titulo, orden, vista_previa_gratis, video_bunny_id)
+             VALUES (UUID(), ?, ?, ?, 1, ?)'
+        )->execute([$moduloId, 'Lección de muestra', 0, 'video-preview-1']);
+
+        $cursosConBunny = new Cursos(
+            $this->bd, $this->config, self::URL,
+            new \App\Soporte\BunnyStream('12345', 'clave-secreta'),
+        );
+
+        $r = $cursosConBunny->ficha('curso-con-preview-video');
+
+        self::assertStringContainsString('iframe.mediadelivery.net', $r->cuerpo);
     }
 }

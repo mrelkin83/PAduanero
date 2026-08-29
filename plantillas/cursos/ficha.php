@@ -7,6 +7,7 @@ use App\Soporte\Vista;
 /**
  * @var array<string,mixed> $curso
  * @var list<array{titulo:string,lecciones:list<array<string,mixed>>}> $modulos
+ * @var string|null $urlVideoPreview
  * @var array{titulo:string,descripcion:string,indexable:bool,url:string} $meta
  */
 
@@ -55,6 +56,13 @@ $precio = '$' . number_format((int) $curso['precio_cop'], 0, ',', '.') . ' COP';
     <p class="text-xs uppercase tracking-widest text-acero"><?= $e((string) $curso['categoria_nombre']) ?></p>
     <h1 class="titular-seccion mt-2"><?= $e((string) $curso['titulo']) ?></h1>
     <p class="mt-4 text-acero"><?= $e((string) $curso['descripcion']) ?></p>
+
+    <?php if ($urlVideoPreview !== null): ?>
+    <div class="mt-6 aspect-video">
+        <iframe src="<?= $e($urlVideoPreview) ?>" loading="lazy" allow="autoplay; fullscreen"
+                class="h-full w-full rounded" allowfullscreen></iframe>
+    </div>
+    <?php endif; ?>
 
     <?php if ($curso['lo_que_aprendera'] !== []): ?>
     <section class="mt-8">

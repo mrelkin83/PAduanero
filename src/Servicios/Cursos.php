@@ -22,6 +22,7 @@ final class Cursos
         private readonly BD $bd,
         private readonly Config $config,
         private readonly string $urlBase,
+        private readonly \App\Soporte\BunnyStream $bunny,
     ) {
     }
 
@@ -57,9 +58,12 @@ final class Cursos
             return Respuesta::texto('Curso no encontrado.', 404);
         }
 
+        $modulos = $this->temario($curso['id']);
+
         return Respuesta::vista('cursos/ficha', [
             'curso' => $curso,
-            'modulos' => $this->temario($curso['id']),
+            'modulos' => $modulos,
+            'urlVideoPreview' => $this->urlVideoPreview($modulos),
             'meta' => $this->meta(
                 $curso['titulo'],
                 $curso['resumen'],
@@ -70,6 +74,24 @@ final class Cursos
                 $curso['estado'] === 'borrador' ? false : null,
             ),
         ]);
+    }
+
+    /** @param list<array{titulo:string,lecciones:list<array<string,mixed>>}> $modulos */
+    private function urlVideoPreview(array $modulos): ?string
+    {
+        if (!$this->bunny->disponible()) {
+            return null;
+        }
+
+        foreach ($modulos as $modulo) {
+            foreach ($modulo['lecciones'] as $leccion) {
+                if ((int) $leccion['vista_previa_gratis'] === 1 && $leccion['video_bunny_id'] !== null) {
+                    return $this->bunny->urlEmbed((string) $leccion['video_bunny_id']);
+                }
+            }
+        }
+
+        return null;
     }
 
     /** @return array<string,mixed>|null */
@@ -109,7 +131,7 @@ final class Cursos
         $idsModulos = array_column($modulos, 'id');
 
         $stmt = $this->bd->pdo()->prepare(
-            "SELECT modulo_id, titulo, duracion_min, orden, vista_previa_gratis
+            "SELECT modulo_id, titulo, duracion_min, orden, vista_previa_gratis, video_bunny_id
                FROM curso_lecciones WHERE modulo_id IN ({$marcas}) ORDER BY orden"
         );
         $stmt->execute($idsModulos);

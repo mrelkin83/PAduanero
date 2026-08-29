@@ -48,7 +48,7 @@ final class AulaControladorTest extends CasoBaseBd
             sys_get_temp_dir() . "/pa-aula-sent-{$sufijo}",
             sys_get_temp_dir() . "/pa-aula-cfg-{$sufijo}.json",
         );
-        $cursos = new Cursos($this->bd, $config, self::URL);
+        $cursos = new Cursos($this->bd, $config, self::URL, new BunnyStream('', ''));
 
         $this->controlador = new AulaControlador(
             $this->auth,
