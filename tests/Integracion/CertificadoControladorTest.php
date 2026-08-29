@@ -156,4 +156,35 @@ final class CertificadoControladorTest extends CasoBaseBd
         self::assertSame($r1->estado, $r2->estado);
         self::assertSame($r1->cuerpo, $r2->cuerpo);
     }
+
+    #[Test]
+    public function verificarMostrarConCodigoEnLaQuerystringFuncionaSinJavascript(): void
+    {
+        $cursoId = $this->curso('curso-verificar-sin-js');
+        $compradorId = $this->compradores->crear('Ana', 'Gómez', 'CC', '1010101010', '3001234567', 'ana-sinjs@ejemplo.com', 'clave123');
+        $compraId = $this->compras->crear($cursoId, 'Ana', 'ana-sinjs@ejemplo.com', 250000);
+        $this->compras->marcarPagada($compraId);
+        $this->compras->vincularComprador($compraId, $compradorId);
+        $this->certificados->crear($compraId, 'PA-SINJS0001');
+
+        $peticion = new Peticion(
+            metodo: 'GET',
+            ruta: '/certificados/verificar',
+            consulta: ['codigo' => 'PA-SINJS0001'],
+        );
+
+        $r = $this->controlador->verificarMostrar($peticion);
+
+        self::assertSame(200, $r->estado);
+        self::assertStringContainsString('Ana', $r->cuerpo);
+        self::assertStringContainsString('Curso certificado descarga', $r->cuerpo);
+    }
+
+    #[Test]
+    public function verificarMostrarSinCodigoMuestraElFormularioEnBlanco(): void
+    {
+        $r = $this->controlador->verificarMostrar(new Peticion(metodo: 'GET', ruta: '/certificados/verificar'));
+
+        self::assertSame(200, $r->estado);
+    }
 }

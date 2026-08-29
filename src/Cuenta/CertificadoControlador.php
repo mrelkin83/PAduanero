@@ -52,7 +52,14 @@ final class CertificadoControlador
 
     public function verificarMostrar(Peticion $peticion): Respuesta
     {
-        return Respuesta::vista('cuenta/certificado_verificar', []);
+        $codigo = trim((string) ($peticion->consulta['codigo'] ?? ''));
+        if ($codigo === '') {
+            return Respuesta::vista('cuenta/certificado_verificar', []);
+        }
+
+        return Respuesta::vista('cuenta/certificado_resultado', [
+            'certificado' => $this->certificados->porCodigo($codigo),
+        ]);
     }
 
     public function verificarBuscar(Peticion $peticion, string $codigo): Respuesta
