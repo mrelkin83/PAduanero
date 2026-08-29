@@ -105,6 +105,18 @@ final class CompraCursoRepo
         return (bool) $stmt->fetchColumn();
     }
 
+    public function idDePagadaPorComprador(string $compradorId, string $cursoId): ?string
+    {
+        $stmt = $this->bd->pdo()->prepare(
+            "SELECT id FROM compras_curso
+              WHERE comprador_id = ? AND curso_id = ? AND estado = 'pagada'"
+        );
+        $stmt->execute([$compradorId, $cursoId]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (string) $id;
+    }
+
     /** @return list<array<string,mixed>> compras pagadas de un comprador, con datos del curso */
     public function pagadasDeComprador(string $compradorId): array
     {

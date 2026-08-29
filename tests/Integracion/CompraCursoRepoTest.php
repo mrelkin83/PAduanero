@@ -180,4 +180,42 @@ final class CompraCursoRepoTest extends CasoBaseBd
 
         self::assertFalse($this->repo->tienePagada($compradorId, $cursoId));
     }
+
+    #[Test]
+    public function idDePagadaPorCompradorDevuelveElIdSoloSiEstaPagada(): void
+    {
+        $cursoId = $this->curso();
+        $compradorId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO compradores (id, nombres, apellidos, tipo_documento, numero_documento_cifrado, celular, correo, password_hash)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$compradorId, 'Ana', 'Gómez', 'CC', 'x', '300', 'ana@ejemplo.com', 'hash']);
+
+        $compraId = $this->repo->crear($cursoId, 'Ana', 'ana@ejemplo.com', 250000);
+        $this->repo->vincularComprador($compraId, $compradorId);
+
+        self::assertNull($this->repo->idDePagadaPorComprador($compradorId, $cursoId));
+
+        $this->repo->marcarPagada($compraId);
+
+        self::assertSame($compraId, $this->repo->idDePagadaPorComprador($compradorId, $cursoId));
+    }
+
+    #[Test]
+    public function idDePagadaPorCompradorEsNullParaOtroComprador(): void
+    {
+        $cursoId = $this->curso();
+        $compradorId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $otroCompradorId = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
+        $this->bd->pdo()->prepare(
+            'INSERT INTO compradores (id, nombres, apellidos, tipo_documento, numero_documento_cifrado, celular, correo, password_hash)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$compradorId, 'Ana', 'Gómez', 'CC', 'x', '300', 'ana@ejemplo.com', 'hash']);
+
+        $compraId = $this->repo->crear($cursoId, 'Ana', 'ana@ejemplo.com', 250000);
+        $this->repo->marcarPagada($compraId);
+        $this->repo->vincularComprador($compraId, $compradorId);
+
+        self::assertNull($this->repo->idDePagadaPorComprador($otroCompradorId, $cursoId));
+    }
 }
