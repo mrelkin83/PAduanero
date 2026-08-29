@@ -27,7 +27,7 @@ $contenido = static function () use ($e, $ctx, $compras): void {
             <td><?= $e((string) $c['nombre']) ?></td>
             <td><?= $e((string) $c['correo']) ?></td>
             <td class="font-mono">$<?= $e(number_format((int) $c['precio_cop'], 0, ',', '.')) ?></td>
-            <td><?= (string) $c['estado'] ?></td>
+            <td><?= $e((string) $c['estado']) ?></td>
             <td class="font-mono text-xs"><?= $e((string) ($c['codigo_verificacion'] ?? '—')) ?></td>
             <td>
                 <?php if ($editable && $c['estado'] !== 'pagada'): ?>
