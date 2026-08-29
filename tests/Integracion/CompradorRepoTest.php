@@ -74,4 +74,18 @@ final class CompradorRepoTest extends CasoBaseBd
         self::assertTrue($this->repo->existeCorreo('ana5@ejemplo.com'));
         self::assertFalse($this->repo->existeCorreo('nadie@ejemplo.com'));
     }
+
+    #[Test]
+    public function numeroDocumentoDescifraElValorGuardado(): void
+    {
+        $id = $this->repo->crear('Ana', 'Gómez', 'CC', '1010101010', '3001234567', 'ana-doc@ejemplo.com', 'clave123');
+
+        self::assertSame('1010101010', $this->repo->numeroDocumento($id));
+    }
+
+    #[Test]
+    public function numeroDocumentoEsNullParaUnCompradorQueNoExiste(): void
+    {
+        self::assertNull($this->repo->numeroDocumento((string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn()));
+    }
 }

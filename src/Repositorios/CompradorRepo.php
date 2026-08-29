@@ -76,6 +76,15 @@ final class CompradorRepo
         return $id;
     }
 
+    public function numeroDocumento(string $compradorId): ?string
+    {
+        $stmt = $this->bd->pdo()->prepare('SELECT numero_documento_cifrado FROM compradores WHERE id = ?');
+        $stmt->execute([$compradorId]);
+        $blob = $stmt->fetchColumn();
+
+        return $blob === false ? null : $this->cifrado->descifrar((string) $blob);
+    }
+
     /**
      * Mismo cuidado contra enumeración que `UsuarioRepo::verificarPassword()`:
      * cuando el correo no existe, se gasta igual el tiempo de un
