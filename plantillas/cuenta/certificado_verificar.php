@@ -22,7 +22,8 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
     <p class="mt-4 text-acero">Escriba el código de verificación impreso en el certificado.</p>
 
     <form method="get" action="" class="mt-6" onsubmit="event.preventDefault(); window.location = '/certificados/verificar/' + encodeURIComponent(this.codigo.value.trim());">
-        <input name="codigo" placeholder="PA-XXXXXXXX" class="campo" required>
+        <input name="codigo" placeholder="PA-XXXXXXXX" required
+               class="mt-2 w-full rounded border border-linea bg-white/5 p-3 text-papel">
         <button type="submit" class="boton-diagnostico-global mt-3">Verificar</button>
     </form>
 </main>
