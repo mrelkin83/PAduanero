@@ -104,8 +104,10 @@ PHP 8.2+ · MySQL 8 · TailwindCSS 4 · JavaScript sin dependencias ·
 verificación** (`bin/auditar-landing.mjs`, `bin/capturar.mjs`). No hay
 framework de front ni JavaScript de build.
 
-Composer trae únicamente PHPUnit en `require-dev`. No hay dependencias de
-producción: todo lo que usa este sistema viene con PHP.
+Composer trae PHPUnit en `require-dev` y una única dependencia de
+producción: `dompdf/dompdf`, para generar el PDF del certificado de
+finalización (decisión del PO, 2026-08-29 — ver
+`docs/superpowers/specs/2026-08-29-certificado-cursos-design.md` §7).
 
 ---
 
