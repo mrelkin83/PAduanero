@@ -71,7 +71,8 @@ final class CertificadoPdf
         <p class="pie">
             {$e($tipoDocumento)} {$e($numeroDocumento)}<br>
             Emitido el {$e($emitidoEn)}<br>
-            Código de verificación: {$e($codigo)}
+            Código de verificación: {$e($codigo)}<br>
+            Verifique este certificado en pedroabogadoaduanero.com/certificados/verificar/{$e($codigo)}
         </p>
         </body></html>
         HTML;
