@@ -101,6 +101,22 @@ final class PanelCursosControlador extends ControladorBase
 
         $precio = (int) $precio;
 
+        // Se sube DESPUÉS de las validaciones baratas de arriba: si el
+        // formulario es inválido y se manda de vuelta, no queda un archivo
+        // huérfano en disco por cada intento. Si hay archivo, gana sobre lo
+        // que haya en el campo de texto.
+        $subida = \App\Soporte\SubidaImagen::guardar(
+            $ctx->archivo('imagen_portada_archivo'),
+            dirname(__DIR__, 2) . '/public/img/cursos',
+            $titulo,
+        );
+        if ($subida['error'] !== '') {
+            return $this->redirigirCon($this->rutaEdicion($id), 'error', $subida['error']);
+        }
+        if ($subida['ok']) {
+            $imagen = $subida['nombre'];
+        }
+
         // Mismo guardia que TarifasControlador::guardar(): a $400.000 el
         // curso, un cero de más son cuatro millones. El error es fácil
         // porque la pasarela del sub-proyecto 2 SÍ cobrará en centavos.

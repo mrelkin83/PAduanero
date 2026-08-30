@@ -21,7 +21,7 @@ $contenido = static function () use ($e, $ctx, $curso, $modulos, $categorias, $e
     ?>
     <h2 class="rotulo"><?= $esNuevo ? 'Nuevo curso' : 'Editar curso' ?></h2>
 
-    <form method="post" action="/panel/cursos/guardar" class="tarjeta mt-4 p-4">
+    <form method="post" action="/panel/cursos/guardar" enctype="multipart/form-data" class="tarjeta mt-4 p-4">
         <?= $ctx->csrf->campoOculto() ?>
         <input type="hidden" name="id" value="<?= $e((string) ($curso['id'] ?? '')) ?>">
 
@@ -87,9 +87,21 @@ $contenido = static function () use ($e, $ctx, $curso, $modulos, $categorias, $e
             </div>
 
             <div class="sm:col-span-2">
-                <label class="rotulo">Imagen de portada (nombre de archivo en public/img/cursos/)</label>
+                <label class="rotulo">Imagen de portada</label>
+                <?php if (!empty($curso['imagen_portada'])): ?>
+                    <img src="/img/cursos/<?= $e((string) $curso['imagen_portada']) ?>" alt=""
+                         class="mt-1 h-24 w-auto rounded border">
+                <?php endif; ?>
                 <input name="imagen_portada" value="<?= $e((string) ($curso['imagen_portada'] ?? '')) ?>"
+                       placeholder="nombre de archivo en public/img/cursos/"
                        class="campo mt-1" <?= $editable ? '' : 'disabled' ?>>
+                <?php if ($editable): ?>
+                    <input type="file" name="imagen_portada_archivo" accept="image/jpeg,image/png,image/webp"
+                           class="campo mt-1">
+                    <p class="mt-1 text-xs text-acero">
+                        Subir un archivo aquí reemplaza el nombre de arriba al guardar. JPG, PNG o WebP, máx. 5 MB.
+                    </p>
+                <?php endif; ?>
             </div>
         </div>
 
