@@ -182,6 +182,7 @@ final class Panel
             'POST /whatsapp/qr' => $modulos['whatsapp']->conectarQr($ctx),
             'POST /whatsapp/qr-codigo' => $modulos['whatsapp']->conectarCodigo($ctx),
             'POST /whatsapp/desvincular' => $modulos['whatsapp']->desvincular($ctx),
+            'POST /whatsapp/conmutar' => $modulos['whatsapp']->conmutar($ctx),
             'POST /whatsapp/cobro' => $modulos['whatsapp']->guardarCobro($ctx),
             'POST /whatsapp/wompi' => $modulos['whatsapp']->guardarWompi($ctx),
             'POST /whatsapp/horario' => $modulos['whatsapp']->guardarHorario($ctx),
@@ -251,6 +252,7 @@ final class Panel
                 $this->c->obtener(\App\Soporte\Cifrado::class),
                 $this->c->obtener(Logger::class),
                 $this->c->obtener(AuditoriaRepo::class),
+                $this->c->obtener(\App\Servicios\Config::class),
             ),
         ];
     }

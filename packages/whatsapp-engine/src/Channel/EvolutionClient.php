@@ -54,6 +54,25 @@ class EvolutionClient implements ChannelInterface
         return new self($url, $cfg['evolution_instancia'], $apikey);
     }
 
+    /**
+     * Como desdeConfig(), pero para una instancia CONCRETA (no la activa de
+     * wa_config). La URL y la API Key son las mismas —un solo servidor
+     * Evolution—; solo cambia el nombre de la instancia. Lo usa el failover
+     * para gestionar la instancia de respaldo sin conmutarla.
+     */
+    public static function desdeConfigCon($db, string $instancia): ?self
+    {
+        $instancia = trim($instancia);
+        if ($instancia === '') return null;
+        $cfg = WaConfig::cargar($db);
+        if (!$cfg) return null;
+        $url    = !empty($cfg['evolution_url']) ? $cfg['evolution_url'] : \ElkinLinan\WhatsappAiEngine\Engine::config()->canalUrlPorDefecto();
+        $apikey = WaConfig::secreto($cfg, 'evolution_apikey');
+        if ($apikey === '') $apikey = \ElkinLinan\WhatsappAiEngine\Engine::config()->canalApikeyPorDefecto();
+        if ($url === '') return null;
+        return new self($url, $instancia, $apikey);
+    }
+
     public function nombre(): string { return 'Evolution API'; }
 
     public function requisitosFaltantes(): array

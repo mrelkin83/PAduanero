@@ -43,7 +43,26 @@ final class WhatsappControlador extends ControladorBase
         private readonly Cifrado $cifrado,
         private readonly Logger $log,
         private readonly AuditoriaRepo $auditoria,
+        private readonly \App\Servicios\Config $config,
     ) {
+    }
+
+    /**
+     * Canal de la instancia PRINCIPAL (la activa) o de la de RESPALDO. El
+     * failover gestiona las dos por separado; para eso hace falta un cliente
+     * apuntado a cada nombre de instancia, no solo a la activa.
+     */
+    private function canalPara(\App\Wa\DbMotor $db, string $cual): ?EvolutionClient
+    {
+        $cfg = WaConfig::cargar($db, true) ?? [];
+        $inst = $cual === 'respaldo'
+            ? trim((string) ($cfg['evolution_instancia_respaldo'] ?? ''))
+            : trim((string) ($cfg['evolution_instancia'] ?? ''));
+        if ($inst === '') {
+            return null;
+        }
+
+        return EvolutionClient::desdeConfigCon($db, $inst);
     }
 
     private function db(): \App\Wa\DbMotor
@@ -86,6 +105,17 @@ final class WhatsappControlador extends ControladorBase
             }
         }
 
+        // Estado de la instancia de respaldo (failover), si está configurada.
+        $estadoRespaldo = null;
+        if (!empty($cfg['evolution_instancia_respaldo'])) {
+            try {
+                $cr = EvolutionClient::desdeConfigCon($db, (string) $cfg['evolution_instancia_respaldo']);
+                $estadoRespaldo = $cr ? $cr->estado() : null;
+            } catch (\Throwable) {
+                $estadoRespaldo = null;
+            }
+        }
+
         $citasProximas = $db->fetchAll(
             "SELECT COUNT(*) n FROM wa_citas WHERE slot_activo = 1 AND inicio >= NOW()"
         )[0]['n'] ?? 0;
@@ -99,6 +129,7 @@ final class WhatsappControlador extends ControladorBase
             'proveedores' => \ElkinLinan\WhatsappAiEngine\Providers\LlmProviderManager::PROVEEDORES,
             'sttProveedores' => \ElkinLinan\WhatsappAiEngine\Media\SttManager::PROVEEDORES,
             'estado' => $estado,
+            'estadoRespaldo' => $estadoRespaldo,
             'googleConectado' => $google->conectado(),
             'urlAutorizacion' => $this->urlAutorizacionSiHayCliente($google),
             'horario' => WaConfig::horario(WaConfig::cargar($db, true)),
@@ -142,6 +173,16 @@ final class WhatsappControlador extends ControladorBase
         if (empty($cfg['evolution_url'])) {
             $datos['evolution_url'] = rtrim((string) (Entorno::obtener('EVOLUTION_URL', 'http://127.0.0.1:8080') ?? ''), '/');
         }
+
+        // Instancia de respaldo (failover): opcional, pero si se pone debe ser
+        // OTRA — apuntar el respaldo a la misma instancia activa haría que el
+        // «failover» conmutara al mismo número que se cayó.
+        $respaldo = trim($ctx->campo('evolution_instancia_respaldo'));
+        if ($respaldo !== '' && $respaldo === trim($datos['evolution_instancia'])) {
+            return $this->redirigirCon('/panel/whatsapp', 'error',
+                'La instancia de respaldo no puede ser la misma que la principal.');
+        }
+        $datos['evolution_instancia_respaldo'] = $respaldo;
 
         // Alerta de sesión caída (bin/wa-vigilar.php): mismo formato E.164 que
         // handoff_numero, y la instancia que la envía tiene que ser OTRA — si
@@ -352,10 +393,13 @@ final class WhatsappControlador extends ControladorBase
         $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
         $db = $this->db();
 
-        $canal = EvolutionClient::desdeConfig($db);
+        // 'principal' (la activa) o 'respaldo' (para vincular el failover).
+        $destino = $ctx->campo('destino') === 'respaldo' ? 'respaldo' : 'principal';
+        $canal = $this->canalPara($db, $destino);
         if (!$canal) {
-            return $this->redirigirCon('/panel/whatsapp', 'error',
-                'Primero guarde la conexión con Evolution (URL, instancia y API Key).');
+            return $this->redirigirCon('/panel/whatsapp', 'error', $destino === 'respaldo'
+                ? 'Primero guarde el nombre de la instancia de respaldo.'
+                : 'Primero guarde la conexión con Evolution (URL, instancia y API Key).');
         }
 
         // WhatsApp NO entrega QR de una sesión ya vinculada: Baileys no lo
@@ -395,10 +439,12 @@ final class WhatsappControlador extends ControladorBase
                 'Número a vincular inválido: dígitos con indicativo de país y sin «+», ej. 573001234567.');
         }
 
-        $canal = EvolutionClient::desdeConfig($db);
+        $destino = $ctx->campo('destino') === 'respaldo' ? 'respaldo' : 'principal';
+        $canal = $this->canalPara($db, $destino);
         if (!$canal) {
-            return $this->redirigirCon('/panel/whatsapp', 'error',
-                'Primero guarde la conexión con Evolution (URL, instancia y API Key).');
+            return $this->redirigirCon('/panel/whatsapp', 'error', $destino === 'respaldo'
+                ? 'Primero guarde el nombre de la instancia de respaldo.'
+                : 'Primero guarde la conexión con Evolution (URL, instancia y API Key).');
         }
 
         $estado = $canal->estado();
@@ -434,21 +480,80 @@ final class WhatsappControlador extends ControladorBase
         $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
         $db = $this->db();
 
-        $canal = EvolutionClient::desdeConfig($db);
+        $destino = $ctx->campo('destino') === 'respaldo' ? 'respaldo' : 'principal';
+        $canal = $this->canalPara($db, $destino);
         if (!$canal) {
-            return $this->redirigirCon('/panel/whatsapp', 'error',
-                'Primero guarde la conexión con Evolution (URL, instancia y API Key).');
+            return $this->redirigirCon('/panel/whatsapp', 'error', $destino === 'respaldo'
+                ? 'Primero guarde el nombre de la instancia de respaldo.'
+                : 'Primero guarde la conexión con Evolution (URL, instancia y API Key).');
         }
 
         $r = $canal->desconectar();
-        $this->auditar($ctx, 'desvincular', ['ok' => !empty($r['ok'])]);
+        $this->auditar($ctx, 'desvincular', ['destino' => $destino, 'ok' => !empty($r['ok'])]);
         if (empty($r['ok'])) {
             return $this->redirigirCon('/panel/whatsapp', 'error',
                 'No se pudo desvincular' . (!empty($r['error']) ? ': ' . (string) $r['error'] : '.'));
         }
 
+        return $this->redirigirCon('/panel/whatsapp', 'ok', $destino === 'respaldo'
+            ? 'Instancia de respaldo desvinculada.'
+            : 'WhatsApp desvinculado. Ahora vincula el número nuevo con «Pedir QR» u «Obtener código».');
+    }
+
+    /**
+     * Failover MANUAL: intercambia la instancia activa con la de respaldo.
+     * Como `evolution_instancia` es la que usa todo el código, el swap basta
+     * para que el bot pase a atender por el número de respaldo — sin tocar el
+     * webhook ni los envíos.
+     *
+     * Solo conmuta si la instancia de respaldo está VINCULADA (`open`): pasar
+     * al respaldo apagado dejaría al negocio sin ningún número que atienda.
+     * Al conmutar, el número público de la landing pasa a ser el de la nueva
+     * instancia activa — si no, los clientes nuevos seguirían llegando al
+     * número caído.
+     */
+    public function conmutar(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+        $db = $this->db();
+
+        $cfg = WaConfig::cargar($db, true) ?? [];
+        $activa   = trim((string) ($cfg['evolution_instancia'] ?? ''));
+        $respaldo = trim((string) ($cfg['evolution_instancia_respaldo'] ?? ''));
+        if ($activa === '' || $respaldo === '') {
+            return $this->redirigirCon('/panel/whatsapp', 'error',
+                'Configura y vincula la instancia de respaldo antes de conmutar.');
+        }
+
+        $canalRespaldo = EvolutionClient::desdeConfigCon($db, $respaldo);
+        $estado = $canalRespaldo?->estado() ?? ['estado' => 'error'];
+        if (($estado['estado'] ?? '') !== 'conectado') {
+            return $this->redirigirCon('/panel/whatsapp', 'error',
+                'La instancia de respaldo no está vinculada: vincúlala antes de conmutar, o el bot se quedaría sin número que atienda.');
+        }
+
+        // El swap: la de respaldo pasa a activa y la activa pasa a respaldo.
+        WaConfig::guardar($db, [
+            'evolution_instancia'          => $respaldo,
+            'evolution_instancia_respaldo' => $activa,
+        ]);
+
+        // La landing debe apuntar al número que AHORA atiende.
+        $numero = trim((string) ($estado['numero'] ?? ''));
+        $numero = $numero !== '' ? preg_replace('/\D+/', '', explode('@', $numero)[0]) : '';
+        $avisoLanding = '';
+        if ($numero !== '') {
+            $this->config->set('whatsapp_numero_negocio', $numero, (string) $ctx->usuario->id,
+                'Failover de WhatsApp: número activo cambiado a la instancia de respaldo');
+            $avisoLanding = ' La landing ahora apunta al ' . $numero . '.';
+        } else {
+            $avisoLanding = ' No se pudo leer el número del respaldo: revisa el número de la landing a mano.';
+        }
+
+        $this->auditar($ctx, 'conmutar_failover', ['nueva_activa' => $respaldo, 'numero' => $numero]);
+
         return $this->redirigirCon('/panel/whatsapp', 'ok',
-            'WhatsApp desvinculado. Ahora vincula el número nuevo con «Pedir QR» u «Obtener código».');
+            'Conmutado: ahora atiende la instancia «' . $respaldo . '».' . $avisoLanding);
     }
 
     /* ── Cobro y horario ──────────────────────────────────────────────── */

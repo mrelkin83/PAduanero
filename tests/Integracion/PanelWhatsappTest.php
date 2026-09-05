@@ -43,7 +43,8 @@ final class PanelWhatsappTest extends CasoBaseBd
         // no herede la configuración del anterior.
         $pdo = $this->bd->pdo();
         $pdo->exec("UPDATE wa_config SET activo = 0, evolution_url = NULL,
-                    evolution_instancia = NULL, evolution_apikey = NULL,
+                    evolution_instancia = NULL, evolution_instancia_respaldo = NULL,
+                    evolution_apikey = NULL,
                     llm_proveedor = NULL, llm_modelo = NULL, llm_api_key = NULL,
                     pago_modo = 'mixto', pago_datos_transferencia = NULL,
                     pago_transferencia_json = NULL WHERE id = 1");
@@ -60,7 +61,36 @@ final class PanelWhatsappTest extends CasoBaseBd
             Cifrado::desdeEntorno(),
             new Logger(sys_get_temp_dir() . '/pa-wa-panel.log', 'error'),
             new AuditoriaRepo($this->bd),
+            $this->configStub(),
         );
+    }
+
+    /** Config de mentira: no toca la BD; captura lo que se le escriba. */
+    private function configStub(): \App\Servicios\Config
+    {
+        return new class implements \App\Servicios\Config {
+            /** @var array<string,mixed> */
+            public array $escrito = [];
+
+            public function get(string $clave, mixed $porDefecto = null): mixed
+            {
+                return $porDefecto;
+            }
+
+            public function set(string $clave, mixed $valor, string $usuarioId, ?string $motivo = null): void
+            {
+                $this->escrito[$clave] = $valor;
+            }
+
+            public function getGrupo(string $grupo): array
+            {
+                return [];
+            }
+
+            public function invalidarCache(?string $clave = null): void
+            {
+            }
+        };
     }
 
     /** @param array<string,mixed> $formulario */
@@ -533,6 +563,43 @@ final class PanelWhatsappTest extends CasoBaseBd
         // el logout, con un mensaje claro y sin excepción.
         $r = $this->ctrl()->desvincular($this->ctx('super_admin', ['x' => '1']));
         self::assertStringContainsString('Evolution', urldecode($r->cabeceras['Location']));
+    }
+
+    /* ── Failover (número de respaldo) ────────────────────────────────── */
+
+    #[Test]
+    public function laInstanciaDeRespaldoNoPuedeSerLaMismaQueLaPrincipal(): void
+    {
+        $r = $this->ctrl()->guardarConexion($this->ctx('super_admin', [
+            'evolution_instancia' => 'pedro',
+            'evolution_instancia_respaldo' => 'pedro',
+        ]));
+        self::assertStringContainsString('no puede ser la misma', urldecode($r->cabeceras['Location']));
+
+        // Distintas: se guarda sin queja.
+        $r = $this->ctrl()->guardarConexion($this->ctx('super_admin', [
+            'evolution_instancia' => 'pedro',
+            'evolution_instancia_respaldo' => 'pedro-respaldo',
+        ]));
+        self::assertStringContainsString('guardada', urldecode($r->cabeceras['Location']));
+        self::assertSame('pedro-respaldo',
+            (string) $this->bd->pdo()->query('SELECT evolution_instancia_respaldo FROM wa_config WHERE id = 1')->fetchColumn());
+    }
+
+    #[Test]
+    public function conmutarSinRespaldoConfiguradoAvisa(): void
+    {
+        // setUp deja la config limpia: sin respaldo, no hay a qué conmutar.
+        $r = $this->ctrl()->conmutar($this->ctx('super_admin', ['x' => '1']));
+        self::assertStringContainsString('respaldo', urldecode($r->cabeceras['Location']));
+    }
+
+    #[Test]
+    public function elAbogadoNoConmutaElFailover(): void
+    {
+        // Conmutar es tocar la tubería: ia.proveedores.escribir.
+        $this->expectException(SinPermisoException::class);
+        $this->ctrl()->conmutar($this->ctx('abogado', ['x' => '1']));
     }
 
     /* ── Pendientes sin responder ─────────────────────────────────────── */

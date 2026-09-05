@@ -40,7 +40,9 @@ $modosPago = [
     'contra_entrega' => 'Agendar sin cobrar — el pago se maneja por fuera',
 ];
 
-$contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleConectado, $urlAutorizacion, $horario, $citasProximas, $tokenNuevo, $qr, $codigoVinculacion, $dias, $proveedores, $sttProveedores, $modosPago, $smtpConfigurado, $vocesTts): void {
+$estadoRespaldo = $estadoRespaldo ?? null;
+
+$contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $estadoRespaldo, $googleConectado, $urlAutorizacion, $horario, $citasProximas, $tokenNuevo, $qr, $codigoVinculacion, $dias, $proveedores, $sttProveedores, $modosPago, $smtpConfigurado, $vocesTts): void {
     $puedeConexion = $ctx->puede('ia.proveedores.escribir');
     $puedeSwitch = $ctx->puede('motor.killswitch');
     $puedePrompt = $ctx->puede('ia.prompts.editar');
@@ -144,9 +146,14 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                            class="campo mt-1 font-mono" readonly>
                 </div>
                 <div>
-                    <label class="rotulo">Nombre de la instancia</label>
+                    <label class="rotulo">Nombre de la instancia (activa)</label>
                     <input name="evolution_instancia" value="<?= $e((string) ($cfg['evolution_instancia'] ?? '')) ?>"
                            class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                </div>
+                <div>
+                    <label class="rotulo">Instancia de respaldo (failover, opcional)</label>
+                    <input name="evolution_instancia_respaldo" value="<?= $e((string) ($cfg['evolution_instancia_respaldo'] ?? '')) ?>"
+                           placeholder="pedro-respaldo" class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
                 </div>
                 <div class="sm:col-span-2">
                     <span class="rotulo">API Key de Evolution</span>
@@ -241,6 +248,85 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
             En desarrollo local con Evolution en Docker, la base debe ser
             <code class="font-mono">http://host.docker.internal:8123</code> para que el contenedor alcance esta máquina.
         </p>
+        <?php endif; ?>
+    </section>
+
+    <!-- ── Failover: número de respaldo ───────────────────────────── -->
+    <section class="mt-8">
+        <h2 class="rotulo">Número de respaldo (failover)</h2>
+        <p class="mt-2 text-sm text-acero">
+            Un segundo número que puede <strong>tomar el relevo</strong> si el
+            principal se cae o lo bloquean. La conmutación es manual: cuando
+            conmutas, el bot pasa a atender por el respaldo y la landing apunta
+            a ese número.
+            <br>
+            <span class="text-xs">
+                Ojo: en WhatsApp cada número es una dirección distinta. Los
+                clientes que ya escribieron al número caído no migran solos; el
+                respaldo atiende a los <em>nuevos</em>. Vincula el respaldo a
+                <strong>otro teléfono</strong>, distinto del principal.
+            </span>
+        </p>
+
+        <?php if (empty($cfg['evolution_instancia_respaldo'])): ?>
+            <p class="mt-3 text-sm text-acero">
+                No hay instancia de respaldo configurada. Ponle un nombre en
+                «Instancia de respaldo» arriba (ej. <code class="font-mono">pedro-respaldo</code>),
+                guarda la conexión, y vuelve aquí para vincularla.
+            </p>
+        <?php else: ?>
+            <div class="tarjeta mt-3 p-4">
+                <p class="text-sm">
+                    Instancia: <span class="font-mono"><?= $e((string) $cfg['evolution_instancia_respaldo']) ?></span>
+                    <?php if ($estadoRespaldo !== null): ?>
+                        · Estado: <strong><?= $e((string) ($estadoRespaldo['estado'] ?? 'desconocido')) ?></strong>
+                        <?php if (!empty($estadoRespaldo['numero'])): ?>
+                            (<?= $e(explode('@', (string) $estadoRespaldo['numero'])[0]) ?>)
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </p>
+
+                <?php if ($puedeConexion): ?>
+                <div class="mt-3 flex flex-wrap gap-3">
+                    <form method="post" action="/panel/whatsapp/qr">
+                        <?= $ctx->csrf->campoOculto() ?>
+                        <input type="hidden" name="destino" value="respaldo">
+                        <button type="submit" class="boton-secundario">Pedir QR (respaldo)</button>
+                    </form>
+
+                    <form method="post" action="/panel/whatsapp/qr-codigo" class="flex flex-wrap items-end gap-2">
+                        <?= $ctx->csrf->campoOculto() ?>
+                        <input type="hidden" name="destino" value="respaldo">
+                        <div>
+                            <label class="rotulo" for="numero_respaldo">…o código (número del respaldo)</label>
+                            <input id="numero_respaldo" name="numero_vinculacion" inputmode="numeric"
+                                   placeholder="573001234567" class="campo mt-1" pattern="\d{10,15}"
+                                   title="Dígitos con indicativo de país, sin «+»">
+                        </div>
+                        <button type="submit" class="boton-secundario">Obtener código</button>
+                    </form>
+
+                    <?php if (($estadoRespaldo['estado'] ?? '') === 'conectado'): ?>
+                    <form method="post" action="/panel/whatsapp/desvincular"
+                          onsubmit="return confirm('Se cerrará la sesión del número de respaldo. ¿Continuar?')">
+                        <?= $ctx->csrf->campoOculto() ?>
+                        <input type="hidden" name="destino" value="respaldo">
+                        <button type="submit" class="boton-secundario">Desvincular respaldo</button>
+                    </form>
+
+                    <form method="post" action="/panel/whatsapp/conmutar"
+                          onsubmit="return confirm('El bot pasará a atender por el número de respaldo y la landing apuntará a ese número. ¿Conmutar ahora?')">
+                        <?= $ctx->csrf->campoOculto() ?>
+                        <button type="submit" class="boton">Conmutar: usar el respaldo como número activo</button>
+                    </form>
+                    <?php else: ?>
+                    <p class="text-sm text-acero self-center">
+                        Vincula el respaldo (QR o código) para poder conmutar.
+                    </p>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
     </section>
 
