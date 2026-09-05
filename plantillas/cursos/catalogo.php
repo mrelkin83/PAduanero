@@ -73,6 +73,11 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
         <?php endforeach; ?>
     </div>
     <?php endif; ?>
+
+    <p class="mt-12 text-center text-sm text-acero">
+        ¿Tienes un certificado de un curso?
+        <a href="/certificados/verificar" class="underline">Verifica su autenticidad aquí</a>.
+    </p>
 </main>
 
 </body>

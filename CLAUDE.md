@@ -104,10 +104,13 @@ PHP 8.2+ · MySQL 8 · TailwindCSS 4 · JavaScript sin dependencias ·
 verificación** (`bin/auditar-landing.mjs`, `bin/capturar.mjs`). No hay
 framework de front ni JavaScript de build.
 
-Composer trae PHPUnit en `require-dev` y una única dependencia de
+Composer trae PHPUnit en `require-dev` y **dos** dependencias de
 producción: `dompdf/dompdf`, para generar el PDF del certificado de
 finalización (decisión del PO, 2026-08-29 — ver
-`docs/superpowers/specs/2026-08-29-certificado-cursos-design.md` §7).
+`docs/superpowers/specs/2026-08-29-certificado-cursos-design.md` §7), y
+`chillerlan/php-qrcode`, para el QR de verificación que lleva el
+certificado (decisión del PO, 2026-09-05). El QR se genera como PNG si
+hay extensión `gd`, y cae a SVG si no (`App\Soporte\GeneradorQr`).
 
 ---
 

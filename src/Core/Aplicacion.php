@@ -231,6 +231,13 @@ final class Aplicacion
         );
 
         $this->contenedor->registrar(
+            \App\Repositorios\CertificadoPlantillaRepo::class,
+            static fn (Contenedor $c): \App\Repositorios\CertificadoPlantillaRepo => new \App\Repositorios\CertificadoPlantillaRepo(
+                $c->obtener(BD::class),
+            ),
+        );
+
+        $this->contenedor->registrar(
             \App\Repositorios\CompradorRepo::class,
             static fn (Contenedor $c): \App\Repositorios\CompradorRepo => new \App\Repositorios\CompradorRepo(
                 $c->obtener(BD::class),
@@ -514,7 +521,10 @@ final class Aplicacion
                 $this->contenedor->obtener(\App\Servicios\Cursos::class),
                 $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
                 $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
-                new \App\Cuenta\CertificadoPdf($this->contenedor->obtener(\App\Repositorios\CompradorRepo::class)),
+                new \App\Cuenta\CertificadoPdf(
+                    $this->contenedor->obtener(\App\Repositorios\CompradorRepo::class),
+                    $this->contenedor->obtener(\App\Repositorios\CertificadoPlantillaRepo::class),
+                ),
             ))->descargar($p, (string) $p->parametros['slug']);
         });
 
@@ -524,7 +534,10 @@ final class Aplicacion
                 $this->contenedor->obtener(\App\Servicios\Cursos::class),
                 $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
                 $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
-                new \App\Cuenta\CertificadoPdf($this->contenedor->obtener(\App\Repositorios\CompradorRepo::class)),
+                new \App\Cuenta\CertificadoPdf(
+                    $this->contenedor->obtener(\App\Repositorios\CompradorRepo::class),
+                    $this->contenedor->obtener(\App\Repositorios\CertificadoPlantillaRepo::class),
+                ),
             ))->verificarMostrar($p);
         });
 
@@ -534,7 +547,10 @@ final class Aplicacion
                 $this->contenedor->obtener(\App\Servicios\Cursos::class),
                 $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
                 $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
-                new \App\Cuenta\CertificadoPdf($this->contenedor->obtener(\App\Repositorios\CompradorRepo::class)),
+                new \App\Cuenta\CertificadoPdf(
+                    $this->contenedor->obtener(\App\Repositorios\CompradorRepo::class),
+                    $this->contenedor->obtener(\App\Repositorios\CertificadoPlantillaRepo::class),
+                ),
             ))->verificarBuscar($p, (string) $p->parametros['codigo']);
         });
 

@@ -21,6 +21,8 @@ final class PanelCursosControlador extends ControladorBase
         private readonly \App\Repositorios\CompraCursoRepo $compras,
         private readonly \App\Cuenta\ConfirmadorCompra $confirmador,
         private readonly \App\Repositorios\CursoMaterialRepo $materiales,
+        private readonly \App\Repositorios\CertificadoPlantillaRepo $plantillaCert,
+        private readonly \App\Cuenta\CertificadoPdf $certificadoPdf,
     ) {
     }
 
@@ -472,6 +474,78 @@ final class PanelCursosControlador extends ControladorBase
         $this->auditoria->registrar('curso_leccion', $id, 'actualizar', $ctx->actor(), ['titulo' => $titulo], $ctx->ip());
 
         return $this->redirigirCon('/panel/cursos/lecciones/editar?id=' . urlencode($id), 'ok', 'Lección actualizada.');
+    }
+
+    /* ── Plantilla del certificado ────────────────────────────────────── */
+
+    /** Pantalla para configurar la plantilla del certificado (global). */
+    public function plantillaCertificado(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $plantilla = $this->plantillaCert->obtener();
+
+        return $this->vista('panel/cursos_certificado', [
+            'ctx' => $ctx,
+            'imagenFondo' => $plantilla['imagen_fondo'],
+            'campos' => $plantilla['campos'],
+            'etiquetas' => \App\Repositorios\CertificadoPlantillaRepo::camposDisponibles(),
+            'avisos' => $this->avisos($ctx),
+        ]);
+    }
+
+    /** Guarda la imagen de fondo (si se subió) y las posiciones de los datos. */
+    public function guardarPlantillaCertificado(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        // Imagen de fondo: opcional. Si no se sube una nueva, se conserva la
+        // que había (SubidaImagen devuelve nombre vacío sin error).
+        $nombreImagen = null;
+        $archivo = $ctx->peticion->archivos['imagen_fondo'] ?? null;
+        if (is_array($archivo)) {
+            $carpeta = dirname(__DIR__, 2) . '/' . \App\Cuenta\CertificadoPdf::CARPETA_FONDOS;
+            $r = \App\Soporte\SubidaImagen::guardar($archivo, $carpeta, 'certificado');
+            if ($r['error'] !== '') {
+                return $this->redirigirCon('/panel/cursos/certificado', 'error', $r['error']);
+            }
+            if ($r['ok']) {
+                $nombreImagen = $r['nombre'];
+            }
+        }
+
+        // Campos: por cada dato, sus posiciones y estilo desde el formulario.
+        $campos = [];
+        foreach (array_keys(\App\Repositorios\CertificadoPlantillaRepo::camposDisponibles()) as $clave) {
+            $campos[$clave] = [
+                'y'          => (int) $ctx->campo("campo_{$clave}_y"),
+                'x'          => (int) $ctx->campo("campo_{$clave}_x"),
+                'alineacion' => $ctx->campo("campo_{$clave}_alineacion"),
+                'tamano'     => (int) $ctx->campo("campo_{$clave}_tamano"),
+                'color'      => $ctx->campo("campo_{$clave}_color"),
+                'visible'    => $ctx->campo("campo_{$clave}_visible") === '1',
+            ];
+        }
+
+        $this->plantillaCert->guardar($nombreImagen, $campos);
+        $this->auditoria->registrar('certificado_plantilla', '1', 'actualizar', $ctx->actor(),
+            ['imagen' => $nombreImagen !== null], $ctx->ip());
+
+        return $this->redirigirCon('/panel/cursos/certificado', 'ok', 'Plantilla del certificado guardada.');
+    }
+
+    /** PDF de muestra con datos de ejemplo, para ajustar la plantilla. */
+    public function previewCertificado(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $plantilla = $this->plantillaCert->obtener();
+        $pdf = $this->certificadoPdf->muestra($plantilla['imagen_fondo'], $plantilla['campos']);
+
+        return new Respuesta($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="certificado-ejemplo.pdf"',
+        ]);
     }
 
     public function agregarMaterial(Contexto $ctx): Respuesta

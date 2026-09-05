@@ -84,6 +84,11 @@ final class PanelCursosTest extends CasoBaseBd
                 'https://pedroabogadoaduanero.com',
             ),
             new \App\Repositorios\CursoMaterialRepo($this->bd),
+            new \App\Repositorios\CertificadoPlantillaRepo($this->bd),
+            new \App\Cuenta\CertificadoPdf(
+                new \App\Repositorios\CompradorRepo($this->bd, \App\Soporte\Cifrado::desdeEntorno()),
+                new \App\Repositorios\CertificadoPlantillaRepo($this->bd),
+            ),
         );
     }
 
@@ -676,5 +681,52 @@ final class PanelCursosTest extends CasoBaseBd
 
         self::assertSame(302, $r->estado);
         self::assertStringContainsString('no+existe', $r->cabeceras['Location']);
+    }
+
+    /* ── Plantilla del certificado ────────────────────────────────────── */
+
+    #[Test]
+    public function laPantallaDePlantillaDeCertificadoSePinta(): void
+    {
+        $html = $this->controlador()->plantillaCertificado($this->ctx('abogado'))->cuerpo;
+
+        self::assertStringContainsString('Plantilla del certificado', $html);
+        self::assertStringContainsString('Código QR de verificación', $html);
+    }
+
+    #[Test]
+    public function guardarLaPlantillaPersisteLasPosiciones(): void
+    {
+        $r = $this->controlador()->guardarPlantillaCertificado($this->ctx('abogado', [
+            'campo_nombre_y' => '40', 'campo_nombre_x' => '0', 'campo_nombre_alineacion' => 'center',
+            'campo_nombre_tamano' => '34', 'campo_nombre_color' => '#112233', 'campo_nombre_visible' => '1',
+            'campo_qr_y' => '70', 'campo_qr_x' => '5', 'campo_qr_alineacion' => 'right',
+            'campo_qr_tamano' => '16', 'campo_qr_visible' => '1',
+        ]));
+
+        self::assertStringContainsString('guardada', urldecode($r->cabeceras['Location']));
+
+        $json = (string) $this->bd->pdo()->query('SELECT campos_json FROM certificado_plantilla WHERE id = 1')->fetchColumn();
+        $campos = json_decode($json, true);
+        self::assertSame(40, $campos['nombre']['y']);
+        self::assertSame('#112233', $campos['nombre']['color']);
+        self::assertSame(16, $campos['qr']['tamano']);
+    }
+
+    #[Test]
+    public function elEjemploDevuelveUnPdf(): void
+    {
+        $r = $this->controlador()->previewCertificado($this->ctx('abogado'));
+
+        self::assertSame(200, $r->estado);
+        self::assertSame('application/pdf', $r->cabeceras['Content-Type']);
+        self::assertStringStartsWith('%PDF', $r->cuerpo);
+    }
+
+    #[Test]
+    public function elContadorNoConfiguraElCertificado(): void
+    {
+        $this->expectException(SinPermisoException::class);
+        $this->controlador()->plantillaCertificado($this->ctx('contador'));
     }
 }

@@ -12,6 +12,7 @@
     "ext-pdo": "*",
     "ext-pdo_mysql": "*",
     "ext-xmlwriter": "*",
+    "chillerlan/php-qrcode": "^6.0",
     "dompdf/dompdf": "^3.1"
   },
   "suggest": {

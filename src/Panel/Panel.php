@@ -164,6 +164,9 @@ final class Panel
             'POST /cursos/lecciones/guardar' => $modulos['cursos']->guardarLeccion($ctx),
             'POST /cursos/lecciones/materiales/agregar' => $modulos['cursos']->agregarMaterial($ctx),
             'POST /cursos/lecciones/materiales/eliminar' => $modulos['cursos']->eliminarMaterial($ctx),
+            'GET /cursos/certificado' => $modulos['cursos']->plantillaCertificado($ctx),
+            'POST /cursos/certificado' => $modulos['cursos']->guardarPlantillaCertificado($ctx),
+            'GET /cursos/certificado/ejemplo' => $modulos['cursos']->previewCertificado($ctx),
             'GET /cursos/categorias' => $modulos['cursos']->categorias($ctx),
             'POST /cursos/categorias/guardar' => $modulos['cursos']->guardarCategoria($ctx),
             'GET /cursos/compras' => $modulos['cursos']->compras($ctx),
@@ -231,6 +234,11 @@ final class Panel
                 $this->c->obtener(\App\Repositorios\CompraCursoRepo::class),
                 $this->c->obtener(\App\Cuenta\ConfirmadorCompra::class),
                 $this->c->obtener(\App\Repositorios\CursoMaterialRepo::class),
+                $this->c->obtener(\App\Repositorios\CertificadoPlantillaRepo::class),
+                new \App\Cuenta\CertificadoPdf(
+                    $this->c->obtener(\App\Repositorios\CompradorRepo::class),
+                    $this->c->obtener(\App\Repositorios\CertificadoPlantillaRepo::class),
+                ),
             ),
             'usuarios' => new UsuariosControlador(
                 $this->c->obtener(UsuarioRepo::class),
