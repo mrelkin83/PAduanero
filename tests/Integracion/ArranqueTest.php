@@ -112,6 +112,21 @@ final class ArranqueTest extends TestCase
     }
 
     #[Test]
+    public function laRutaDeCompraNoRevientaPorUnaVariableSinCapturar(): void
+    {
+        // La closure de /comprar usa $urlBase; si no lo captura con use(),
+        // PHP lo deja indefinido y la ruta responde 500 «Error interno» —
+        // pasó en producción. Con un slug inexistente el curso no se
+        // encuentra, pero la closure igual construye el controlador con
+        // $urlBase: si el bug volviera, esto sería 500 otra vez.
+        $respuesta = (new Aplicacion($this->raiz))
+            ->manejar(new Peticion(metodo: 'GET', ruta: '/cursos/curso-que-no-existe/comprar'));
+
+        self::assertNotSame(500, $respuesta->estado);
+        self::assertStringNotContainsString('Error interno', $respuesta->cuerpo);
+    }
+
+    #[Test]
     public function saludInformaDelEstadoDeLaBase(): void
     {
         $respuesta = (new Aplicacion($this->raiz))

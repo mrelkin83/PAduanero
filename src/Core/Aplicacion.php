@@ -326,7 +326,7 @@ final class Aplicacion
             return $this->contenedor->obtener(\App\Servicios\Cursos::class)->ficha($p->parametros['slug']);
         });
 
-        $this->router->get('/cursos/{slug}/comprar', function (Peticion $p): Respuesta {
+        $this->router->get('/cursos/{slug}/comprar', function (Peticion $p) use ($urlBase): Respuesta {
             $conexion = $this->contenedor->obtener(\App\Wa\ConexionCompartida::class);
 
             return (new \App\Cuenta\ComprasControlador(
@@ -337,7 +337,7 @@ final class Aplicacion
             ))->formulario($p, (string) $p->parametros['slug']);
         });
 
-        $this->router->post('/cursos/{slug}/comprar', function (Peticion $p): Respuesta {
+        $this->router->post('/cursos/{slug}/comprar', function (Peticion $p) use ($urlBase): Respuesta {
             $csrf = new \App\Core\Csrf((Entorno::obtener('APP_ENV', 'produccion') ?? '') !== 'desarrollo');
             if (!$csrf->validar($p)) {
                 return Respuesta::texto('Sesión de formulario expirada. Vuelva a intentarlo.', 419);
@@ -353,7 +353,7 @@ final class Aplicacion
             ))->procesar($p, (string) $p->parametros['slug']);
         });
 
-        $this->router->get('/cursos/{slug}/gracias', function (Peticion $p): Respuesta {
+        $this->router->get('/cursos/{slug}/gracias', function (Peticion $p) use ($urlBase): Respuesta {
             $conexion = $this->contenedor->obtener(\App\Wa\ConexionCompartida::class);
 
             return (new \App\Cuenta\ComprasControlador(
