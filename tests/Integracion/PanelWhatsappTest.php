@@ -494,4 +494,38 @@ final class PanelWhatsappTest extends CasoBaseBd
         );
         self::assertSame(0, (int) $pdo->query('SELECT COUNT(*) FROM wa_mensajes')->fetchColumn());
     }
+
+    /* ── Pendientes sin responder ─────────────────────────────────────── */
+
+    #[Test]
+    public function losPendientesSinCanalAvisanEnVezDeReventar(): void
+    {
+        // setUp deja la conexión de Evolution en NULL: la pantalla tiene que
+        // decirlo, no quedarse en blanco ni tumbar el panel.
+        $html = $this->ctrl()->pendientes($this->ctx('abogado'))->cuerpo;
+
+        self::assertStringContainsString('Pendientes sin responder', $html);
+        self::assertStringContainsString('no está configurado', $html);
+    }
+
+    #[Test]
+    public function elContadorNoVeLosPendientes(): void
+    {
+        $this->expectException(SinPermisoException::class);
+        $this->ctrl()->pendientes($this->ctx('contador'));
+    }
+
+    #[Test]
+    public function enviarPendientesSinCanalNoSaleASintetizarNada(): void
+    {
+        // El corte del canal va ANTES de gastar un peso en TTS o en LLM.
+        $r = $this->ctrl()->enviarPendientes($this->ctx('abogado', [
+            'enviar' => ['573204993515@s.whatsapp.net'],
+            'telefono' => ['573204993515@s.whatsapp.net' => '573204993515'],
+            'texto' => ['573204993515@s.whatsapp.net' => 'Hola'],
+        ]));
+
+        self::assertStringContainsString('no está configurado', urldecode($r->cabeceras['Location']));
+        self::assertSame(0, (int) $this->bd->pdo()->query('SELECT COUNT(*) FROM wa_mensajes')->fetchColumn());
+    }
 }

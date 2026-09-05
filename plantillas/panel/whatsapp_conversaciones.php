@@ -35,6 +35,7 @@ $contenido = static function () use ($e, $ctx, $lista, $abierta, $mensajes, $est
     <p class="text-sm text-acero">
         Las últimas 100. Responder desde aquí deja la conversación contigo
         (la IA no contesta encima) hasta que la devuelvas.
+        <a class="underline" href="/panel/whatsapp/pendientes">Pendientes sin responder</a> ·
         <a class="underline" href="/panel/whatsapp">Volver a la configuración</a>.
     </p>
 

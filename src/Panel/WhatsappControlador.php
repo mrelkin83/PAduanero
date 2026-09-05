@@ -12,6 +12,7 @@ use App\Soporte\Entorno;
 use App\Soporte\Logger;
 use App\Wa\GoogleCalendar;
 use App\Wa\MotorWa;
+use App\Wa\PendientesSinResponder;
 use ElkinLinan\WhatsappAiEngine\Channel\EvolutionClient;
 use ElkinLinan\WhatsappAiEngine\Core\WaConfig;
 use ElkinLinan\WhatsappAiEngine\Providers\ModelDiscoveryService;
@@ -952,6 +953,127 @@ final class WhatsappControlador extends ControladorBase
         $this->auditar($ctx, 'reanudar_ia', ['conversacion' => $id]);
 
         return $this->redirigirCon('/panel/whatsapp/conversaciones?ver=' . $id, 'ok', 'La IA vuelve a atender esta conversación.');
+    }
+
+    /* ── Pendientes sin responder ─────────────────────────────────────── */
+
+    /**
+     * Chats cuyo último mensaje es del cliente y nadie contestó — lo que
+     * queda tras una desconexión. La pantalla lista; «Analizar» propone; el
+     * envío es otra acción, con la propuesta ya revisada por una persona.
+     */
+    public function pendientes(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'casos.ver');
+        $db = $this->db();
+
+        $canal = null;
+        $lista = [];
+        $errorCanal = '';
+        try {
+            $canal = EvolutionClient::desdeConfig($db);
+            if ($canal !== null) {
+                $lista = (new PendientesSinResponder($db))->listar($canal);
+            } else {
+                $errorCanal = 'El canal de WhatsApp no está configurado.';
+            }
+        } catch (\Throwable $e) {
+            $errorCanal = 'No se pudo consultar Evolution: ' . $e->getMessage();
+        }
+
+        return $this->vista('panel/whatsapp_pendientes', [
+            'ctx' => $ctx,
+            'lista' => $lista,
+            'propuestas' => [],
+            'errorCanal' => $errorCanal,
+            'avisos' => $this->avisos($ctx),
+        ]);
+    }
+
+    /**
+     * El análisis: la IA lee cada chat pendiente y propone si responder y
+     * con qué texto. NADA se envía aquí — las propuestas vuelven a la misma
+     * pantalla, editables, para que una persona decida.
+     */
+    public function proponerPendientes(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'casos.editar');
+        $db = $this->db();
+
+        $canal = EvolutionClient::desdeConfig($db);
+        if ($canal === null) {
+            return $this->redirigirCon('/panel/whatsapp/pendientes', 'error', 'El canal de WhatsApp no está configurado.');
+        }
+
+        $servicio = new PendientesSinResponder($db);
+        $lista = $servicio->listar($canal);
+
+        // Tope de análisis por pasada: cada propuesta es una llamada al LLM
+        // y esta pantalla la espera una persona con el navegador abierto.
+        $propuestas = [];
+        foreach (array_slice($lista, 0, 15) as $p) {
+            $propuestas[$p['jid']] = $servicio->proponer($p, $canal);
+        }
+        $this->auditar($ctx, 'pendientes_analizados', ['chats' => count($propuestas)]);
+
+        return $this->vista('panel/whatsapp_pendientes', [
+            'ctx' => $ctx,
+            'lista' => $lista,
+            'propuestas' => $propuestas,
+            'errorCanal' => '',
+            'avisos' => $this->avisos($ctx),
+        ]);
+    }
+
+    /**
+     * Envía como nota de voz las propuestas que la persona marcó (y pudo
+     * editar). Cada envío queda en la conversación como saliente y la deja
+     * en HUMANO_ATENDIENDO, igual que responder a mano.
+     */
+    public function enviarPendientes(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'casos.editar');
+        $db = $this->db();
+
+        $canal = EvolutionClient::desdeConfig($db);
+        if ($canal === null) {
+            return $this->redirigirCon('/panel/whatsapp/pendientes', 'error', 'El canal de WhatsApp no está configurado.');
+        }
+
+        $marcados = (array) ($ctx->peticion->formulario['enviar'] ?? []);
+        $telefonos = (array) ($ctx->peticion->formulario['telefono'] ?? []);
+        $textos = (array) ($ctx->peticion->formulario['texto'] ?? []);
+        if ($marcados === []) {
+            return $this->redirigirCon('/panel/whatsapp/pendientes', 'error', 'No marcaste ninguna respuesta para enviar.');
+        }
+
+        $servicio = new PendientesSinResponder($db);
+        $enviados = 0;
+        $fallos = [];
+        foreach ($marcados as $clave) {
+            $clave = (string) $clave;
+            $telefono = trim((string) ($telefonos[$clave] ?? ''));
+            $texto = trim(mb_substr((string) ($textos[$clave] ?? ''), 0, 1500));
+            if ($telefono === '' || $texto === '') {
+                $fallos[] = $telefono !== '' ? $telefono : $clave;
+                continue;
+            }
+            $r = $servicio->enviarNotaDeVoz($telefono, $texto, $canal);
+            if (!empty($r['ok'])) {
+                $enviados++;
+            } else {
+                $fallos[] = $telefono . ' (' . (string) $r['error'] . ')';
+            }
+        }
+        $this->auditar($ctx, 'pendientes_respondidos', ['enviados' => $enviados, 'fallos' => count($fallos)]);
+
+        if ($fallos !== []) {
+            return $this->redirigirCon('/panel/whatsapp/pendientes', $enviados > 0 ? 'ok' : 'error',
+                ($enviados > 0 ? "Enviadas {$enviados}. " : '') . 'Fallaron: ' . implode(' · ', array_slice($fallos, 0, 5)));
+        }
+
+        return $this->redirigirCon('/panel/whatsapp/pendientes', 'ok',
+            $enviados === 1 ? 'Nota de voz enviada.' : "Enviadas {$enviados} notas de voz.");
     }
 
     /* ── Interno ──────────────────────────────────────────────────────── */

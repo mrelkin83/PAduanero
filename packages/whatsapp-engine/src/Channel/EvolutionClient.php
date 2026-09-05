@@ -387,4 +387,30 @@ class EvolutionClient implements ChannelInterface
         $bin = base64_decode($b64, true);
         return ($bin === false || $bin === '') ? null : $bin;
     }
+
+    /**
+     * Los chats de la instancia tal como los guarda Evolution, cada uno con su
+     * `lastMessage`. Es la única memoria que sobrevive a una desconexión: los
+     * mensajes que llegan con el motor caído no pasan por el webhook, pero el
+     * historial que el teléfono sincroniza al revincular sí queda aquí.
+     */
+    public function listarChats(): array
+    {
+        $r = Http::json('POST', $this->url . '/chat/findChats/' . rawurlencode($this->instancia),
+            $this->cabeceras(), '{}', 30);
+        return ($r['ok'] && is_array($r['json'])) ? $r['json'] : [];
+    }
+
+    /**
+     * Últimos mensajes de un chat según Evolution (findMessages). Ojo: tras
+     * una revinculación el historial puede estar incompleto — es lo que el
+     * teléfono quiso sincronizar, no la conversación entera.
+     */
+    public function mensajesDeChat(string $remoteJid, int $limite = 10): array
+    {
+        $r = Http::json('POST', $this->url . '/chat/findMessages/' . rawurlencode($this->instancia),
+            $this->cabeceras(), ['where' => ['key' => ['remoteJid' => $remoteJid]], 'limit' => $limite], 30);
+        $recs = $r['json']['messages']['records'] ?? null;
+        return is_array($recs) ? $recs : [];
+    }
 }
