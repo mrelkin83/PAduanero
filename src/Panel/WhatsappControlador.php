@@ -358,6 +358,19 @@ final class WhatsappControlador extends ControladorBase
                 'Primero guarde la conexión con Evolution (URL, instancia y API Key).');
         }
 
+        // WhatsApp NO entrega QR de una sesión ya vinculada: Baileys no lo
+        // genera y `conectar()` cae en el mensaje genérico de «versión», que
+        // aquí sería un diagnóstico falso. Si ya está conectada, decirlo tal
+        // cual — para re-vincular hay que desvincular primero.
+        $estado = $canal->estado();
+        if (($estado['estado'] ?? '') === 'conectado') {
+            $num = trim((string) ($estado['numero'] ?? ''));
+            $num = $num !== '' ? ' (' . explode('@', $num)[0] . ')' : '';
+            return $this->redirigirCon('/panel/whatsapp', 'ok',
+                'WhatsApp ya está vinculado y funcionando' . $num
+                . '. Para vincular otro número, primero use «Desvincular».');
+        }
+
         $r = $canal->conectar();
         if (!$r['ok']) {
             return $this->redirigirCon('/panel/whatsapp', 'error', mb_substr('QR: ' . $r['error'], 0, 290));
@@ -386,6 +399,15 @@ final class WhatsappControlador extends ControladorBase
         if (!$canal) {
             return $this->redirigirCon('/panel/whatsapp', 'error',
                 'Primero guarde la conexión con Evolution (URL, instancia y API Key).');
+        }
+
+        $estado = $canal->estado();
+        if (($estado['estado'] ?? '') === 'conectado') {
+            $num = trim((string) ($estado['numero'] ?? ''));
+            $num = $num !== '' ? ' (' . explode('@', $num)[0] . ')' : '';
+            return $this->redirigirCon('/panel/whatsapp', 'ok',
+                'WhatsApp ya está vinculado y funcionando' . $num
+                . '. Para vincular otro número, primero use «Desvincular».');
         }
 
         $r = $canal->conectarPorCodigo($numero);
