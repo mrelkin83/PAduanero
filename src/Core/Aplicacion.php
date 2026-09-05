@@ -487,6 +487,27 @@ final class Aplicacion
             );
         });
 
+        $this->router->get('/mis-cursos/{slug}/leccion/{leccionId}/video', function (Peticion $p): Respuesta {
+            return (new \App\Cuenta\AulaControlador(
+                $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),
+                $this->contenedor->obtener(\App\Servicios\Cursos::class),
+                $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
+                new \App\Cuenta\AccesoLeccion($this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class)),
+                $this->contenedor->obtener(BD::class),
+                \App\Soporte\BunnyStream::desdeEntorno(),
+                $this->contenedor->obtener(\App\Repositorios\CursoMaterialRepo::class),
+                new \App\Cuenta\ProgresoCurso(
+                    $this->contenedor->obtener(BD::class),
+                    $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
+                ),
+                $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
+            ))->video(
+                $p,
+                (string) $p->parametros['slug'],
+                (string) $p->parametros['leccionId'],
+            );
+        });
+
         $this->router->get('/mis-cursos/{slug}/certificado', function (Peticion $p): Respuesta {
             return (new \App\Cuenta\CertificadoControlador(
                 $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),

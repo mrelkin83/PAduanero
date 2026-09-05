@@ -34,12 +34,17 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
 <main class="mx-auto max-w-3xl px-5 py-12 md:px-7">
     <h1 class="titular-seccion"><?= $e((string) $leccion['titulo']) ?></h1>
 
-    <?php if ($urlVideo !== null): ?>
+    <?php if ($urlVideo !== null && !empty($videoLocal)): ?>
+    <div class="mt-6 aspect-video">
+        <video src="<?= $e($urlVideo) ?>" controls controlslist="nodownload" preload="metadata"
+               oncontextmenu="return false" class="h-full w-full rounded bg-black"></video>
+    </div>
+    <?php elseif ($urlVideo !== null): ?>
     <div class="mt-6 aspect-video">
         <iframe src="<?= $e($urlVideo) ?>" loading="lazy" allow="autoplay; fullscreen"
                 class="h-full w-full rounded" allowfullscreen></iframe>
     </div>
-    <?php elseif ($leccion['video_bunny_id'] !== null): ?>
+    <?php elseif ($leccion['video_bunny_id'] !== null || !empty($leccion['video_archivo'])): ?>
     <p class="mt-6 text-acero">Video no disponible por ahora.</p>
     <?php endif; ?>
 

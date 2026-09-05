@@ -431,6 +431,10 @@ final class PanelCursosControlador extends ControladorBase
         $titulo = $ctx->campo('titulo');
         $duracion = $ctx->campo('duracion_min');
         $videoBunnyId = $ctx->campo('video_bunny_id');
+        // Video local: solo el nombre del archivo (se sube por SFTP a
+        // storage/cursos/videos/<leccion_id>/). basename descarta cualquier
+        // ruta que intenten meter; el archivo real se valida al servirlo.
+        $videoArchivo = basename(trim($ctx->campo('video_archivo')));
         $contenidoTexto = $ctx->campo('contenido_texto');
         $vistaPrevia = (int) ($ctx->campo('vista_previa_gratis') === '1');
 
@@ -454,11 +458,13 @@ final class PanelCursosControlador extends ControladorBase
 
         $this->bd->pdo()->prepare(
             'UPDATE curso_lecciones
-                SET titulo = ?, duracion_min = ?, vista_previa_gratis = ?, video_bunny_id = ?, contenido_texto = ?
+                SET titulo = ?, duracion_min = ?, vista_previa_gratis = ?, video_bunny_id = ?,
+                    video_archivo = ?, contenido_texto = ?
               WHERE id = ?'
         )->execute([
             $titulo, $duracionMin, $vistaPrevia,
             $videoBunnyId !== '' ? $videoBunnyId : null,
+            $videoArchivo !== '' ? $videoArchivo : null,
             $contenidoTexto !== '' ? $contenidoTexto : null,
             $id,
         ]);

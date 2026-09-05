@@ -357,6 +357,57 @@ final class AulaControladorTest extends CasoBaseBd
     }
 
     #[Test]
+    public function elVideoLocalSinAccesoRedirige(): void
+    {
+        $cursoId = $this->curso('curso-video-sin-acceso');
+        $leccionId = $this->leccionEnCurso($cursoId, preview: false);
+        $this->bd->pdo()->prepare('UPDATE curso_lecciones SET video_archivo = ? WHERE id = ?')
+            ->execute(['clase.mp4', $leccionId]);
+
+        $r = $this->controlador->video($this->peticion(), 'curso-video-sin-acceso', $leccionId);
+
+        self::assertSame(302, $r->estado);
+        self::assertSame('/entrar', $r->cabeceras['Location']);
+    }
+
+    #[Test]
+    public function elVideoLocalConAccesoDelegaEnNginxConXAccelRedirect(): void
+    {
+        $cursoId = $this->curso('curso-video-con-acceso');
+        $leccionId = $this->leccionEnCurso($cursoId, preview: true);
+        $this->bd->pdo()->prepare('UPDATE curso_lecciones SET video_archivo = ? WHERE id = ?')
+            ->execute(['clase.mp4', $leccionId]);
+
+        $carpeta = dirname(__DIR__, 2) . '/storage/cursos/videos/' . $leccionId;
+        @mkdir($carpeta, 0775, true);
+        file_put_contents($carpeta . '/clase.mp4', 'FAKEMP4');
+
+        $r = $this->controlador->video($this->peticion(), 'curso-video-con-acceso', $leccionId);
+
+        self::assertSame(200, $r->estado);
+        self::assertSame('video/mp4', $r->cabeceras['Content-Type']);
+        self::assertSame('/_video_protegido/' . $leccionId . '/clase.mp4', $r->cabeceras['X-Accel-Redirect']);
+        // El cuerpo va VACÍO: el archivo lo entrega nginx, no PHP.
+        self::assertSame('', $r->cuerpo);
+
+        unlink($carpeta . '/clase.mp4');
+        rmdir($carpeta);
+    }
+
+    #[Test]
+    public function elVideoLocalConAccesoPeroSinElArchivoEnDiscoDa404(): void
+    {
+        $cursoId = $this->curso('curso-video-sin-archivo');
+        $leccionId = $this->leccionEnCurso($cursoId, preview: true);
+        $this->bd->pdo()->prepare('UPDATE curso_lecciones SET video_archivo = ? WHERE id = ?')
+            ->execute(['noexiste.mp4', $leccionId]);
+
+        $r = $this->controlador->video($this->peticion(), 'curso-video-sin-archivo', $leccionId);
+
+        self::assertSame(404, $r->estado);
+    }
+
+    #[Test]
     public function verUnaLeccionDePreviewSinHaberCompradoNoRegistraProgreso(): void
     {
         $cursoId = $this->curso('curso-preview-sin-progreso');

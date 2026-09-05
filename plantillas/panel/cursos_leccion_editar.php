@@ -45,9 +45,22 @@ $contenido = static function () use ($e, $ctx, $leccion, $materiales): void {
             </label>
 
             <div class="sm:col-span-2">
-                <label class="rotulo">ID de video en Bunny Stream</label>
+                <label class="rotulo">Video de la lección (archivo local)</label>
+                <input name="video_archivo" value="<?= $e((string) ($leccion['video_archivo'] ?? '')) ?>"
+                       placeholder="mi-leccion.mp4"
+                       class="campo mt-1 font-mono" <?= $editable ? '' : 'disabled' ?>>
+                <p class="mt-1 text-xs text-acero">
+                    Sube el archivo por SFTP a
+                    <code class="font-mono">storage/cursos/videos/<?= $e((string) ($leccion['id'] ?? '&lt;id-lección&gt;')) ?>/</code>
+                    y escribe aquí solo el nombre del archivo (ej. <code class="font-mono">mi-leccion.mp4</code>).
+                    Se sirve protegido: solo lo ve quien compró el curso. Tiene prioridad sobre Bunny.
+                </p>
+            </div>
+
+            <div class="sm:col-span-2">
+                <label class="rotulo">ID de video en Bunny Stream (alternativa)</label>
                 <input name="video_bunny_id" value="<?= $e((string) ($leccion['video_bunny_id'] ?? '')) ?>"
-                       placeholder="Súbalo en el panel de Bunny y pegue aquí el ID del video"
+                       placeholder="Solo si usas Bunny en vez del archivo local"
                        class="campo mt-1 font-mono" <?= $editable ? '' : 'disabled' ?>>
             </div>
 

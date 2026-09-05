@@ -76,13 +76,75 @@ final class AulaControlador
             }
         }
 
+        // El video local tiene prioridad sobre Bunny (decisión del PO,
+        // 2026-09-05). El local se sirve por una URL protegida propia; Bunny,
+        // por su iframe de embed — la plantilla los pinta distinto.
+        $urlVideo = null;
+        $videoLocal = false;
+        if (!empty($leccion['video_archivo'])) {
+            $urlVideo = '/mis-cursos/' . rawurlencode($slug) . '/leccion/' . rawurlencode($leccionId) . '/video';
+            $videoLocal = true;
+        } elseif ($leccion['video_bunny_id'] !== null && $this->bunny->disponible()) {
+            $urlVideo = $this->bunny->urlEmbed((string) $leccion['video_bunny_id']);
+        }
+
         return Respuesta::vista('cuenta/leccion', [
             'curso' => $curso,
             'leccion' => $leccion,
             'materiales' => $this->materiales->deLeccion($leccionId),
-            'urlVideo' => ($leccion['video_bunny_id'] !== null && $this->bunny->disponible())
-                ? $this->bunny->urlEmbed((string) $leccion['video_bunny_id'])
-                : null,
+            'urlVideo' => $urlVideo,
+            'videoLocal' => $videoLocal,
+        ]);
+    }
+
+    /**
+     * Sirve el video local de una lección, protegido: solo a quien compró el
+     * curso (AccesoLeccion). El archivo NUNCA se sirve por PHP —que ocuparía un
+     * worker por stream y no haría *seek*—: PHP autoriza y delega en nginx con
+     * X-Accel-Redirect, que entrega el archivo con soporte de rango (saltar en
+     * el video) desde una `location internal` fuera del webroot.
+     */
+    public function video(Peticion $peticion, string $slug, string $leccionId): Respuesta
+    {
+        $curso = $this->cursos->porSlug($slug);
+        if ($curso === null) {
+            return Respuesta::texto('No encontrado.', 404);
+        }
+
+        $leccion = $this->leccionDelCurso($curso['id'], $leccionId);
+        if ($leccion === null) {
+            return Respuesta::texto('No encontrado.', 404);
+        }
+
+        $comprador = $this->compradorActual();
+        if (!$this->acceso->puedeVer($comprador, $leccion, $curso['id'])) {
+            return $comprador === null
+                ? new Respuesta('', 302, ['Location' => '/entrar'])
+                : new Respuesta('', 302, ['Location' => '/mis-cursos']);
+        }
+
+        // basename() ancla el archivo dentro de la carpeta de la lección: un
+        // nombre con ../ no puede escapar a otra parte del disco.
+        $archivo = basename((string) ($leccion['video_archivo'] ?? ''));
+        if ($archivo === '') {
+            return Respuesta::texto('No encontrado.', 404);
+        }
+
+        $ruta = dirname(__DIR__, 2) . '/storage/cursos/videos/' . $leccionId . '/' . $archivo;
+        if (!is_file($ruta)) {
+            return Respuesta::texto('No encontrado.', 404);
+        }
+
+        // nginx intercepta X-Accel-Redirect y sirve el archivo desde la
+        // location interna `/_video_protegido/` (alias a storage/cursos/videos).
+        $mimes = ['mp4' => 'video/mp4', 'webm' => 'video/webm', 'mov' => 'video/quicktime', 'm4v' => 'video/mp4'];
+        $ext = strtolower(pathinfo($archivo, PATHINFO_EXTENSION));
+
+        return new Respuesta('', 200, [
+            'Content-Type' => $mimes[$ext] ?? 'application/octet-stream',
+            'X-Accel-Redirect' => '/_video_protegido/' . rawurlencode($leccionId) . '/' . rawurlencode($archivo),
+            'Content-Disposition' => 'inline',
+            'Cache-Control' => 'private, max-age=0, must-revalidate',
         ]);
     }
 
