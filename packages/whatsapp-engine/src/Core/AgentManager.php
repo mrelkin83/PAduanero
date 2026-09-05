@@ -45,6 +45,7 @@ class AgentManager
             'rol'          => 'Atiendes a los clientes del negocio por WhatsApp.',
             'objetivo'     => 'Resolver dudas, mostrar la carta, tomar pedidos y acompañar el pago.',
             'personalidad' => 'Amable, cercano y directo.',
+            'genero'       => 'femenino',
             'idioma'       => 'es',
             'instrucciones' => '',
             'herramientas' => null,          // null = todas las permitidas por el plan
@@ -60,15 +61,15 @@ class AgentManager
         $d = $this->porDefecto();
         $s = Scope::paraInsert();
         return (int)$this->db->insert(
-            "INSERT INTO wa_agentes ({$s['columnas']}nombre, rol, objetivo, personalidad, idioma, activo)
-             VALUES ({$s['marcadores']}?,?,?,?,?,1)",
+            "INSERT INTO wa_agentes ({$s['columnas']}nombre, rol, objetivo, personalidad, genero, idioma, activo)
+             VALUES ({$s['marcadores']}?,?,?,?,?,?,1)",
             array_merge($s['valores'],
-                [$d['nombre'], $d['rol'], $d['objetivo'], $d['personalidad'], $d['idioma']]));
+                [$d['nombre'], $d['rol'], $d['objetivo'], $d['personalidad'], $d['genero'], $d['idioma']]));
     }
 
     public function guardar(array $campos): void
     {
-        $permitidos = ['nombre', 'rol', 'objetivo', 'personalidad', 'idioma', 'instrucciones',
+        $permitidos = ['nombre', 'rol', 'objetivo', 'personalidad', 'genero', 'idioma', 'instrucciones',
                        'herramientas', 'saludo_inicial', 'mensaje_fuera_horario', 'mensaje_error', 'activo'];
         $sets = []; $vals = [];
         foreach ($campos as $k => $v) {

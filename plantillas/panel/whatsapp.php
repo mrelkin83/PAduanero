@@ -143,6 +143,41 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                     </p>
                 </div>
             </div>
+
+            <!-- ── Alerta de sesión caída ─────────────────────────────── -->
+            <div class="mt-5 border-t pt-4">
+                <h3 class="rotulo">Si esta conexión se cae</h3>
+                <p class="mt-1 text-sm text-acero">
+                    Un cron revisa cada 5 minutos el estado real en Evolution y avisa
+                    solo cuando cambia. El aviso sale por OTRO número — nunca por este
+                    mismo, que es justo el que podría estar caído.
+                </p>
+                <div class="grid gap-3 sm:grid-cols-3 mt-3">
+                    <div>
+                        <label class="rotulo">Número que recibe la alerta</label>
+                        <input name="alerta_whatsapp_numero"
+                               value="<?= $e((string) ($cfg['alerta_whatsapp_numero'] ?? '')) ?>"
+                               placeholder="573001234567" class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                    </div>
+                    <div>
+                        <label class="rotulo">Instancia que la envía (otro teléfono)</label>
+                        <input name="alerta_whatsapp_instancia"
+                               value="<?= $e((string) ($cfg['alerta_whatsapp_instancia'] ?? '')) ?>"
+                               placeholder="pedro-respaldo" class="campo mt-1 font-mono" <?= $puedeConexion ? '' : 'disabled' ?>>
+                    </div>
+                    <div>
+                        <label class="rotulo">Correo que recibe la alerta (opcional)</label>
+                        <input name="alerta_correo" type="email"
+                               value="<?= $e((string) ($cfg['alerta_correo'] ?? '')) ?>"
+                               class="campo mt-1" <?= $puedeConexion ? '' : 'disabled' ?>
+                               <?= $smtpConfigurado ? '' : 'title="Sin SMTP configurado en el servidor, este correo no saldrá."' ?>>
+                        <?php if (!$smtpConfigurado): ?>
+                            <p class="mt-1 text-xs text-acero">Sin SMTP configurado en el servidor: se guarda, pero no saldrá correo todavía.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
             <?php if ($puedeConexion): ?>
                 <button type="submit" class="boton mt-4">Guardar conexión</button>
             <?php endif; ?>
@@ -588,6 +623,17 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                 <div>
                     <label class="rotulo">Personalidad</label>
                     <input name="personalidad" value="<?= $e((string) ($agente['personalidad'] ?? '')) ?>" class="campo mt-1" <?= $puedePrompt ? '' : 'disabled' ?>>
+                </div>
+                <div>
+                    <label class="rotulo">Género con el que se refiere a sí mismo</label>
+                    <select name="genero" class="campo mt-1" <?= $puedePrompt ? '' : 'disabled' ?>>
+                        <option value="femenino" <?= ($agente['genero'] ?? 'femenino') === 'femenino' ? 'selected' : '' ?>>Femenino — «la asistente»</option>
+                        <option value="masculino" <?= ($agente['genero'] ?? 'femenino') === 'masculino' ? 'selected' : '' ?>>Masculino — «el asistente»</option>
+                    </select>
+                    <p class="mt-1 text-xs text-acero">
+                        Se aplica siempre desde código, para que no dependa de mantener a mano la
+                        concordancia en Rol, Personalidad e Instrucciones.
+                    </p>
                 </div>
                 <div class="sm:col-span-2">
                     <label class="rotulo">Rol</label>

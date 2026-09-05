@@ -61,6 +61,14 @@ class PromptComposer
         if (!empty($agente['personalidad'])) $rol .= "\nTu forma de ser: " . $agente['personalidad'];
         $idioma = $agente['idioma'] ?: 'es';
         $rol .= "\nHablas siempre en " . ($idioma === 'es' ? 'español' : $idioma) . '.';
+        // Se fija aquí, en código, y no en la prosa de rol/personalidad/
+        // instrucciones: esos tres son texto libre que el negocio edita a
+        // mano, y basta con que uno quede desactualizado (p.ej. «eres un
+        // asistente virtual» tras cambiar el rol a femenino) para que el
+        // modelo responda en el género contrario a la mitad del prompt.
+        $rol .= (($agente['genero'] ?? 'femenino') === 'masculino')
+            ? "\nTe refieres a ti mismo siempre en masculino (\"el asistente\", \"un asistente\"), nunca en femenino."
+            : "\nTe refieres a ti misma siempre en femenino (\"la asistente\", \"una asistente\"), nunca en masculino.";
         $p[] = $rol;
 
         // ── 5. Contexto del negocio ───────────────────────────────────

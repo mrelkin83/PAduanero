@@ -141,6 +141,28 @@ final class WhatsappControlador extends ControladorBase
         if (empty($cfg['evolution_url'])) {
             $datos['evolution_url'] = rtrim((string) (Entorno::obtener('EVOLUTION_URL', 'http://127.0.0.1:8080') ?? ''), '/');
         }
+
+        // Alerta de sesión caída (bin/wa-vigilar.php): mismo formato E.164 que
+        // handoff_numero, y la instancia que la envía tiene que ser OTRA — si
+        // fuera la misma que se cayó, el aviso nunca saldría.
+        $alertaNumero = preg_replace('/[\s+\-().]/', '', $ctx->campo('alerta_whatsapp_numero'));
+        if ($alertaNumero !== '' && !preg_match('/^\d{10,15}$/', $alertaNumero)) {
+            return $this->redirigirCon('/panel/whatsapp', 'error',
+                'Número de alerta inválido: solo dígitos con indicativo de país y sin «+», ej. 573001234567.');
+        }
+        $alertaInstancia = trim($ctx->campo('alerta_whatsapp_instancia'));
+        if ($alertaInstancia !== '' && $alertaInstancia === trim($datos['evolution_instancia'])) {
+            return $this->redirigirCon('/panel/whatsapp', 'error',
+                'La instancia que manda la alerta no puede ser la misma del negocio: si esa se cae, la alerta se cae con ella.');
+        }
+        $alertaCorreo = trim($ctx->campo('alerta_correo'));
+        if ($alertaCorreo !== '' && !filter_var($alertaCorreo, FILTER_VALIDATE_EMAIL)) {
+            return $this->redirigirCon('/panel/whatsapp', 'error', 'Correo de alerta inválido.');
+        }
+        $datos['alerta_whatsapp_numero'] = $alertaNumero;
+        $datos['alerta_whatsapp_instancia'] = $alertaInstancia;
+        $datos['alerta_correo'] = $alertaCorreo;
+
         WaConfig::guardar($db, $datos);
         $this->auditar($ctx, 'conexion');
 
@@ -501,8 +523,10 @@ final class WhatsappControlador extends ControladorBase
         $ctx->permisos->exigir($ctx->usuario, 'ia.prompts.editar');
         $db = $this->db();
 
+        $genero = $ctx->campo('genero') === 'masculino' ? 'masculino' : 'femenino';
+
         $db->query(
-            'UPDATE wa_agentes SET nombre = ?, rol = ?, objetivo = ?, personalidad = ?,
+            'UPDATE wa_agentes SET nombre = ?, rol = ?, objetivo = ?, personalidad = ?, genero = ?,
                     instrucciones = ?, saludo_inicial = ?, mensaje_fuera_horario = ?, mensaje_error = ?
               WHERE id = 1',
             [
@@ -510,6 +534,7 @@ final class WhatsappControlador extends ControladorBase
                 mb_substr($ctx->campo('rol'), 0, 200),
                 $ctx->campo('objetivo'),
                 mb_substr($ctx->campo('personalidad'), 0, 200),
+                $genero,
                 $ctx->campo('instrucciones'),
                 $ctx->campo('saludo_inicial'),
                 $ctx->campo('mensaje_fuera_horario'),
