@@ -45,6 +45,14 @@ $precio = '$' . number_format((int) $curso['precio_cop'], 0, ',', '.') . ' COP';
         <label class="mt-4 block text-xs uppercase tracking-widest text-acero">Correo</label>
         <input name="correo" type="email" required class="mt-2 w-full rounded border border-linea bg-white/5 p-3 text-papel">
 
+        <label class="mt-4 block text-xs uppercase tracking-widest text-acero">WhatsApp</label>
+        <input name="whatsapp" type="tel" inputmode="numeric" required
+               placeholder="573001234567"
+               pattern="[\d\s()+-]{10,20}"
+               title="Número con indicativo de país, ej. 573001234567"
+               class="mt-2 w-full rounded border border-linea bg-white/5 p-3 text-papel">
+        <p class="mt-1 text-xs text-acero">Con indicativo de país. Por aquí te contactamos sobre el curso.</p>
+
         <button type="submit" class="boton-diagnostico-global mt-6 w-full">
             Pagar <?= $e($precio) ?> con Wompi
         </button>

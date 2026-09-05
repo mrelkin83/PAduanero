@@ -97,12 +97,31 @@ final class ComprasControladorTest extends CasoBaseBd
     }
 
     #[Test]
+    public function procesarSinWhatsappValidoRedirigeConErrorYNoCreaCompra(): void
+    {
+        $this->crearCursoPublicado();
+
+        $r = $this->controlador()->procesar(
+            $this->peticion('/cursos/curso-comprable/comprar', [
+                'nombre' => 'Ana Gómez', 'correo' => 'ana@ejemplo.com', 'whatsapp' => '123',
+            ]),
+            'curso-comprable',
+        );
+
+        self::assertSame(302, $r->estado);
+        self::assertStringContainsString('WhatsApp', urldecode($r->cabeceras['Location']));
+        self::assertSame(0, (int) $this->bd->pdo()->query('SELECT COUNT(*) FROM compras_curso')->fetchColumn());
+    }
+
+    #[Test]
     public function procesarConDatosValidosCreaLaCompraYRedirigeAWompi(): void
     {
         $this->crearCursoPublicado(250000);
 
         $r = $this->controlador()->procesar(
-            $this->peticion('/cursos/curso-comprable/comprar', ['nombre' => 'Ana Gómez', 'correo' => 'ana@ejemplo.com']),
+            $this->peticion('/cursos/curso-comprable/comprar', [
+                'nombre' => 'Ana Gómez', 'correo' => 'ana@ejemplo.com', 'whatsapp' => '+57 300 123 4567',
+            ]),
             'curso-comprable',
         );
 
@@ -113,6 +132,8 @@ final class ComprasControladorTest extends CasoBaseBd
         self::assertSame('pendiente', $compra['estado']);
         self::assertSame(250000, (int) $compra['precio_cop']);
         self::assertSame('wompi_ref_falsa', $compra['referencia_wompi']);
+        // El WhatsApp se guarda solo con dígitos, sin «+», espacios ni signos.
+        self::assertSame('573001234567', $compra['whatsapp']);
 
         // El precio se manda en PESOS, nunca en centavos (ADR-010) — la
         // conversión a centavos vive solo dentro de WompiAdapter.
@@ -126,7 +147,7 @@ final class ComprasControladorTest extends CasoBaseBd
         $this->crearCursoPublicado();
 
         $r = $this->controlador(null)->procesar(
-            $this->peticion('/cursos/curso-comprable/comprar', ['nombre' => 'Ana', 'correo' => 'ana@ejemplo.com']),
+            $this->peticion('/cursos/curso-comprable/comprar', ['nombre' => 'Ana', 'correo' => 'ana@ejemplo.com', 'whatsapp' => '573001234567']),
             'curso-comprable',
         );
 
@@ -141,7 +162,7 @@ final class ComprasControladorTest extends CasoBaseBd
         $this->wompi->respuestaCrearCobro = ['ok' => false, 'enlace' => '', 'referencia' => '', 'estado' => 'ERROR', 'error' => 'boom'];
 
         $this->controlador()->procesar(
-            $this->peticion('/cursos/curso-comprable/comprar', ['nombre' => 'Ana', 'correo' => 'ana@ejemplo.com']),
+            $this->peticion('/cursos/curso-comprable/comprar', ['nombre' => 'Ana', 'correo' => 'ana@ejemplo.com', 'whatsapp' => '573001234567']),
             'curso-comprable',
         );
 

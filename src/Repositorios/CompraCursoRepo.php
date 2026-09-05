@@ -12,13 +12,13 @@ final class CompraCursoRepo
     {
     }
 
-    public function crear(string $cursoId, string $nombre, string $correo, int $precioCop): string
+    public function crear(string $cursoId, string $nombre, string $correo, int $precioCop, string $whatsapp = ''): string
     {
         $id = (string) $this->bd->pdo()->query('SELECT UUID()')->fetchColumn();
 
         $this->bd->pdo()->prepare(
-            'INSERT INTO compras_curso (id, curso_id, nombre, correo, precio_cop) VALUES (?, ?, ?, ?, ?)'
-        )->execute([$id, $cursoId, $nombre, $correo, $precioCop]);
+            'INSERT INTO compras_curso (id, curso_id, nombre, correo, whatsapp, precio_cop) VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute([$id, $cursoId, $nombre, $correo, $whatsapp !== '' ? $whatsapp : null, $precioCop]);
 
         return $id;
     }

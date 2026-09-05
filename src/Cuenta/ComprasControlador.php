@@ -49,12 +49,16 @@ final class ComprasControlador
 
         $nombre = trim((string) ($peticion->formulario['nombre'] ?? ''));
         $correo = trim((string) ($peticion->formulario['correo'] ?? ''));
+        $whatsapp = preg_replace('/\D+/', '', (string) ($peticion->formulario['whatsapp'] ?? ''));
 
         if ($nombre === '' || filter_var($correo, FILTER_VALIDATE_EMAIL) === false) {
             return $this->redirigirAlFormulario($slug, 'Escriba su nombre y un correo válido.');
         }
+        if ($whatsapp === '' || !preg_match('/^\d{10,15}$/', $whatsapp)) {
+            return $this->redirigirAlFormulario($slug, 'Escriba un número de WhatsApp válido (con indicativo, solo dígitos).');
+        }
 
-        $compraId = $this->compras->crear($curso['id'], $nombre, $correo, (int) $curso['precio_cop']);
+        $compraId = $this->compras->crear($curso['id'], $nombre, $correo, (int) $curso['precio_cop'], $whatsapp);
 
         if ($this->wompi === null) {
             $this->compras->marcarFallida($compraId);
