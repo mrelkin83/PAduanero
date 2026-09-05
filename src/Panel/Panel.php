@@ -180,6 +180,7 @@ final class Panel
             'POST /whatsapp/apagar' => $modulos['whatsapp']->apagar($ctx),
             'POST /whatsapp/token' => $modulos['whatsapp']->regenerarToken($ctx),
             'POST /whatsapp/qr' => $modulos['whatsapp']->conectarQr($ctx),
+            'POST /whatsapp/qr-codigo' => $modulos['whatsapp']->conectarCodigo($ctx),
             'POST /whatsapp/cobro' => $modulos['whatsapp']->guardarCobro($ctx),
             'POST /whatsapp/wompi' => $modulos['whatsapp']->guardarWompi($ctx),
             'POST /whatsapp/horario' => $modulos['whatsapp']->guardarHorario($ctx),

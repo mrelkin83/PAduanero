@@ -366,6 +366,37 @@ final class WhatsappControlador extends ControladorBase
         return $this->ver($ctx, ['qr' => (string) $r['qr']]);
     }
 
+    /**
+     * Vinculación por CÓDIGO en vez de QR — la salida cuando el QR no llega o
+     * caduca antes de escanearlo (pasó el 2026-09-04). El código se teclea en
+     * el teléfono y dura minutos, no cuarenta segundos.
+     */
+    public function conectarCodigo(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+        $db = $this->db();
+
+        $numero = preg_replace('/\D+/', '', $ctx->campo('numero_vinculacion'));
+        if ($numero === '' || !preg_match('/^\d{10,15}$/', $numero)) {
+            return $this->redirigirCon('/panel/whatsapp', 'error',
+                'Número a vincular inválido: dígitos con indicativo de país y sin «+», ej. 573001234567.');
+        }
+
+        $canal = EvolutionClient::desdeConfig($db);
+        if (!$canal) {
+            return $this->redirigirCon('/panel/whatsapp', 'error',
+                'Primero guarde la conexión con Evolution (URL, instancia y API Key).');
+        }
+
+        $r = $canal->conectarPorCodigo($numero);
+        $this->auditar($ctx, 'vincular_codigo', ['ok' => !empty($r['ok'])]);
+        if (!$r['ok']) {
+            return $this->redirigirCon('/panel/whatsapp', 'error', mb_substr('Código: ' . $r['error'], 0, 290));
+        }
+
+        return $this->ver($ctx, ['codigoVinculacion' => (string) $r['codigo']]);
+    }
+
     /* ── Cobro y horario ──────────────────────────────────────────────── */
 
     public function guardarCobro(Contexto $ctx): Respuesta

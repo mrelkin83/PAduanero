@@ -25,6 +25,7 @@ $titulo = 'WhatsApp';
 
 $tokenNuevo = $tokenNuevo ?? null;
 $qr = $qr ?? null;
+$codigoVinculacion = $codigoVinculacion ?? null;
 
 $dias = [1 => 'Lunes', 2 => 'Martes', 3 => 'Miércoles', 4 => 'Jueves',
          5 => 'Viernes', 6 => 'Sábado', 0 => 'Domingo'];
@@ -39,7 +40,7 @@ $modosPago = [
     'contra_entrega' => 'Agendar sin cobrar — el pago se maneja por fuera',
 ];
 
-$contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleConectado, $urlAutorizacion, $horario, $citasProximas, $tokenNuevo, $qr, $dias, $proveedores, $sttProveedores, $modosPago, $smtpConfigurado, $vocesTts): void {
+$contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleConectado, $urlAutorizacion, $horario, $citasProximas, $tokenNuevo, $qr, $codigoVinculacion, $dias, $proveedores, $sttProveedores, $modosPago, $smtpConfigurado, $vocesTts): void {
     $puedeConexion = $ctx->puede('ia.proveedores.escribir');
     $puedeSwitch = $ctx->puede('motor.killswitch');
     $puedePrompt = $ctx->puede('ia.prompts.editar');
@@ -116,6 +117,19 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
     </section>
     <?php endif; ?>
 
+    <?php if ($codigoVinculacion !== null): ?>
+    <!-- ── Código de emparejamiento (alternativa al QR) ────────────── -->
+    <section class="tarjeta mt-6 p-4">
+        <h2 class="rotulo">Vincular WhatsApp por código</h2>
+        <p class="mt-2 text-sm text-acero">
+            En el teléfono: WhatsApp → Dispositivos vinculados → Vincular un
+            dispositivo → <strong>«Vincular con el número de teléfono»</strong>,
+            y escriba este código. Dura unos minutos.
+        </p>
+        <p class="mt-3 font-mono text-2xl tracking-widest"><?= $e($codigoVinculacion) ?></p>
+    </section>
+    <?php endif; ?>
+
     <!-- ── Conexión ───────────────────────────────────────────────── -->
     <section class="mt-8">
         <h2 class="rotulo">Conexión con Evolution API</h2>
@@ -188,6 +202,18 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
             <form method="post" action="/panel/whatsapp/qr">
                 <?= $ctx->csrf->campoOculto() ?>
                 <button type="submit" class="boton">Pedir QR para vincular</button>
+            </form>
+
+            <form method="post" action="/panel/whatsapp/qr-codigo" class="flex flex-wrap items-end gap-2">
+                <?= $ctx->csrf->campoOculto() ?>
+                <div>
+                    <label class="rotulo" for="numero_vinculacion">…o por código (si el QR no vincula)</label>
+                    <input id="numero_vinculacion" name="numero_vinculacion" inputmode="numeric"
+                           placeholder="573001234567"
+                           class="campo mt-1" pattern="\d{10,15}"
+                           title="Dígitos con indicativo de país, sin «+»">
+                </div>
+                <button type="submit" class="boton-secundario">Obtener código</button>
             </form>
 
             <form method="post" action="/panel/whatsapp/token" class="flex flex-wrap items-end gap-2">

@@ -151,6 +151,59 @@ class EvolutionClient implements ChannelInterface
                          . 'Evolution o fija CONFIG_SESSION_PHONE_VERSION. Revisa `docker compose logs evolution`.'];
     }
 
+    /**
+     * Vinculación por CÓDIGO en vez de QR. Evolution/Baileys devuelve un
+     * `pairingCode` de ocho caracteres que se teclea en el teléfono
+     * (WhatsApp → Dispositivos vinculados → «Vincular con el número de
+     * teléfono»). Es más confiable que el QR cuando este no llega o caduca en
+     * el ida y vuelta del panel: el código dura minutos, no cuarenta segundos.
+     *
+     * El número va SOLO dígitos con indicativo, sin '+'. La instancia se crea
+     * con ese número (create con `number`) porque el pairing code depende de
+     * él; si ya existe, el 403/409 se ignora y se pide el connect igual.
+     *
+     * @return array{ok:bool,codigo:?string,error:string}
+     */
+    public function conectarPorCodigo(string $numero, int $intentos = 6, int $esperaMs = 1500): array
+    {
+        $numero = preg_replace('/\D+/', '', $numero) ?? '';
+        if ($numero === '') {
+            return ['ok' => false, 'codigo' => null, 'error' => 'Falta el número a vincular (dígitos con indicativo, sin «+»).'];
+        }
+
+        $crear = Http::json('POST', $this->url . '/instance/create', $this->cabeceras(), [
+            'instanceName' => $this->instancia,
+            'qrcode'       => true,
+            'integration'  => 'WHATSAPP-BAILEYS',
+            'number'       => $numero,
+        ], 30);
+        if ($crear['status'] === 0) {
+            return ['ok' => false, 'codigo' => null,
+                    'error' => 'No se pudo contactar con Evolution API en ' . $this->url . '. ' . $crear['error']];
+        }
+
+        $codigo = $crear['json']['qrcode']['pairingCode'] ?? ($crear['json']['pairingCode'] ?? null);
+        $ultimoError = '';
+        for ($i = 0; $i < max(1, $intentos) && !$codigo; $i++) {
+            if ($i > 0) usleep($esperaMs * 1000);
+            $r = Http::json('GET', $this->url . '/instance/connect/' . rawurlencode($this->instancia)
+                . '?number=' . rawurlencode($numero), $this->cabeceras(), null, 15);
+            if ($r['status'] === 0) { $ultimoError = $r['error']; break; }
+            if (!$r['ok']) { $ultimoError = $r['error']; continue; }
+            $codigo = $r['json']['pairingCode'] ?? ($r['json']['qrcode']['pairingCode'] ?? null);
+        }
+
+        if ($codigo) {
+            return ['ok' => true, 'codigo' => (string) $codigo, 'error' => ''];
+        }
+
+        return ['ok' => false, 'codigo' => null,
+                'error' => $ultimoError !== ''
+                    ? $ultimoError
+                    : 'Evolution no entregó el código de vinculación. Suele ser la versión de WhatsApp Web '
+                    . 'del contenedor: actualiza la imagen o fija CONFIG_SESSION_PHONE_VERSION.'];
+    }
+
     public function desconectar(): array
     {
         $r = Http::json('DELETE', $this->url . '/instance/logout/' . rawurlencode($this->instancia), $this->cabeceras(), null, 20);

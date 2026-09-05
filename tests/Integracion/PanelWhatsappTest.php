@@ -495,6 +495,29 @@ final class PanelWhatsappTest extends CasoBaseBd
         self::assertSame(0, (int) $pdo->query('SELECT COUNT(*) FROM wa_mensajes')->fetchColumn());
     }
 
+    #[Test]
+    public function elCodigoDeVinculacionRechazaUnNumeroInvalido(): void
+    {
+        // El corte del número inválido va ANTES de tocar Evolution: un número
+        // mal escrito no debe siquiera intentar crear la instancia.
+        $r = $this->ctrl()->conectarCodigo($this->ctx('super_admin', ['numero_vinculacion' => '123']));
+        self::assertStringContainsString('inválido', urldecode($r->cabeceras['Location']));
+
+        $r = $this->ctrl()->conectarCodigo($this->ctx('super_admin', ['numero_vinculacion' => '+57 300 123 4567']));
+        // Con «+», espacios y 12 dígitos limpios, el patrón sí lo acepta y el
+        // corte pasa a ser el del canal sin configurar (setUp lo deja en NULL).
+        self::assertStringContainsString('Evolution', urldecode($r->cabeceras['Location']));
+    }
+
+    #[Test]
+    public function elAbogadoNoVinculaPorCodigo(): void
+    {
+        // Vincular es tocar la tubería: ia.proveedores.escribir, que el
+        // abogado no tiene (igual que guardar la conexión).
+        $this->expectException(SinPermisoException::class);
+        $this->ctrl()->conectarCodigo($this->ctx('abogado', ['numero_vinculacion' => '573001234567']));
+    }
+
     /* ── Pendientes sin responder ─────────────────────────────────────── */
 
     #[Test]
