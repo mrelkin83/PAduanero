@@ -216,6 +216,14 @@ $contenido = static function () use ($e, $ctx, $cfg, $agente, $estado, $googleCo
                 <button type="submit" class="boton-secundario">Obtener código</button>
             </form>
 
+            <?php if (($estado['estado'] ?? '') === 'conectado'): ?>
+            <form method="post" action="/panel/whatsapp/desvincular"
+                  onsubmit="return confirm('Se cerrará la sesión de WhatsApp: el bot dejará de recibir y responder hasta que vincules un número de nuevo. Úsalo para cambiar de número. ¿Continuar?')">
+                <?= $ctx->csrf->campoOculto() ?>
+                <button type="submit" class="boton-secundario">Desvincular (para cambiar de número)</button>
+            </form>
+            <?php endif; ?>
+
             <form method="post" action="/panel/whatsapp/token" class="flex flex-wrap items-end gap-2">
                 <?= $ctx->csrf->campoOculto() ?>
                 <div>

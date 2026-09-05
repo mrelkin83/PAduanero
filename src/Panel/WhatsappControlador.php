@@ -419,6 +419,38 @@ final class WhatsappControlador extends ControladorBase
         return $this->ver($ctx, ['codigoVinculacion' => (string) $r['codigo']]);
     }
 
+    /**
+     * Desvincula la sesión de WhatsApp (logout de la instancia). Es el paso
+     * previo obligado para CAMBIAR DE NÚMERO: WhatsApp no entrega QR de una
+     * sesión ya vinculada, así que primero se corta la actual y luego se
+     * vincula la nueva con QR o con código.
+     *
+     * Acción destructiva: mientras esté desvinculada, el bot no recibe ni
+     * responde. Por eso el botón pide confirmación y exige el permiso de
+     * tocar la conexión.
+     */
+    public function desvincular(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'ia.proveedores.escribir');
+        $db = $this->db();
+
+        $canal = EvolutionClient::desdeConfig($db);
+        if (!$canal) {
+            return $this->redirigirCon('/panel/whatsapp', 'error',
+                'Primero guarde la conexión con Evolution (URL, instancia y API Key).');
+        }
+
+        $r = $canal->desconectar();
+        $this->auditar($ctx, 'desvincular', ['ok' => !empty($r['ok'])]);
+        if (empty($r['ok'])) {
+            return $this->redirigirCon('/panel/whatsapp', 'error',
+                'No se pudo desvincular' . (!empty($r['error']) ? ': ' . (string) $r['error'] : '.'));
+        }
+
+        return $this->redirigirCon('/panel/whatsapp', 'ok',
+            'WhatsApp desvinculado. Ahora vincula el número nuevo con «Pedir QR» u «Obtener código».');
+    }
+
     /* ── Cobro y horario ──────────────────────────────────────────────── */
 
     public function guardarCobro(Contexto $ctx): Respuesta

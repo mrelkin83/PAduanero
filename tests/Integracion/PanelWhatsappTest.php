@@ -518,6 +518,23 @@ final class PanelWhatsappTest extends CasoBaseBd
         $this->ctrl()->conectarCodigo($this->ctx('abogado', ['numero_vinculacion' => '573001234567']));
     }
 
+    #[Test]
+    public function desvincularExigeElPermisoDeConexion(): void
+    {
+        // Desvincular corta el bot: es tocar la tubería, no atender casos.
+        $this->expectException(SinPermisoException::class);
+        $this->ctrl()->desvincular($this->ctx('abogado', ['x' => '1']));
+    }
+
+    #[Test]
+    public function desvincularSinCanalAvisaEnVezDeReventar(): void
+    {
+        // setUp deja Evolution sin configurar: el corte va antes de intentar
+        // el logout, con un mensaje claro y sin excepción.
+        $r = $this->ctrl()->desvincular($this->ctx('super_admin', ['x' => '1']));
+        self::assertStringContainsString('Evolution', urldecode($r->cabeceras['Location']));
+    }
+
     /* ── Pendientes sin responder ─────────────────────────────────────── */
 
     #[Test]
