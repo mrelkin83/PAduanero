@@ -21,6 +21,9 @@ final class ColaCorreos
     /** Un correo no se reintenta indefinidamente: 3 strikes y queda 'fallido'. */
     public const MAX_INTENTOS = 3;
 
+    /** Buzón del despacho: a él llegan los avisos internos (nueva compra, cita). */
+    public const CORREO_DESPACHO = 'info@pedroabogadoaduanero.com';
+
     public function __construct(private readonly BD $bd)
     {
     }

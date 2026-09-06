@@ -18,6 +18,10 @@ final class ProgresoCurso
     public function __construct(
         private readonly BD $bd,
         private readonly CertificadoRepo $certificados,
+        // Opcionales: sin ellos el progreso funciona igual pero no avisa por
+        // correo (el caso de las pruebas que no ejercen el correo).
+        private readonly ?\App\Servicios\ColaCorreos $correos = null,
+        private readonly string $urlBase = '',
     ) {
     }
 
@@ -35,7 +39,41 @@ final class ProgresoCurso
 
         if ($this->estaCompleto($compradorId, $cursoId)) {
             $this->certificados->crear($compraId, $this->codigoUnico());
+            $this->avisarCertificado($compradorId, $cursoId);
         }
+    }
+
+    /** Encola el correo «tu certificado está listo» al alumno. Mejor esfuerzo. */
+    private function avisarCertificado(string $compradorId, string $cursoId): void
+    {
+        if ($this->correos === null) {
+            return;
+        }
+
+        $stmt = $this->bd->pdo()->prepare(
+            'SELECT c.correo, c.nombres, cu.titulo, cu.slug
+               FROM compradores c, cursos cu
+              WHERE c.id = ? AND cu.id = ?'
+        );
+        $stmt->execute([$compradorId, $cursoId]);
+        $d = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$d || ($d['correo'] ?? '') === '') {
+            return;
+        }
+
+        $e = \App\Soporte\Vista::e(...);
+        $url = rtrim($this->urlBase, '/') . '/mis-cursos/' . rawurlencode((string) $d['slug']) . '/certificado';
+        $cuerpo = '<p>¡Felicitaciones, ' . $e((string) $d['nombres']) . '!</p>'
+            . '<p>Completaste el curso <strong>' . $e((string) $d['titulo']) . '</strong> y tu '
+            . 'certificado de finalización ya está disponible para descargar.</p>';
+
+        $this->correos->encolar(
+            (string) $d['correo'],
+            'Tu certificado del curso ' . (string) $d['titulo'] . ' está listo',
+            \App\Soporte\PlantillaCorreo::envolver('Certificado disponible', $cuerpo,
+                ['texto' => 'Descargar mi certificado', 'url' => $url]),
+            'certificado',
+        );
     }
 
     public function estaCompleto(string $compradorId, string $cursoId): bool

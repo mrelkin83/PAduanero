@@ -204,7 +204,7 @@ final class Aplicacion
                 $c->obtener(\App\Repositorios\CompradorEnlaceRepo::class),
                 $c->obtener(\App\Wa\ConexionCompartida::class),
                 $c->obtener(BD::class),
-                \App\Soporte\Smtp::desdeEntorno(),
+                $c->obtener(\App\Servicios\ColaCorreos::class),
                 $urlBase,
             ),
         );
@@ -445,7 +445,7 @@ final class Aplicacion
             ))->mostrar($p);
         });
 
-        $this->router->get('/mis-cursos/{slug}', function (Peticion $p): Respuesta {
+        $this->router->get('/mis-cursos/{slug}', function (Peticion $p) use ($urlBase): Respuesta {
             return (new \App\Cuenta\AulaControlador(
                 $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),
                 $this->contenedor->obtener(\App\Servicios\Cursos::class),
@@ -457,12 +457,14 @@ final class Aplicacion
                 new \App\Cuenta\ProgresoCurso(
                     $this->contenedor->obtener(BD::class),
                     $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
+                    $this->contenedor->obtener(\App\Servicios\ColaCorreos::class),
+                    $urlBase,
                 ),
                 $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
             ))->aula($p, (string) $p->parametros['slug']);
         });
 
-        $this->router->get('/mis-cursos/{slug}/leccion/{leccionId}', function (Peticion $p): Respuesta {
+        $this->router->get('/mis-cursos/{slug}/leccion/{leccionId}', function (Peticion $p) use ($urlBase): Respuesta {
             return (new \App\Cuenta\AulaControlador(
                 $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),
                 $this->contenedor->obtener(\App\Servicios\Cursos::class),
@@ -474,12 +476,14 @@ final class Aplicacion
                 new \App\Cuenta\ProgresoCurso(
                     $this->contenedor->obtener(BD::class),
                     $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
+                    $this->contenedor->obtener(\App\Servicios\ColaCorreos::class),
+                    $urlBase,
                 ),
                 $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
             ))->leccion($p, (string) $p->parametros['slug'], (string) $p->parametros['leccionId']);
         });
 
-        $this->router->get('/mis-cursos/{slug}/leccion/{leccionId}/material/{materialId}', function (Peticion $p): Respuesta {
+        $this->router->get('/mis-cursos/{slug}/leccion/{leccionId}/material/{materialId}', function (Peticion $p) use ($urlBase): Respuesta {
             return (new \App\Cuenta\AulaControlador(
                 $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),
                 $this->contenedor->obtener(\App\Servicios\Cursos::class),
@@ -491,6 +495,8 @@ final class Aplicacion
                 new \App\Cuenta\ProgresoCurso(
                     $this->contenedor->obtener(BD::class),
                     $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
+                    $this->contenedor->obtener(\App\Servicios\ColaCorreos::class),
+                    $urlBase,
                 ),
                 $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
             ))->material(
@@ -501,7 +507,7 @@ final class Aplicacion
             );
         });
 
-        $this->router->get('/mis-cursos/{slug}/leccion/{leccionId}/video', function (Peticion $p): Respuesta {
+        $this->router->get('/mis-cursos/{slug}/leccion/{leccionId}/video', function (Peticion $p) use ($urlBase): Respuesta {
             return (new \App\Cuenta\AulaControlador(
                 $this->contenedor->obtener(\App\Servicios\AutenticacionComprador::class),
                 $this->contenedor->obtener(\App\Servicios\Cursos::class),
@@ -513,6 +519,8 @@ final class Aplicacion
                 new \App\Cuenta\ProgresoCurso(
                     $this->contenedor->obtener(BD::class),
                     $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
+                    $this->contenedor->obtener(\App\Servicios\ColaCorreos::class),
+                    $urlBase,
                 ),
                 $this->contenedor->obtener(\App\Repositorios\CertificadoRepo::class),
             ))->video(

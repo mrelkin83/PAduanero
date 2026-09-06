@@ -39,7 +39,7 @@ final class MotorWa
             'db' => $db,
             'secreto' => new SecretoMotor($cifrado),
             'archivo' => new ArchivosMotor($raiz . '/storage/wa', (string) (Entorno::obtener('APP_URL', '') ?? '')),
-            'dominio' => new AdaptadorDespacho($db, new GoogleCalendar($bd, $cifrado, $log)),
+            'dominio' => new AdaptadorDespacho($db, new GoogleCalendar($bd, $cifrado, $log), new \App\Servicios\ColaCorreos($bd)),
             // 'formato' queda en el defecto: pesos colombianos.
             // 'funcion' y 'negocio' quedan en el defecto: sin planes, un solo negocio.
         ]);

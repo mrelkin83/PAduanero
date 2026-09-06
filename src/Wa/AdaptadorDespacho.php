@@ -43,6 +43,10 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
     public function __construct(
         private readonly DbPort $db,
         private readonly GoogleCalendar $calendario,
+        // Opcional: sin él la cita se confirma igual, solo sin correos (el
+        // aviso por WhatsApp a Pedro y la invitación de Google Calendar
+        // siguen saliendo).
+        private readonly ?\App\Servicios\ColaCorreos $correos = null,
     ) {
     }
 
@@ -330,8 +334,58 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
         );
 
         $this->avisarAlAbogado($c, $evento);
+        $this->avisarCitaPorCorreo($c, $evento);
 
         return true;
+    }
+
+    /**
+     * Correos de la cita confirmada: confirmación al cliente (si dio correo) y
+     * aviso al buzón del despacho. Mejor esfuerzo, por la cola — la cita ya
+     * está confirmada, un correo caído no la deshace.
+     *
+     * @param array<string,mixed> $cita
+     * @param array{ok:bool,event_id:?string,meet:?string} $evento
+     */
+    private function avisarCitaPorCorreo(array $cita, array $evento): void
+    {
+        if ($this->correos === null) {
+            return;
+        }
+
+        $e = \App\Soporte\Vista::e(...);
+        $inicio = (string) ($cita['inicio'] ?? '');
+        $meet = (string) ($evento['meet'] ?? '');
+        $nombre = (string) ($cita['nombre'] ?? '');
+
+        // Al cliente (si dio correo).
+        $correoCliente = trim((string) ($cita['correo'] ?? ''));
+        if ($correoCliente !== '') {
+            $cuerpo = '<p>Hola ' . $e($nombre) . ',</p>'
+                . '<p>Su asesoría con el Dr. Pedro quedó <strong>confirmada</strong> para el '
+                . $e($inicio) . '.</p>'
+                . ($meet !== '' ? '<p>Enlace de la videollamada:<br><a href="' . $e($meet) . '">' . $e($meet) . '</a></p>' : '')
+                . '<p>Si necesita reprogramar, respóndanos por WhatsApp.</p>';
+            $this->correos->encolar(
+                $correoCliente,
+                'Su asesoría quedó confirmada',
+                \App\Soporte\PlantillaCorreo::envolver('Asesoría confirmada', $cuerpo),
+                'cita_cliente',
+            );
+        }
+
+        // Al despacho.
+        $cuerpoP = '<p>Nueva cita confirmada:</p>'
+            . '<p><strong>Cliente:</strong> ' . $e($nombre)
+            . ($correoCliente !== '' ? ' (' . $e($correoCliente) . ')' : '') . '<br>'
+            . '<strong>Cuándo:</strong> ' . $e($inicio)
+            . ($cita['motivo'] ?? '' ? '<br><strong>Motivo:</strong> ' . $e((string) $cita['motivo']) : '') . '</p>';
+        $this->correos->encolar(
+            \App\Servicios\ColaCorreos::CORREO_DESPACHO,
+            'Nueva cita confirmada: ' . $inicio,
+            \App\Soporte\PlantillaCorreo::envolver('Nueva cita', $cuerpoP),
+            'cita_pedro',
+        );
     }
 
     /**

@@ -34,7 +34,7 @@ final class ConfirmadorCompraTest extends CasoBaseBd
             $this->enlaces,
             new ConexionCompartida($this->bd, Cifrado::desdeEntorno(), new Logger(sys_get_temp_dir() . '/pa-confirmador.log', 'error'), dirname(__DIR__, 2)),
             $this->bd,
-            null, // Smtp: sin SMTP configurado en pruebas, debe degradar sin tronar
+            new \App\Servicios\ColaCorreos($this->bd),
             self::URL,
         );
     }
@@ -99,24 +99,33 @@ final class ConfirmadorCompraTest extends CasoBaseBd
     }
 
     #[Test]
-    public function confirmarSinSmtpConfiguradoNoTruena(): void
+    public function confirmarEncolaElAccesoAlCompradorYElAvisoAlDespacho(): void
     {
-        // El constructor de este test ya pasa null como $smtp — llegar aquí
-        // sin excepción es la prueba.
+        $this->bd->pdo()->exec('DELETE FROM correos_cola');
+
         $this->confirmador->confirmar($this->compraPendiente());
 
-        self::assertTrue(true);
+        $tipos = $this->bd->pdo()->query('SELECT tipo FROM correos_cola ORDER BY tipo')->fetchAll(\PDO::FETCH_COLUMN);
+        self::assertContains('compra_acceso', $tipos);
+        self::assertContains('compra_aviso', $tipos);
+
+        // El aviso interno va al buzón del despacho.
+        $destinoAviso = $this->bd->pdo()->query("SELECT destinatario FROM correos_cola WHERE tipo = 'compra_aviso'")->fetchColumn();
+        self::assertSame(\App\Servicios\ColaCorreos::CORREO_DESPACHO, $destinoAviso);
     }
 
     #[Test]
-    public function reenviarAccesoEnUnaCompraPagadaSinRegistrarMandaOtroCorreo(): void
+    public function reenviarAccesoEnUnaCompraPagadaSinRegistrarEncolaOtroCorreo(): void
     {
         $compraId = $this->compraPendiente();
         $this->confirmador->confirmar($compraId);
+        $this->bd->pdo()->exec('DELETE FROM correos_cola');
 
-        // El confirmador de este test se construye con smtp=null (línea 36),
-        // así que reenviarAcceso() debe degradar a false sin tronar.
-        self::assertFalse($this->confirmador->reenviarAcceso($compraId));
+        // Ahora reenviarAcceso encola el correo y devuelve true.
+        self::assertTrue($this->confirmador->reenviarAcceso($compraId));
+        self::assertSame(1, (int) $this->bd->pdo()->query(
+            "SELECT COUNT(*) FROM correos_cola WHERE tipo = 'compra_acceso'"
+        )->fetchColumn());
     }
 
     #[Test]

@@ -80,7 +80,7 @@ final class PanelCursosTest extends CasoBaseBd
                     dirname(__DIR__, 2),
                 ),
                 $this->bd,
-                null,
+                new \App\Servicios\ColaCorreos($this->bd),
                 'https://pedroabogadoaduanero.com',
             ),
             new \App\Repositorios\CursoMaterialRepo($this->bd),

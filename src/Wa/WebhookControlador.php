@@ -10,7 +10,6 @@ use App\Core\Respuesta;
 use App\Soporte\Cifrado;
 use App\Soporte\Entorno;
 use App\Soporte\Logger;
-use App\Soporte\Smtp;
 use ElkinLinan\WhatsappAiEngine\Channel\EvolutionClient;
 use ElkinLinan\WhatsappAiEngine\Core\AgentManager;
 use ElkinLinan\WhatsappAiEngine\Core\AiOrchestrator;
@@ -445,7 +444,7 @@ final class WebhookControlador
                     new \App\Repositorios\CompradorEnlaceRepo($this->bd),
                     new ConexionCompartida($this->bd, $this->cifrado, $this->logApp, $this->raiz),
                     $this->bd,
-                    Smtp::desdeEntorno(),
+                    new \App\Servicios\ColaCorreos($this->bd),
                     (string) (Entorno::obtener('APP_URL', '') ?? ''),
                 );
                 $confirmador->confirmar($compraCurso['id']);

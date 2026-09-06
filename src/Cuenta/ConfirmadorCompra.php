@@ -7,7 +7,9 @@ namespace App\Cuenta;
 use App\Core\BD;
 use App\Repositorios\CompraCursoRepo;
 use App\Repositorios\CompradorEnlaceRepo;
-use App\Soporte\Smtp;
+use App\Servicios\ColaCorreos;
+use App\Soporte\PlantillaCorreo;
+use App\Soporte\Vista;
 use App\Wa\ConexionCompartida;
 
 /**
@@ -29,7 +31,7 @@ final class ConfirmadorCompra
         private readonly CompradorEnlaceRepo $enlaces,
         private readonly ConexionCompartida $conexion,
         private readonly BD $bd,
-        private readonly ?Smtp $smtp,
+        private readonly ColaCorreos $correos,
         private readonly string $urlBase,
     ) {
     }
@@ -50,26 +52,20 @@ final class ConfirmadorCompra
         $stmt->execute([$compra['curso_id']]);
         $tituloCurso = (string) $stmt->fetchColumn();
 
+        // Aviso a Pedro por WhatsApp (como siempre) y también por correo al
+        // buzón del despacho, ahora que hay cola.
         $this->conexion->avisarPedro(sprintf(
             'Nuevo pago de curso: %s (%s) compró "%s".',
             $compra['nombre'],
             $compra['correo'],
             $tituloCurso,
         ));
+        $this->avisarPedroPorCorreo($compra, $tituloCurso);
 
         $token = $this->enlaces->crear('completar_registro', null, $compraId, self::MINUTOS_VIGENCIA_ENLACE);
         $enlaceUrl = rtrim($this->urlBase, '/') . '/mis-cursos/completar?token=' . $token;
 
-        if ($this->smtp !== null) {
-            $this->smtp->enviar(
-                (string) $compra['correo'],
-                'Su acceso al curso: ' . $tituloCurso,
-                "Hola {$compra['nombre']},\n\n"
-                    . "Su pago del curso \"{$tituloCurso}\" fue confirmado.\n\n"
-                    . "Complete su registro (o inicie sesión si ya tiene cuenta) en este enlace:\n{$enlaceUrl}\n\n"
-                    . "Este enlace es válido por 48 horas.\n",
-            );
-        }
+        $this->encolarAcceso($compra, $tituloCurso, $enlaceUrl, esReenvio: false);
     }
 
     /**
@@ -86,10 +82,6 @@ final class ConfirmadorCompra
             return false;
         }
 
-        if ($this->smtp === null) {
-            return false;
-        }
-
         $stmt = $this->bd->pdo()->prepare('SELECT titulo FROM cursos WHERE id = ?');
         $stmt->execute([$compra['curso_id']]);
         $tituloCurso = (string) $stmt->fetchColumn();
@@ -97,13 +89,50 @@ final class ConfirmadorCompra
         $token = $this->enlaces->crear('completar_registro', null, $compraId, self::MINUTOS_VIGENCIA_ENLACE);
         $enlaceUrl = rtrim($this->urlBase, '/') . '/mis-cursos/completar?token=' . $token;
 
-        return $this->smtp->enviar(
+        return $this->encolarAcceso($compra, $tituloCurso, $enlaceUrl, esReenvio: true) !== null;
+    }
+
+    /**
+     * Encola el correo HTML con el enlace de acceso al comprador.
+     *
+     * @param array<string,mixed> $compra
+     */
+    private function encolarAcceso(array $compra, string $tituloCurso, string $enlaceUrl, bool $esReenvio): ?int
+    {
+        $e = Vista::e(...);
+        $intro = $esReenvio
+            ? 'Le reenviamos el acceso al curso <strong>' . $e($tituloCurso) . '</strong>.'
+            : 'Su pago del curso <strong>' . $e($tituloCurso) . '</strong> fue confirmado.';
+
+        $cuerpo = '<p>Hola ' . $e((string) $compra['nombre']) . ',</p>'
+            . '<p>' . $intro . '</p>'
+            . '<p>Complete su registro (o inicie sesión si ya tiene cuenta) con el botón de abajo. '
+            . 'El enlace es válido por 48 horas.</p>';
+
+        return $this->correos->encolar(
             (string) $compra['correo'],
             'Su acceso al curso: ' . $tituloCurso,
-            "Hola {$compra['nombre']},\n\n"
-                . "Le reenviamos el acceso al curso \"{$tituloCurso}\".\n\n"
-                . "Complete su registro (o inicie sesión si ya tiene cuenta) en este enlace:\n{$enlaceUrl}\n\n"
-                . "Este enlace es válido por 48 horas.\n",
+            PlantillaCorreo::envolver('Acceso a su curso', $cuerpo, ['texto' => 'Acceder al curso', 'url' => $enlaceUrl]),
+            'compra_acceso',
+        );
+    }
+
+    /** @param array<string,mixed> $compra */
+    private function avisarPedroPorCorreo(array $compra, string $tituloCurso): void
+    {
+        $e = Vista::e(...);
+        $wpp = (string) ($compra['whatsapp'] ?? '');
+        $cuerpo = '<p>Entró una compra de curso:</p>'
+            . '<p><strong>Curso:</strong> ' . $e($tituloCurso) . '<br>'
+            . '<strong>Comprador:</strong> ' . $e((string) $compra['nombre']) . '<br>'
+            . '<strong>Correo:</strong> ' . $e((string) $compra['correo'])
+            . ($wpp !== '' ? '<br><strong>WhatsApp:</strong> ' . $e($wpp) : '') . '</p>';
+
+        $this->correos->encolar(
+            ColaCorreos::CORREO_DESPACHO,
+            'Nueva compra de curso: ' . $tituloCurso,
+            PlantillaCorreo::envolver('Nueva compra', $cuerpo),
+            'compra_aviso',
         );
     }
 }
