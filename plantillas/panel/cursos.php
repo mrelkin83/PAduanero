@@ -21,6 +21,7 @@ $contenido = static function () use ($e, $ctx, $cursos): void {
         <div class="flex gap-3">
             <a href="/panel/cursos/categorias" class="boton-secundario">Categorías</a>
             <a href="/panel/cursos/certificado" class="boton-secundario">Certificado</a>
+            <a href="/panel/cursos/correos" class="boton-secundario">Correos</a>
             <?php if ($editable): ?>
             <a href="/panel/cursos/editar" class="boton">Nuevo curso</a>
             <?php endif; ?>

@@ -89,6 +89,7 @@ final class PanelCursosTest extends CasoBaseBd
                 new \App\Repositorios\CompradorRepo($this->bd, \App\Soporte\Cifrado::desdeEntorno()),
                 new \App\Repositorios\CertificadoPlantillaRepo($this->bd),
             ),
+            new \App\Servicios\ColaCorreos($this->bd),
         );
     }
 
@@ -728,5 +729,28 @@ final class PanelCursosTest extends CasoBaseBd
     {
         $this->expectException(SinPermisoException::class);
         $this->controlador()->plantillaCertificado($this->ctx('contador'));
+    }
+
+    /* ── Bitácora de correos ──────────────────────────────────────────── */
+
+    #[Test]
+    public function laBitacoraDeCorreosSePinta(): void
+    {
+        $this->bd->pdo()->prepare(
+            "INSERT INTO correos_cola (destinatario, asunto, cuerpo_html, tipo, estado)
+             VALUES ('cliente@ejemplo.com', 'Su acceso', '<p>x</p>', 'compra_acceso', 'enviado')"
+        )->execute();
+
+        $html = $this->controlador()->correos($this->ctx('abogado'))->cuerpo;
+
+        self::assertStringContainsString('Correos enviados', $html);
+        self::assertStringContainsString('cliente@ejemplo.com', $html);
+    }
+
+    #[Test]
+    public function reintentarCorreoExigePermisoDeEditar(): void
+    {
+        $this->expectException(SinPermisoException::class);
+        $this->controlador()->reintentarCorreo($this->ctx('contador', ['id' => '1']));
     }
 }

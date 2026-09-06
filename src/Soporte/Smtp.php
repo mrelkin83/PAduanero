@@ -20,7 +20,7 @@ namespace App\Soporte;
  * del VPS mientras el SMTP siga pendiente. Quien lo usa trata el null como
  * «sin correo», no como error: el recordatorio de WhatsApp sale igual.
  */
-final class Smtp
+final class Smtp implements EnviadorCorreo
 {
     public function __construct(
         private readonly string $host,
@@ -49,6 +49,50 @@ final class Smtp
 
     /** Envía texto plano. Devuelve false ante cualquier tropiezo, sin excepción. */
     public function enviar(string $para, string $asunto, string $texto): bool
+    {
+        return $this->entregar($para, $asunto, [
+            'Content-Type: text/plain; charset=UTF-8',
+            'Content-Transfer-Encoding: base64',
+            '',
+            chunk_split(base64_encode($texto)),
+        ]);
+    }
+
+    /**
+     * Envía un correo HTML con alternativa de texto plano (multipart/
+     * alternative): el cliente que no renderiza HTML ve el texto, y los
+     * filtros antispam premian que exista esa versión. El texto se deriva del
+     * HTML si no se da uno propio.
+     */
+    public function enviarHtml(string $para, string $asunto, string $html, ?string $texto = null): bool
+    {
+        $texto ??= trim(html_entity_decode(strip_tags((string) preg_replace('/<(br|\/p|\/div|\/h[1-6])\s*\/?>/i', "\n", $html)), ENT_QUOTES, 'UTF-8'));
+        $frontera = 'pa-' . bin2hex(random_bytes(12));
+
+        return $this->entregar($para, $asunto, [
+            'Content-Type: multipart/alternative; boundary="' . $frontera . '"',
+            '',
+            '--' . $frontera,
+            'Content-Type: text/plain; charset=UTF-8',
+            'Content-Transfer-Encoding: base64',
+            '',
+            chunk_split(base64_encode($texto)),
+            '--' . $frontera,
+            'Content-Type: text/html; charset=UTF-8',
+            'Content-Transfer-Encoding: base64',
+            '',
+            chunk_split(base64_encode($html)),
+            '--' . $frontera . '--',
+        ]);
+    }
+
+    /**
+     * El diálogo SMTP completo, con el cuerpo MIME ya armado por quien llama.
+     * Devuelve false ante cualquier tropiezo, sin excepción.
+     *
+     * @param list<string> $mime líneas del cuerpo tras las cabeceras comunes
+     */
+    private function entregar(string $para, string $asunto, array $mime): bool
     {
         $para = trim($para);
         if ($para === '' || !filter_var($para, FILTER_VALIDATE_EMAIL) || $this->desde === '') {
@@ -119,20 +163,14 @@ final class Smtp
                 return $this->cerrar($s);
             }
 
-            $cuerpo = implode("\r\n", [
+            $cuerpo = implode("\r\n", array_merge([
                 'From: <' . $this->desde . '>',
                 'To: <' . $para . '>',
                 'Subject: =?UTF-8?B?' . base64_encode($asunto) . '?=',
                 'Date: ' . date('r'),
                 'Message-ID: <' . bin2hex(random_bytes(16)) . '@' . $this->host . '>',
                 'MIME-Version: 1.0',
-                'Content-Type: text/plain; charset=UTF-8',
-                'Content-Transfer-Encoding: base64',
-                '',
-                // Base64 del cuerpo entero: evita tener que escapar los puntos
-                // iniciales y los finales de línea del protocolo.
-                chunk_split(base64_encode($texto)),
-            ]);
+            ], $mime));
             $this->manda($s, $cuerpo . "\r\n.");
             $ok = $this->espera($s, '250');
             $this->manda($s, 'QUIT');

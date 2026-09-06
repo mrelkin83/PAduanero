@@ -23,7 +23,35 @@ final class PanelCursosControlador extends ControladorBase
         private readonly \App\Repositorios\CursoMaterialRepo $materiales,
         private readonly \App\Repositorios\CertificadoPlantillaRepo $plantillaCert,
         private readonly \App\Cuenta\CertificadoPdf $certificadoPdf,
+        private readonly \App\Servicios\ColaCorreos $correos,
     ) {
+    }
+
+    /* ── Bitácora de correos ──────────────────────────────────────────── */
+
+    /** Lista los correos de la cola (enviados, pendientes, fallidos). */
+    public function correos(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.ver');
+
+        return $this->vista('panel/cursos_correos', [
+            'ctx' => $ctx,
+            'correos' => $this->correos->ultimos(100),
+            'avisos' => $this->avisos($ctx),
+        ]);
+    }
+
+    /** Reintenta un correo fallido (lo devuelve a la cola). */
+    public function reintentarCorreo(Contexto $ctx): Respuesta
+    {
+        $ctx->permisos->exigir($ctx->usuario, 'cursos.editar');
+
+        $id = (int) $ctx->campo('id');
+        $ok = $id > 0 && $this->correos->reintentar($id);
+        $this->auditoria->registrar('correo', (string) $id, 'reintentar', $ctx->actor(), ['ok' => $ok], $ctx->ip());
+
+        return $this->redirigirCon('/panel/cursos/correos', $ok ? 'ok' : 'error',
+            $ok ? 'Correo puesto de nuevo en la cola; saldrá en el próximo envío.' : 'No se pudo reintentar ese correo.');
     }
 
     public function listar(Contexto $ctx): Respuesta

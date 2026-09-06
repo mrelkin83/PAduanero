@@ -164,6 +164,8 @@ final class Panel
             'POST /cursos/lecciones/guardar' => $modulos['cursos']->guardarLeccion($ctx),
             'POST /cursos/lecciones/materiales/agregar' => $modulos['cursos']->agregarMaterial($ctx),
             'POST /cursos/lecciones/materiales/eliminar' => $modulos['cursos']->eliminarMaterial($ctx),
+            'GET /cursos/correos' => $modulos['cursos']->correos($ctx),
+            'POST /cursos/correos/reintentar' => $modulos['cursos']->reintentarCorreo($ctx),
             'GET /cursos/certificado' => $modulos['cursos']->plantillaCertificado($ctx),
             'POST /cursos/certificado' => $modulos['cursos']->guardarPlantillaCertificado($ctx),
             'GET /cursos/certificado/ejemplo' => $modulos['cursos']->previewCertificado($ctx),
@@ -239,6 +241,7 @@ final class Panel
                     $this->c->obtener(\App\Repositorios\CompradorRepo::class),
                     $this->c->obtener(\App\Repositorios\CertificadoPlantillaRepo::class),
                 ),
+                $this->c->obtener(\App\Servicios\ColaCorreos::class),
             ),
             'usuarios' => new UsuariosControlador(
                 $this->c->obtener(UsuarioRepo::class),
