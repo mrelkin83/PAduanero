@@ -32,7 +32,10 @@ $css = @file_get_contents(dirname(__DIR__, 2) . '/public/css/app.css') ?: '';
 <header class="barra-sitio">
     <div class="mx-auto flex items-center gap-6 px-5 py-3 md:px-7">
         <a href="/" class="flex shrink-0 items-center" aria-label="Pedro, abogado aduanero">
-            <img src="/img/logo-pedro.png" alt="" width="40" height="40" class="h-10 w-10" decoding="async">
+            <picture>
+                <source type="image/webp" srcset="/img/logo-pedro.webp">
+                <img src="/img/logo-pedro.png" alt="" width="40" height="40" class="h-10 w-10" decoding="async">
+            </picture>
             <span class="sr-only">Pedro</span>
         </a>
         <h1 class="ml-auto text-lg font-semibold">Cursos</h1>

@@ -51,7 +51,9 @@ final class Perfil
     {
         return new Respuesta($this->htmlCacheado(), 200, [
             'Content-Type' => 'text/html; charset=utf-8',
-            'Cache-Control' => 'no-cache, must-revalidate',
+            // Misma política que la landing y por la misma razón; el
+            // porqué de cada directiva está explicado en `Landing::responder()`.
+            'Cache-Control' => 'public, max-age=0, s-maxage=300, stale-while-revalidate=600, must-revalidate',
         ]);
     }
 

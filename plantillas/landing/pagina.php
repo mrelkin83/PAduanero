@@ -205,11 +205,19 @@ $menu = array_values(array_filter(
     <div class="mx-auto flex items-center gap-6 px-5 py-3 md:px-7">
         <?php /* La insignia tapa el nombre, no lo reemplaza: «Pedro» sigue en
                  el enlace para lectores de pantalla y buscadores (`sr-only`),
-                 y el `aria-label` conserva la firma completa. El archivo es
-                 `logo-pedro.png` (192 px, generado desde el original de 2 MB:
-                 nunca servir ese aquí — presupuesto §6.1). */ ?>
+                 y el `aria-label` conserva la firma completa.
+
+                 96 px de lado para 40 de pantalla: cubre las de 2×. Estuvo
+                 en 192 y pesaba 37 KB, que era el archivo **más pesado de
+                 toda la carga inicial** —más que la fuente, más que la foto
+                 del hero— por un sello de 40 px en la esquina. El WebP baja
+                 a 4 KB y el PNG queda de reserva; nunca servir aquí el
+                 original de 2 MB (presupuesto §6.1). */ ?>
         <a href="#contenido" class="flex shrink-0 items-center" aria-label="Pedro, abogado aduanero">
-            <img src="/img/logo-pedro.png" alt="" width="40" height="40" class="h-10 w-10" decoding="async">
+            <picture>
+                <source type="image/webp" srcset="<?= $e(Vista::activo('/img/logo-pedro.webp')) ?>">
+                <img src="<?= $e(Vista::activo('/img/logo-pedro.png')) ?>" alt="" width="40" height="40" class="h-10 w-10" decoding="async">
+            </picture>
             <span class="sr-only">Pedro</span>
         </a>
 

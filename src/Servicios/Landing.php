@@ -43,10 +43,28 @@ final class Landing
 
         return new Respuesta($html, 200, [
             'Content-Type' => 'text/html; charset=utf-8',
-            // El HTML no se cachea en el navegador: si Pedro corrige un
+            // El NAVEGADOR sigue revalidando siempre: si Pedro corrige un
             // precio, no puede quedar viviendo una hora en los clientes.
-            // Lo pesado (imágenes, CSS) sí, y va con hash en el nombre.
-            'Cache-Control' => 'no-cache, must-revalidate',
+            // Eso es `max-age=0, must-revalidate`, y es la regla de antes.
+            //
+            // Lo nuevo es `s-maxage`, que solo obedecen las cachés
+            // COMPARTIDAS —la CDN—, y que es lo que puede arreglar el
+            // problema real de esta página: el origen está en Francia y el
+            // borde de Cloudflare que atiende a Colombia está en Miami. Con
+            // el HTML sin cachear, cada visita cruza el Atlántico dos veces
+            // y el TTFB se va a 0,75 s cuando el servidor responde en 8 ms.
+            //
+            // 300 s es exactamente el TTL que ya tiene la caché de páginas
+            // (`landing_cache_segundos`), así que no añade ni un segundo de
+            // desfase que el sistema no aceptara ya. `stale-while-revalidate`
+            // deja que el borde sirva al instante mientras refresca detrás.
+            //
+            // OJO: esto no hace nada por sí solo. Cloudflare **ignora** las
+            // cabeceras de caché en HTML salvo que haya una Cache Rule que
+            // diga «Cache Everything» para el dominio. La cabecera está aquí
+            // para que el día que se active esa regla el comportamiento sea
+            // el correcto, y no uno que haya que descubrir en producción.
+            'Cache-Control' => 'public, max-age=0, s-maxage=300, stale-while-revalidate=600, must-revalidate',
         ]);
     }
 

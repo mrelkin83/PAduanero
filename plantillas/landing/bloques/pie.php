@@ -82,8 +82,17 @@ $hayContacto = $correo !== '' || $telefonos !== [] || $direccion !== '' || $rede
             <div>
                 <?php /* La insignia cierra todas las páginas públicas: este pie
                          lo comparten la landing, `/perfil` y las legales. Va
-                         sobre la firma, no en vez de ella. */ ?>
-                <img src="/img/logo-pedro.png" alt="" width="72" height="72" class="mb-5 h-18 w-18" loading="lazy" decoding="async">
+                         sobre la firma, no en vez de ella.
+
+                         Archivo propio de 144 px y no el de la cabecera: aquí
+                         se pinta a 72, y con el de 96 quedaba blando en
+                         pantallas de 2×. Cuesta cero en el camino crítico
+                         porque va perezoso — nadie lo descarga hasta llegar
+                         abajo. */ ?>
+                <picture>
+                    <source type="image/webp" srcset="<?= $e(\App\Soporte\Vista::activo('/img/logo-pedro-144.webp')) ?>">
+                    <img src="<?= $e(\App\Soporte\Vista::activo('/img/logo-pedro-144.png')) ?>" alt="" width="72" height="72" class="mb-5 h-18 w-18" loading="lazy" decoding="async">
+                </picture>
                 <p class="marca">Pedro</p>
                 <p class="rotulo mt-4 text-acero">
                     Abogado aduanero
