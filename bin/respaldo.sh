@@ -49,14 +49,30 @@ mysqldump \
   --host="${DB_HOST}" --port="${DB_PORT}" \
   --user="${DB_USER}" --password="${DB_PASS}" \
   --single-transaction --quick --routines --triggers --events \
+  --no-tablespaces \
   --default-character-set=utf8mb4 \
   --set-gtid-purged=OFF \
   "${DB_NAME}" > "${TRABAJO}/mysql/${DB_NAME}.sql" \
   || fallo "mysqldump"
 
 # Verificación mínima: un volcado truncado también pesa.
-grep -q "CREATE TABLE \`casos\`" "${TRABAJO}/mysql/${DB_NAME}.sql" \
-  || fallo "el volcado de MySQL parece incompleto (falta la tabla casos)"
+#
+# Se comprueban las tablas que de verdad duele perder, y el sello que
+# mysqldump escribe al final: sin él, el volcado se cortó a la mitad.
+# Antes se miraba `casos`, que es una tabla huérfana del motor retirado
+# (CLAUDE.md §0.1) — comprobar algo que ya nadie usa es comprobar que el
+# archivo existe, no que sirva.
+#
+# `--no-tablespaces` arriba, por lo mismo: el usuario de la aplicación no
+# tiene el privilegio PROCESS, y sin esa bandera mysqldump escupe un error
+# por los tablespaces aunque el volcado salga bien.
+for TABLA in landing_bloques configuraciones usuarios; do
+  grep -q "CREATE TABLE \`${TABLA}\`" "${TRABAJO}/mysql/${DB_NAME}.sql" \
+    || fallo "el volcado de MySQL no trae la tabla ${TABLA}"
+done
+
+grep -q '^-- Dump completed' "${TRABAJO}/mysql/${DB_NAME}.sql" \
+  || fallo "el volcado de MySQL se cortó antes de terminar"
 
 # Binlogs de la última hora, para el RPO de pagos.
 if [[ -d /var/log/mysql ]]; then
@@ -89,8 +105,12 @@ fi
 log "Archivos: img y adjuntos"
 tar cf "${TRABAJO}/archivos/publicos.tar" \
   -C "${RAIZ}/public" img 2>/dev/null || log "AVISO: sin carpeta img"
-[[ -d "${RAIZ}/storage/adjuntos" ]] && \
+# Con `set -e`, un `[[ … ]] && cmd` que da falso devuelve 1 y mata el
+# script entero. Aquí eso significaba que NO tener adjuntos abortaba el
+# respaldo completo, después de haber volcado bien MySQL. Va como `if`.
+if [[ -d "${RAIZ}/storage/adjuntos" ]]; then
   tar cf "${TRABAJO}/archivos/adjuntos.tar" -C "${RAIZ}/storage" adjuntos
+fi
 
 # .env SIN las claves de cifrado: se respalda la configuración de conexión,
 # no las llaves. Esas van por otro canal (docs/RESPALDOS.md §4).
@@ -120,17 +140,43 @@ BYTES=$(stat -c%s "${PAQUETE}.age")
 [[ "$BYTES" -gt 51200 ]] || fallo "el respaldo pesa solo ${BYTES} bytes"
 
 # --- 6. Fuera del servidor -------------------------------------------
-log "Subiendo a ${REMOTO}"
-rclone copy "${PAQUETE}.age" "${REMOTO}/diario/" || fallo "rclone"
+#
+# La regla 3-2-1 (docs/RESPALDOS.md §3) pide una copia fuera del sitio, y
+# esta es la mitad que todavía no está: hace falta un bucket y sus
+# credenciales, que no se inventan desde aquí.
+#
+# Mientras no lo haya, el respaldo local SÍ se hace y el script NO falla.
+# La alternativa —abortar— era peor de lo que parece: dejaba el sistema sin
+# ningún respaldo, ni siquiera el local, por no tener la copia remota. Un
+# respaldo en el mismo servidor no protege contra perder el servidor, pero
+# sí contra lo que de verdad pasa a diario: un borrado por error, una
+# migración que sale mal, un contenido que alguien pisó desde el panel.
+#
+# El aviso es RUIDOSO a propósito. Que salga en cada corrida es la única
+# forma de que esto no se quede así para siempre.
+if rclone listremotes 2>/dev/null | grep -q "^${REMOTO%%:*}:"; then
+  log "Subiendo a ${REMOTO}"
+  rclone copy "${PAQUETE}.age" "${REMOTO}/diario/" || fallo "rclone"
 
-# Semanal (domingo) y mensual (día 1).
-[[ "$(date +%u)" == "7" ]] && rclone copy "${PAQUETE}.age" "${REMOTO}/semanal/"
-[[ "$(date +%d)" == "01" ]] && rclone copy "${PAQUETE}.age" "${REMOTO}/mensual/"
+  # Semanal (domingo) y mensual (día 1). Mismo motivo que arriba para no
+  # usar `&&`: cualquier día que no fuera domingo mataba el script justo
+  # después de haber subido bien el respaldo diario.
+  if [[ "$(date +%u)" == "7" ]]; then
+    rclone copy "${PAQUETE}.age" "${REMOTO}/semanal/"
+  fi
+  if [[ "$(date +%d)" == "01" ]]; then
+    rclone copy "${PAQUETE}.age" "${REMOTO}/mensual/"
+  fi
 
-# --- 7. Rotación -----------------------------------------------------
+  rclone delete "${REMOTO}/diario/"  --min-age 7d  || true
+  rclone delete "${REMOTO}/semanal/" --min-age 28d || true
+  rclone delete "${REMOTO}/mensual/" --min-age 365d || true
+else
+  log "AVISO: sin destino externo configurado (rclone remoto «${REMOTO%%:*}»)."
+  log "AVISO: el respaldo queda SOLO en este servidor — la regla 3-2-1 no se cumple."
+fi
+
+# --- 7. Rotación local -----------------------------------------------
 find "${DESTINO}" -name 'pedro-*.tar.age' -mtime "+${RETENCION_LOCAL_DIAS}" -delete
-rclone delete "${REMOTO}/diario/"  --min-age 7d  || true
-rclone delete "${REMOTO}/semanal/" --min-age 28d || true
-rclone delete "${REMOTO}/mensual/" --min-age 365d || true
 
 log "=== Respaldo ${SELLO} completado ==="
