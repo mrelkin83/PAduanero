@@ -224,13 +224,35 @@ git pull --ff-only
 composer install --no-dev --optimize-autoloader
 php bin/migrar.php                    # migraciones idempotentes
 rm -f storage/cache/*.html            # landing y diagnóstico se regeneran solos
-systemctl reload php8.2-fpm
-bin/salud.sh
+systemctl reload php8.3-fpm         # OJO: 8.3, no 8.2 — el VPS va en 8.3
+bash bin/salud.sh                   # sin bit de ejecución en el VPS
 ```
 
 **Borrar la caché a mano no es opcional.** `CachePagina` invalida por
 centinela y por `mtime` del CSS, no por el de las plantillas: un despliegue
-que solo cambie un `.php` sirve el HTML viejo hasta que expire el TTL.
+que solo cambie un `.php` sirve el HTML viejo hasta que expire el TTL. Y
+tampoco mira el `mtime` del JavaScript, así que este `rm` es además lo que
+hace llegar un `.js` nuevo (ver abajo).
+
+**Los estáticos van por delante de una CDN que no vuelve a preguntar.**
+nginx los sirve con `max-age=2592000, immutable`, de modo que Cloudflare
+puede seguir entregando el archivo viejo durante treinta días. El 2026-09-11
+eso sirvió un `perfil.js` de dos semanas atrás junto a un HTML recién
+generado: la página traía los `data-*` nuevos y el script no sabía leerlos,
+sin un solo error en consola ni en el servidor.
+
+La cura está en el código, no en el procedimiento: los `<script>` se emiten
+con `Vista::activo()`, que le cuelga a la ruta el `mtime` del archivo. Al
+cambiar el archivo cambia la URL, y una URL nueva es una entrada nueva para
+cualquier caché. `ActivosVersionadosTest` rechaza cualquier
+`<script src="/js/…">` pelado en `plantillas/`. **No hay que purgar nada a
+mano** — pero sí borrar la caché de páginas, porque el `?v=` viaja dentro
+del HTML.
+
+**Comprobar el comportamiento, no el despliegue.** Que `git pull` y
+`migrar.php` terminen bien no dice que el sitio haga lo que debe: el fallo
+de arriba pasó los dos. Después de desplegar, ejercitar en producción lo que
+se acaba de cambiar.
 
 **El VPS no necesita node.** `public/css/app.css` y las variantes AVIF/WebP de
 `public/img/` se versionan ya compiladas. Se regeneran en la máquina de
