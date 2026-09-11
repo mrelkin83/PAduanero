@@ -92,15 +92,26 @@ $contenido = static function () use ($e, $ctx, $bloque, $datos, $rotulo): void {
 
         if (is_scalar($valor) || $valor === null) {
             $texto = (string) $valor;
+            $esImagen = in_array($clave, ['imagen', 'logo'], true);
             ?>
             <div class="mt-2">
                 <label class="rotulo"><?= $e($rotulo($clave)) ?></label>
+                <?php if ($esImagen && $texto !== ''): ?>
+                    <img src="/img/<?= $e($texto) ?>" alt="" class="mt-1 h-16 w-auto rounded border">
+                <?php endif; ?>
                 <?php if (mb_strlen($texto) > 90 || str_contains($texto, "\n")): ?>
                     <textarea name="<?= $e($nombre) ?>" rows="<?= min(8, max(2, (int) ceil(mb_strlen($texto) / 90))) ?>"
                               class="campo mt-1" <?= $editable ? '' : 'disabled' ?>><?= $e($texto) ?></textarea>
                 <?php else: ?>
                     <input name="<?= $e($nombre) ?>" value="<?= $e($texto) ?>"
                            class="campo mt-1" <?= $editable ? '' : 'disabled' ?>>
+                <?php endif; ?>
+                <?php if ($esImagen && $editable): ?>
+                    <input type="file" name="<?= $e(rtrim($nombre, ']') . '__archivo]') ?>"
+                           accept="image/jpeg,image/png,image/webp" class="campo mt-1">
+                    <p class="mt-1 text-xs text-acero">
+                        Subir un archivo aquí reemplaza la ruta de arriba al guardar. JPG, PNG o WebP, máx. 5 MB.
+                    </p>
                 <?php endif; ?>
             </div>
             <?php
@@ -160,7 +171,7 @@ $contenido = static function () use ($e, $ctx, $bloque, $datos, $rotulo): void {
         invalida sola al guardar).
     </p>
 
-    <form method="post" action="/panel/contenido/guardar" class="mt-4 max-w-3xl">
+    <form method="post" action="/panel/contenido/guardar" enctype="multipart/form-data" class="mt-4 max-w-3xl">
         <?= $ctx->csrf->campoOculto() ?>
         <input type="hidden" name="clave" value="<?= $e((string) $bloque['clave']) ?>">
 

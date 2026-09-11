@@ -33,6 +33,8 @@ final class PanelContenidoTest extends CasoBaseBd
     private Permisos $permisos;
     private string $rutaCache;
     private string $rutaSentinela;
+    /** @var list<string> */
+    private array $archivosTemporales = [];
 
     protected function setUp(): void
     {
@@ -42,6 +44,14 @@ final class PanelContenidoTest extends CasoBaseBd
         $sufijo = bin2hex(random_bytes(4));
         $this->rutaCache = sys_get_temp_dir() . "/pa-landing-{$sufijo}.html";
         $this->rutaSentinela = sys_get_temp_dir() . "/pa-landing-{$sufijo}.sentinel";
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->archivosTemporales as $tmp) {
+            @unlink($tmp);
+        }
+        parent::tearDown();
     }
 
     private function ctrl(): ContenidoControlador
@@ -64,11 +74,17 @@ final class PanelContenidoTest extends CasoBaseBd
                 $this->rutaSentinela,
                 dirname(__DIR__, 2) . '/public/css/app.css',
             ),
+            // move_uploaded_file siempre falla fuera de una petición HTTP
+            // real; copy(...) simula el «mover» en las pruebas.
+            copy(...),
         );
     }
 
-    /** @param array<string,mixed> $formulario */
-    private function ctx(string $rol, array $formulario = [], array $consulta = []): Contexto
+    /**
+     * @param array<string,mixed> $formulario
+     * @param array<string,mixed> $archivos   forma cruda de $_FILES['c']
+     */
+    private function ctx(string $rol, array $formulario = [], array $consulta = [], array $archivos = []): Contexto
     {
         return new Contexto(
             new Peticion(
@@ -77,6 +93,7 @@ final class PanelContenidoTest extends CasoBaseBd
                 consulta: $consulta,
                 formulario: $formulario,
                 ip: '190.85.1.1',
+                archivos: $archivos === [] ? [] : ['c' => $archivos],
             ),
             new Usuario(
                 id: '00000000-0000-0000-0000-000000000001',
@@ -259,6 +276,65 @@ final class PanelContenidoTest extends CasoBaseBd
         self::assertSame('whatsapp', $telefonos[0]['icono']);
         self::assertSame('+57 300 123 4567', $telefonos[0]['numero']);
         self::assertSame('telefono', $telefonos[1]['icono'], 'el segundo teléfono no se tocó');
+    }
+
+    /** Forma cruda de $_FILES['c'] para un único archivo en `items[$indice][$campo]`. */
+    private function archivosParaLogo(int $indice, string $campo, string $contenido, string $nombreOriginal = 'foto.jpg'): array
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'pc');
+        file_put_contents($tmp, $contenido);
+        $this->archivosTemporales[] = $tmp;
+
+        return [
+            'name' => ['items' => [$indice => [$campo => $nombreOriginal]]],
+            'type' => ['items' => [$indice => [$campo => 'image/jpeg']]],
+            'tmp_name' => ['items' => [$indice => [$campo => $tmp]]],
+            'error' => ['items' => [$indice => [$campo => UPLOAD_ERR_OK]]],
+            'size' => ['items' => [$indice => [$campo => strlen($contenido)]]],
+        ];
+    }
+
+    #[Test]
+    public function unArchivoQueNoEsImagenParaElLogoSeRechazaYNoGuardaNada(): void
+    {
+        $antes = $this->json('testimonios');
+
+        $r = $this->ctrl()->guardar($this->ctx(
+            'abogado',
+            ['clave' => 'testimonios', 'visible' => '1', 'c' => ['items' => [0 => ['logo' => $antes['items'][0]['logo']]]]],
+            [],
+            $this->archivosParaLogo(0, 'logo__archivo', 'esto no es una imagen'),
+        ));
+
+        self::assertSame(302, $r->estado);
+        self::assertStringContainsString('error', $r->cabeceras['Location'] ?? '');
+        self::assertSame($antes, $this->json('testimonios'), 'nada debió cambiar: la subida se rechazó');
+    }
+
+    #[Test]
+    public function subirUnLogoValidoLoGuardaYReemplazaLaRutaDeTexto(): void
+    {
+        $img = imagecreatetruecolor(1, 1);
+        ob_start();
+        imagejpeg($img);
+        $jpeg = (string) ob_get_clean();
+        imagedestroy($img);
+
+        $r = $this->ctrl()->guardar($this->ctx(
+            'abogado',
+            ['clave' => 'testimonios', 'visible' => '1', 'c' => ['items' => [0 => ['logo' => 'lo-que-sea-que-haya-tecleado.png']]]],
+            [],
+            $this->archivosParaLogo(0, 'logo__archivo', $jpeg),
+        ));
+
+        self::assertSame(302, $r->estado);
+        $logo = $this->json('testimonios')['items'][0]['logo'];
+
+        self::assertNotSame('lo-que-sea-que-haya-tecleado.png', $logo, 'el archivo subido debió ganar sobre el texto');
+        self::assertStringEndsWith('.jpg', $logo);
+        self::assertFileExists(dirname(__DIR__, 2) . '/public/img/' . $logo);
+
+        @unlink(dirname(__DIR__, 2) . '/public/img/' . $logo);
     }
 
     #[Test]

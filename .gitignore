@@ -52,3 +52,9 @@ client_secret_*.json
 # Muestras de voz para clonacion (datos personales, jamas al repo)
 /voz*.ogg
 /PAMELA*.wav
+
+# Imágenes que Pedro sube desde el panel: son contenido del sitio vivo, no
+# del repositorio. La carpeta sí se versiona (.gitkeep) porque si no existe
+# en el servidor, la subida falla — y falla al guardar, no al desplegar.
+public/img/subidas/*
+!public/img/subidas/.gitkeep

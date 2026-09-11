@@ -8,6 +8,7 @@ use App\Core\BD;
 use App\Core\Respuesta;
 use App\Repositorios\AuditoriaRepo;
 use App\Servicios\Landing;
+use App\Soporte\SubidaImagen;
 
 /**
  * El contenido de la página pública, editable al fin desde el panel.
@@ -40,6 +41,10 @@ final class ContenidoControlador extends ControladorBase
         private readonly BD $bd,
         private readonly AuditoriaRepo $auditoria,
         private readonly Landing $landing,
+        // Punto de prueba de SubidaImagen::guardar(): null usa move_uploaded_file
+        // (lo real); las pruebas inyectan copy(...), porque move_uploaded_file
+        // siempre falla fuera de una petición HTTP genuina.
+        private readonly mixed $moverImagen = null,
     ) {
     }
 
@@ -101,7 +106,27 @@ final class ContenidoControlador extends ControladorBase
 
         $original = json_decode((string) $bloque['contenido'], true) ?: [];
         $enviado = $ctx->peticion->formulario['c'] ?? [];
-        $nuevo = $this->reconstruir($original, is_array($enviado) ? $enviado : []);
+        $enviado = is_array($enviado) ? $enviado : [];
+
+        // Los archivos que se hayan subido ganan sobre lo que haya en el
+        // campo de texto de `imagen`/`logo`, ANTES de reconstruir: así
+        // reconstruir() no necesita saber que existen — solo ve un texto
+        // nuevo, como si el operador lo hubiera tecleado.
+        $archivosCrudos = $ctx->peticion->archivos['c'] ?? [];
+        $errorSubida = $this->inyectarSubidas(
+            $original,
+            $enviado,
+            self::normalizarArchivos(is_array($archivosCrudos) ? $archivosCrudos : []),
+        );
+        if ($errorSubida !== null) {
+            return $this->redirigirCon(
+                '/panel/contenido/editar?clave=' . urlencode((string) $bloque['clave']),
+                'error',
+                $errorSubida,
+            );
+        }
+
+        $nuevo = $this->reconstruir($original, $enviado);
 
         // Añadir o quitar elementos de una lista pasa POR AQUÍ y no por una
         // ruta aparte: así la operación guarda también lo que estuviera a
@@ -216,6 +241,102 @@ final class ContenidoControlador extends ControladorBase
         }
 
         return array_is_list($original) ? array_values($resultado) : $resultado;
+    }
+
+    /**
+     * Camina `$original` en paralelo con `$archivos` (ya normalizado) y, para
+     * cada campo `imagen`/`logo` con un archivo subido válido, escribe el
+     * nombre generado directo en `$enviado` — en el mismo lugar donde
+     * `reconstruir()` esperaría encontrar el texto tecleado.
+     *
+     * Devuelve el primer error de subida que encuentre (y corta ahí; no
+     * tiene sentido guardar la mitad de las fotos de una tarjeta y fallar en
+     * la otra), o null si no hubo ningún problema.
+     */
+    private function inyectarSubidas(mixed $original, array &$enviado, mixed $archivos): ?string
+    {
+        if (!is_array($original)) {
+            return null;
+        }
+
+        foreach ($original as $clave => $valor) {
+            if (is_array($valor)) {
+                if (!is_array($enviado[$clave] ?? null)) {
+                    continue;
+                }
+                $error = $this->inyectarSubidas(
+                    $valor,
+                    $enviado[$clave],
+                    is_array($archivos) && is_array($archivos[$clave] ?? null) ? $archivos[$clave] : [],
+                );
+                if ($error !== null) {
+                    return $error;
+                }
+                continue;
+            }
+
+            if (!in_array($clave, ['imagen', 'logo'], true) || !is_array($archivos)) {
+                continue;
+            }
+            $archivo = $archivos[$clave . '__archivo'] ?? null;
+            if (!is_array($archivo)) {
+                continue;
+            }
+
+            // Subcarpeta propia («subidas/») y no /img/ directo: las fotos
+            // de la landing las pone Elkin a mano en el despliegue y viven
+            // en root; www-data solo necesita escritura sobre lo que sube
+            // el panel, no sobre todo /img/. La ruta guardada sigue siendo
+            // relativa a /img/, así que `<img src="/img/{ruta}">` no cambia.
+            $subida = SubidaImagen::guardar(
+                $archivo,
+                dirname(__DIR__, 2) . '/public/img/subidas',
+                (string) $clave,
+                is_callable($this->moverImagen) ? $this->moverImagen : null,
+            );
+            if ($subida['error'] !== '') {
+                return $subida['error'];
+            }
+            if ($subida['ok']) {
+                $enviado[$clave] = 'subidas/' . $subida['nombre'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * $_FILES anida por PROPIEDAD primero (name/type/tmp_name/error/size) y
+     * por CAMPO después — al revés de $_POST. Aquí se reacomoda a la forma
+     * normal para poder caminarla exactamente igual que $enviado.
+     */
+    private static function normalizarArchivos(array $files): array
+    {
+        if (!array_key_exists('name', $files)) {
+            $out = [];
+            foreach ($files as $clave => $sub) {
+                $out[$clave] = is_array($sub) ? self::normalizarArchivos($sub) : $sub;
+            }
+
+            return $out;
+        }
+
+        if (!is_array($files['name'])) {
+            return $files;
+        }
+
+        $out = [];
+        foreach (array_keys($files['name']) as $clave) {
+            $out[$clave] = self::normalizarArchivos([
+                'name' => $files['name'][$clave],
+                'type' => $files['type'][$clave] ?? '',
+                'tmp_name' => $files['tmp_name'][$clave] ?? '',
+                'error' => $files['error'][$clave] ?? UPLOAD_ERR_NO_FILE,
+                'size' => $files['size'][$clave] ?? 0,
+            ]);
+        }
+
+        return $out;
     }
 
     private function escalar(mixed $original, mixed $enviado): mixed
