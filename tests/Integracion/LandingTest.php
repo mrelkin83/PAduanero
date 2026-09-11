@@ -75,7 +75,15 @@ final class LandingTest extends CasoBaseBd
     {
         $html = $this->landing->render();
 
-        self::assertStringContainsString('https://wa.me/573159923676', $html);
+        // El número se lee de la configuración, no se escribe aquí: el
+        // 2026-09-11 cambió el del despacho y esta prueba fallaba por tener
+        // el viejo copiado, que es exactamente el problema que vigila
+        // (`NumeroDeWhatsappTest`). Lo que importa es que la landing pinte
+        // EL configurado, sea cual sea.
+        $numero = (string) $this->config->get('whatsapp_numero_negocio', '');
+        self::assertNotSame('', $numero, 'La semilla perdió el WhatsApp del negocio.');
+
+        self::assertStringContainsString('https://wa.me/' . $numero, $html);
         self::assertStringContainsString(rawurlencode('Hola, necesito asesoría jurídica'), $html);
     }
 
@@ -86,8 +94,10 @@ final class LandingTest extends CasoBaseBd
         // igual: la analítica nunca puede estorbar a la conversión.
         $html = $this->landing->render();
 
+        $numero = preg_quote((string) $this->config->get('whatsapp_numero_negocio', ''), '#');
+
         self::assertMatchesRegularExpression(
-            '#<a href="https://wa\.me/573159923676\?text=[^"]+" class="boton-wa js-wa#u',
+            '#<a href="https://wa\.me/' . $numero . '\?text=[^"]+" class="boton-wa js-wa#u',
             $html,
         );
     }

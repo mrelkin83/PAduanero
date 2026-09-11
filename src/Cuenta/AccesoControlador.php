@@ -11,6 +11,7 @@ use App\Repositorios\CompradorEnlaceRepo;
 use App\Repositorios\CompradorRepo;
 use App\Repositorios\CompradorSesionRepo;
 use App\Servicios\AutenticacionComprador;
+use App\Servicios\Config;
 use App\Soporte\Entorno;
 use App\Soporte\Smtp;
 
@@ -27,14 +28,33 @@ final class AccesoControlador
         private readonly CompraCursoRepo $compras,
         private readonly ?Smtp $smtp,
         private readonly string $urlBase,
+        private readonly ?Config $config = null,
     ) {
+    }
+
+    /**
+     * El WhatsApp del negocio, tal como está configurado.
+     *
+     * Estaba escrito a mano en `cuenta/enlace_invalido.php` —y con un número
+     * distinto del que tiene la configuración en producción—, así que a quien
+     * se le vencía el enlace de su curso se le ofrecía escribir a un teléfono
+     * que no es por el que responde el despacho. No daba ningún error: era un
+     * enlace que abría WhatsApp con normalidad.
+     *
+     * `Config` es opcional para no romper a quien construya el controlador a
+     * mano; sin él la plantilla se queda sin el enlace, que es preferible a
+     * ofrecer un número inventado.
+     */
+    private function whatsapp(): string
+    {
+        return trim((string) ($this->config?->get('whatsapp_numero_negocio', '') ?? ''));
     }
 
     public function completarMostrar(Peticion $peticion): Respuesta
     {
         $datos = $this->resolverEnlaceCompletar((string) ($peticion->consulta['token'] ?? ''));
         if ($datos === null) {
-            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'completar_registro'], 410);
+            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'completar_registro', 'whatsapp' => $this->whatsapp()], 410);
         }
 
         return Respuesta::vista('cuenta/completar', [
@@ -51,7 +71,7 @@ final class AccesoControlador
         $datos = $this->resolverEnlaceCompletar($token);
 
         if ($datos === null) {
-            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'completar_registro'], 410);
+            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'completar_registro', 'whatsapp' => $this->whatsapp()], 410);
         }
 
         $correo = $datos['correo'];
@@ -179,7 +199,7 @@ final class AccesoControlador
         $token = (string) ($peticion->consulta['token'] ?? '');
 
         if ($this->enlaces->vigente($token, 'reset_password') === null) {
-            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'reset_password'], 410);
+            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'reset_password', 'whatsapp' => $this->whatsapp()], 410);
         }
 
         return Respuesta::vista('cuenta/recuperar_confirmar', [
@@ -194,7 +214,7 @@ final class AccesoControlador
         $enlace = $this->enlaces->vigente($token, 'reset_password');
 
         if ($enlace === null || $enlace['comprador_id'] === null) {
-            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'reset_password'], 410);
+            return Respuesta::vista('cuenta/enlace_invalido', ['tipo' => 'reset_password', 'whatsapp' => $this->whatsapp()], 410);
         }
 
         $password = (string) ($peticion->formulario['password'] ?? '');

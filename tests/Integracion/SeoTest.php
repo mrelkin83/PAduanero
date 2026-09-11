@@ -98,7 +98,11 @@ final class SeoTest extends CasoBaseBd
         $datos = $this->seo->datosEstructurados();
 
         self::assertSame('LegalService', $datos['@type']);
-        self::assertSame('+573159923676', $datos['telephone']);
+        // Del configurado, no de un literal: ver LandingTest.
+        self::assertSame(
+            '+' . (string) $this->config->get('whatsapp_numero_negocio', ''),
+            $datos['telephone'],
+        );
 
         // Nada de dirección postal que nadie dio, ni reseñas que nadie dejó.
         // Google penaliza el marcado falso, pero el motivo de fondo es que

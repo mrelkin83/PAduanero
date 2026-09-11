@@ -12,6 +12,7 @@ use App\Repositorios\CompradorRepo;
 use App\Repositorios\CompradorSesionRepo;
 use App\Repositorios\IntentoAccesoRepo;
 use App\Servicios\AutenticacionComprador;
+use App\Servicios\ConfigMysql;
 use App\Soporte\Cifrado;
 use PHPUnit\Framework\Attributes\Test;
 use Pruebas\CasoBaseBd;
@@ -25,10 +26,19 @@ final class AccesoControladorTest extends CasoBaseBd
     private CompradorEnlaceRepo $enlaces;
     private CompraCursoRepo $compras;
     private CompradorSesionRepo $sesiones;
+    private ConfigMysql $config;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $sufijo = bin2hex(random_bytes(4));
+
+        $this->config = new ConfigMysql(
+            $this->bd,
+            sys_get_temp_dir() . "/pa-acceso-sent-{$sufijo}",
+            sys_get_temp_dir() . "/pa-acceso-cfg-{$sufijo}.json",
+        );
 
         $this->compradores = new CompradorRepo($this->bd, Cifrado::desdeEntorno());
         $this->sesiones = new CompradorSesionRepo($this->bd);
@@ -43,6 +53,11 @@ final class AccesoControladorTest extends CasoBaseBd
             $this->compras,
             null, // Smtp
             self::URL,
+            // El WhatsApp de la página del enlace vencido sale de
+            // `configuraciones`, no de la plantilla (2026-09-11): sin este
+            // Config el controlador no tiene número que ofrecer y la página
+            // se queda —correctamente— sin enlace.
+            $this->config,
         );
     }
 
@@ -81,6 +96,15 @@ final class AccesoControladorTest extends CasoBaseBd
         self::assertSame(410, $r->estado);
         self::assertStringContainsString('wa.me', $r->cuerpo);
         self::assertStringNotContainsString('/recuperar"', $r->cuerpo);
+
+        // Y es el número CONFIGURADO, no uno escrito en la plantilla. Hasta
+        // el 2026-09-11 ahí había un literal que no coincidía con el de
+        // `configuraciones`: al comprador con el enlace vencido se le
+        // ofrecía un teléfono por el que el despacho no responde, y la
+        // prueba pasaba igual porque solo miraba que dijera «wa.me».
+        $numero = (string) $this->config->get('whatsapp_numero_negocio', '');
+        self::assertNotSame('', $numero, 'La semilla perdió el WhatsApp del negocio.');
+        self::assertStringContainsString('wa.me/' . $numero, $r->cuerpo);
     }
 
     #[Test]

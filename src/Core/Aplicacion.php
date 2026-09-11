@@ -379,6 +379,7 @@ final class Aplicacion
             $this->contenedor->obtener(\App\Repositorios\CompraCursoRepo::class),
             \App\Soporte\Smtp::desdeEntorno(),
             $urlBase,
+            $this->contenedor->obtener(Config::class),
         );
 
         $this->router->get('/mis-cursos/completar', function (Peticion $p) use ($accesoControlador): Respuesta {
