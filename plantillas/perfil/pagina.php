@@ -488,7 +488,7 @@ require dirname(__DIR__) . '/landing/bloques/pie.php';
          registro de eventos en vez de duplicar sessionStorage y sendBeacon.
          Con `defer` se ejecutan en orden de documento, así que para cuando
          corre el segundo, `window.PA` ya existe. */ ?>
-<script src="/js/landing.js" defer></script>
-<script src="/js/perfil.js" defer></script>
+<script src="<?= $e(Vista::activo('/js/landing.js')) ?>" defer></script>
+<script src="<?= $e(Vista::activo('/js/perfil.js')) ?>" defer></script>
 </body>
 </html>

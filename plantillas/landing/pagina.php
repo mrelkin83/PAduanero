@@ -260,7 +260,7 @@ $pie = $bloques['pie'] ?? null;
 require __DIR__ . '/bloques/pie.php';
 ?>
 
-<script src="/js/landing.js" defer></script>
+<script src="<?= $e(Vista::activo('/js/landing.js')) ?>" defer></script>
 
 <?php if ($chatwoot['token'] !== '' && $chatwoot['url'] !== ''): ?>
 <?php /* El widget solo se emite cuando Chatwoot existe (Etapa 2). Cargarlo

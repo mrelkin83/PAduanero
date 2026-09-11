@@ -97,6 +97,41 @@ final class Vista
     }
 
     /**
+     * La URL de un archivo de `public/`, con la marca de tiempo detrás.
+     *
+     * Existe por un fallo del despliegue del 2026-09-11, que no dio ningún
+     * error y casi pasa desapercibido: se desplegó `perfil.js` nuevo, el
+     * origen lo servía bien, y **Cloudflare siguió entregando el del 26 de
+     * agosto** — nginx marca los estáticos `max-age=2592000, immutable`, así
+     * que el borde tiene permiso para no volver a preguntar en treinta días.
+     * El HTML sí se renovó (la caché de páginas se borra en cada despliegue),
+     * de modo que la página traía los `data-*` nuevos y un script viejo que
+     * no sabía leerlos: la mitad de una función, sin una sola señal de error.
+     *
+     * Con el `?v=<mtime>` la URL cambia cuando cambia el archivo, así que un
+     * archivo nuevo es una entrada nueva para cualquier caché y no hay nada
+     * que purgar a mano. Es la misma idea que ya usa `CachePagina` con el
+     * mtime del CSS; lo que faltaba era aplicarla a lo que sirve nginx.
+     *
+     * Si el archivo no existe se devuelve la ruta tal cual: un `filemtime()`
+     * fallido no puede tumbar la página por un parámetro de caché.
+     *
+     * OJO, el `?v=` queda escrito dentro del HTML cacheado, y `CachePagina`
+     * solo mira el centinela y el mtime del CSS — no el del JavaScript. Un
+     * despliegue que cambie únicamente un `.js` regenera el archivo pero no
+     * la página que lo enlaza. Lo que cierra ese hueco es el
+     * `rm -f storage/cache/*.html` del RUNBOOK §5, que por eso no es
+     * opcional.
+     */
+    public static function activo(string $ruta): string
+    {
+        $disco = dirname(__DIR__, 2) . '/public' . $ruta;
+        $marca = @filemtime($disco);
+
+        return $marca === false ? $ruta : $ruta . '?v=' . $marca;
+    }
+
+    /**
      * `<picture>` con AVIF, WebP y el JPEG original de reserva.
      *
      * Las dimensiones van explícitas siempre: sin `width` y `height` el
