@@ -342,8 +342,30 @@ alguien que va a estar horas ahí.
 
 ### 6.1 Presupuesto de la landing
 
-300 KB y LCP < 2 s, medidos por `bin/auditar-landing.mjs` en cada cierre. Hoy:
-91.6 KB, Performance 99, Accesibilidad 100, LCP 1.5 s, CLS 0.
+300 KB y LCP < 2 s, medidos por `bin/auditar-landing.mjs` en cada cierre.
+Hoy (2026-09-11, contra producción): **96.3 KB**, Performance 95,
+Accesibilidad 100, CLS 0, LCP 2.5 s.
+
+**El LCP está fuera de objetivo y no es por peso.** Medido el mismo día: el
+servidor responde la landing en **8 ms**, pero el TTFB desde fuera es de
+**0,75 s**. El origen está en Francia (Contabo, Lauterbourg), el borde de
+Cloudflare que atiende a Colombia está en Miami, y el HTML sale como
+`cf-cache-status: DYNAMIC` — o sea que **cada visita cruza el Atlántico dos
+veces**. La misma página servida en local da LCP 1.5 s con los mismos bytes.
+
+Lo que falta no está en el código: una **Cache Rule de Cloudflare** que
+aplique «Cache Everything» a `pedroabogadoaduanero.com/` y `/perfil`. La
+aplicación ya emite la cabecera correcta para ese día
+(`max-age=0, must-revalidate` para el navegador, `s-maxage=300` para la
+CDN); mientras la regla no exista, esa cabecera no hace nada porque
+Cloudflare ignora el cacheo de HTML por defecto.
+
+Lo que sí se arregló en el código el 2026-09-11, y de dónde salieron los
+70 KB: el logo pesaba 37 KB (PNG de 192 px para pintarse a 40 — el archivo
+más pesado de la página), y `pedro-hero-890.avif` estaba committeado con
+71 KB cuando `bin/optimizar-imagenes.php` lo deja en 31. Conviene
+desconfiar de las variantes committeadas: **compararlas con lo que produce
+la herramienta** antes de dar el peso por bueno.
 
 **La accesibilidad está en 100 y conviene que se quede ahí.** Estuvo en 96
 mientras el botón principal fue verde de WhatsApp con texto blanco: 3.77:1

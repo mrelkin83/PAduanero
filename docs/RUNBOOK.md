@@ -242,17 +242,35 @@ generado: la página traía los `data-*` nuevos y el script no sabía leerlos,
 sin un solo error en consola ni en el servidor.
 
 La cura está en el código, no en el procedimiento: los `<script>` se emiten
-con `Vista::activo()`, que le cuelga a la ruta el `mtime` del archivo. Al
-cambiar el archivo cambia la URL, y una URL nueva es una entrada nueva para
-cualquier caché. `ActivosVersionadosTest` rechaza cualquier
-`<script src="/js/…">` pelado en `plantillas/`. **No hay que purgar nada a
-mano** — pero sí borrar la caché de páginas, porque el `?v=` viaja dentro
-del HTML.
+con `Vista::activo()`, y las imágenes con `Vista::imagen()`, que usa la misma
+función para cada variante del `<picture>`. Al cambiar el archivo cambia la
+URL, y una URL nueva es una entrada nueva para cualquier caché.
+`ActivosVersionadosTest` rechaza cualquier `<script src="/js/…">` pelado en
+`plantillas/`, y `LandingTest` comprueba que la precarga del hero pida
+exactamente las mismas URLs que el `<source>` —si se separan, la foto del
+camino crítico se descarga dos veces—. **No hay que purgar nada a mano**
+— pero sí borrar la caché de páginas, porque el `?v=` viaja dentro del HTML.
 
 **Comprobar el comportamiento, no el despliegue.** Que `git pull` y
 `migrar.php` terminen bien no dice que el sitio haga lo que debe: el fallo
 de arriba pasó los dos. Después de desplegar, ejercitar en producción lo que
 se acaba de cambiar.
+
+**El `git pull` puede abortar y el despliegue seguir «bien».** Pasó dos veces
+el 2026-09-11: había archivos modificados a mano en el servidor y
+`git pull --ff-only` se negó, pero como la orden iba dentro de una cadena sin
+`pipefail` el resto siguió corriendo y el script dijo «desplegado» con el
+commit viejo en disco. Antes de dar por hecho nada, **leer el commit que
+quedó**: `git log --oneline -1`. Si hay cambios locales, comparar
+(`md5sum` contra `git show origin/main:<archivo>`) antes de descartarlos —
+puede ser trabajo de otra sesión que nadie commiteó.
+
+**Respaldos.** `bin/respaldo.sh` corre en cron (`15 3 * * *`) y cifra con la
+clave PÚBLICA de `age` que está en `AGE_CLAVE_PUBLICA` del `.env`. La privada
+**no vive en el servidor**: sin ella no se recupera nada. Falta la copia
+fuera del sitio (regla 3-2-1): hace falta un bucket y configurar el remoto
+`remoto:` de rclone; mientras no exista, el script avisa en cada corrida y
+no falla.
 
 **El VPS no necesita node.** `public/css/app.css` y las variantes AVIF/WebP de
 `public/img/` se versionan ya compiladas. Se regeneran en la máquina de
