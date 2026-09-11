@@ -116,10 +116,14 @@ window.__paRedRevelado = setTimeout(function () {
 // ordena la edición en el panel. `perfil` va detrás del índice de
 // situaciones a propósito: ver `bloques/perfil.php`.
 //
-// `confianza` y `testimonios` van juntos y detrás de `credenciales`, que es
-// donde la página termina de presentar a Pedro. La secuencia contesta tres
-// preguntas en el orden en que se hacen: quién es (credenciales), si existe
-// de verdad (confianza) y cómo trata a la gente (testimonios).
+// `equipo` va pegado a `credenciales` porque contesta la pregunta que esa
+// sección deja abierta: si Pedro lo hace todo solo. Antes sería presentar
+// al apoyo antes que al titular.
+//
+// `confianza` y `testimonios` van juntos y detrás, que es donde la página
+// termina de presentar al despacho. La secuencia contesta tres preguntas en
+// el orden en que se hacen: quién es (credenciales y equipo), si existe de
+// verdad (confianza) y cómo trata a la gente (testimonios).
 //
 // El orden entre esos dos importa. `confianza` se comprueba sin creerle a
 // nadie; `testimonios` exige creerle a alguien. Un testimonio leído antes de
@@ -138,6 +142,7 @@ foreach ([
     'casos',
     'perfil',
     'credenciales',
+    'equipo',
     'confianza',
     'testimonios',
     'proceso',

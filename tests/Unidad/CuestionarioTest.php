@@ -81,6 +81,62 @@ final class CuestionarioTest extends TestCase
     }
 
     #[Test]
+    public function ningunaSalidaDelCuestionarioMencionaElExpediente(): void
+    {
+        // La mención de la consultora es un refuerzo para quien va a agendar
+        // la asesoría, y hay dos sitios donde estaría mal:
+        //
+        //  · «todavía nada: quiero prevenir» sale por `fuera_alcance`. Ahí la
+        //    revisión técnica sería el servicio principal, no un apoyo — y es
+        //    una línea que el despacho todavía no vende (falta que el PO
+        //    fije precio y facturación).
+        //  · «operativo de la POLFA en curso» sale por `urgente`. Hablarle de
+        //    subpartidas a quien tiene la policía en la puerta es contestar
+        //    otra pregunta.
+        //
+        // `definicion()` lo resuelve apagando `expediente` en cualquier
+        // opción con salida, y no enumerando esos dos casos: así la regla
+        // sigue valiendo para la próxima salida que alguien añada.
+        foreach (Cuestionario::definicion() as $paso) {
+            foreach ($paso['opciones'] as $opcion) {
+                if ($opcion['salida'] === null) {
+                    continue;
+                }
+
+                self::assertFalse(
+                    $opcion['expediente'],
+                    "«{$paso['id']}/{$opcion['valor']}» saca del cuestionario y aun así "
+                    . 'menciona a la consultora en el resultado.',
+                );
+            }
+        }
+    }
+
+    #[Test]
+    public function algunaOpcionMencionaElExpediente(): void
+    {
+        // Sin ninguna, el bloque del resultado es HTML que no se enciende
+        // nunca: no falla, no avisa, y la sección que justifica el bloque
+        // `equipo` de la landing simplemente no existe para nadie.
+        $marcadas = 0;
+
+        foreach (Cuestionario::definicion() as $paso) {
+            foreach ($paso['opciones'] as $opcion) {
+                if ($opcion['expediente'] === true) {
+                    $marcadas++;
+                }
+            }
+        }
+
+        self::assertGreaterThan(
+            0,
+            $marcadas,
+            'Ninguna opción enciende la mención del expediente técnico: '
+            . '`#bloque-expediente` es código muerto.',
+        );
+    }
+
+    #[Test]
     public function elCopyNoNombraPlazosNiNormas(): void
     {
         // Reglas 2 y 3. El sitio donde más tienta romperlas es justo este:

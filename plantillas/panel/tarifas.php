@@ -87,6 +87,29 @@ $contenido = static function () use ($e, $ctx, $modalidades, $horarios, $reserva
                         Activa
                     </label>
                 </div>
+
+                <?php /* La única casilla de esta pantalla que cambia lo que el
+                         bot le DICE a un cliente. Va en su propia fila y con
+                         su explicación porque, puesta al lado de «Activa»,
+                         parece otra casilla de visibilidad — y no lo es: el
+                         catálogo del bot es esta tabla filtrada por aquí. */ ?>
+                <div class="sm:col-span-2 border-t pt-3">
+                    <label class="flex items-start gap-2 text-sm">
+                        <input type="checkbox" name="ofrece_bot" value="1" class="mt-1"
+                               <?= (int) $m['ofrece_bot'] === 1 ? 'checked' : '' ?>
+                               <?= $editable ? '' : 'disabled' ?>>
+                        <span>
+                            <strong>El bot de WhatsApp puede ofrecerla y agendarla</strong>
+                            <span class="block text-acero">
+                                Sin esta casilla la modalidad existe, se cobra y se edita
+                                aquí, pero el bot no la nombra ni la agenda. Es lo que
+                                mantiene la revisión técnica fuera del chat: esa la hace
+                                la consultora, y la cita que el bot agenda es con el
+                                abogado.
+                            </span>
+                        </span>
+                    </label>
+                </div>
             </div>
 
             <?php if ($editable): ?>

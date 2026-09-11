@@ -67,9 +67,16 @@ final class Cuestionario
      *   resumen: string,
      *   opciones: list<array{
      *     valor: string, etiqueta: string, detalle: string, mensaje: string,
-     *     tecnico: ?string, rama: ?string, tipo: ?string, salida: ?string
+     *     tecnico: ?string, rama: ?string, tipo: ?string, salida: ?string,
+     *     expediente?: bool
      *   }>
      * }>
+     *
+     * `expediente` marca las opciones en las que el expediente técnico
+     * —subpartida, valor declarado, régimen, documentos soporte— decide el
+     * caso tanto como el argumento jurídico; el resultado menciona ahí a la
+     * consultora del despacho (§4.5). Solo se escribe donde es `true`:
+     * `definicion()` rellena el resto y es la única que lo lee.
      */
     public static function pasos(): array
     {
@@ -125,6 +132,23 @@ final class Cuestionario
                         'rama' => 'aduanero',
                         'tipo' => 'demoras_contenedor',
                         'salida' => null,
+                    ],
+                    [
+                        // La controversia puramente técnica: no le quitaron
+                        // nada, le discuten CÓMO declaró. Hasta el
+                        // 2026-09-11 estos casos entraban mezclados con el
+                        // pliego de cargos en el paso 2, y son justo la rama
+                        // donde el expediente —subpartida, valor, régimen—
+                        // decide el resultado.
+                        'valor' => 'tecnico',
+                        'etiqueta' => 'Me discuten la clasificación, el valor o el régimen',
+                        'detalle' => 'La DIAN cuestiona la subpartida, el valor en aduana, el origen o el régimen bajo el que entró la mercancía.',
+                        'mensaje' => 'La DIAN me cuestiona la clasificación, el valor en aduana o el régimen de mi operación',
+                        'tecnico' => 'Controversia de clasificación o valor',
+                        'rama' => 'aduanero',
+                        'tipo' => 'clasificacion_arancelaria',
+                        'salida' => null,
+                        'expediente' => true,
                     ],
                     [
                         'valor' => 'preventivo',
@@ -189,6 +213,7 @@ final class Cuestionario
                         'rama' => null,
                         'tipo' => 'proceso_sancionatorio',
                         'salida' => null,
+                        'expediente' => true,
                     ],
                     [
                         'valor' => 'requerimiento_solvencia',
@@ -219,6 +244,28 @@ final class Cuestionario
                         'rama' => null,
                         'tipo' => 'demoras_contenedor',
                         'salida' => null,
+                    ],
+                    [
+                        'valor' => 'regimen_temporal',
+                        'etiqueta' => 'Un requerimiento sobre importación temporal o reimportación',
+                        'detalle' => 'Le cuestionan el régimen: la finalización, la reexportación o la modalidad bajo la cual ingresó la mercancía.',
+                        'mensaje' => 'Recibí un requerimiento sobre una importación temporal o una reimportación',
+                        'tecnico' => 'Controversia de régimen aduanero',
+                        'rama' => null,
+                        'tipo' => 'requerimiento_ordinario',
+                        'salida' => null,
+                        'expediente' => true,
+                    ],
+                    [
+                        'valor' => 'documentos_soporte',
+                        'etiqueta' => 'Le rechazaron documentos soporte o requisitos de otra entidad',
+                        'detalle' => 'Inconsistencias entre factura, BL, packing list y declaración, o requisitos de ICA o INVIMA no acreditados.',
+                        'mensaje' => 'Me rechazaron documentos soporte o requisitos de otra entidad',
+                        'tecnico' => 'Inconsistencias en documentos soporte',
+                        'rama' => null,
+                        'tipo' => 'requerimiento_ordinario',
+                        'salida' => null,
+                        'expediente' => true,
                     ],
                     [
                         'valor' => 'nada_escrito',
@@ -273,7 +320,11 @@ final class Cuestionario
                 'rama' => null,
                 'rotulo' => 'La cuantía',
                 'pregunta' => '¿De cuánto es el valor o controversia aproximada?',
-                'ayuda' => 'Un aproximado basta para dimensionar la controversia aduanera. La tarifa de la asesoría es fija para todos los casos.',
+                // «La tarifa es fija para todos los casos» dejó de ser cierto
+                // el día que el despacho tuvo más de un servicio. Lo que
+                // sigue siendo cierto —y es lo único que esta pregunta
+                // necesita decir— es que la cuantía no la mueve.
+                'ayuda' => 'Un aproximado basta para dimensionar la controversia aduanera. La tarifa no depende de la cuantía.',
                 'resumen' => 'Cuantía',
                 'opciones' => [
                     ['valor' => 'menos_20', 'etiqueta' => 'Menos de $20 millones', 'detalle' => '', 'mensaje' => 'menos de $20 millones', 'tecnico' => null, 'rama' => null, 'tipo' => null, 'salida' => null],
@@ -301,13 +352,30 @@ final class Cuestionario
     }
 
     /**
-     * Los pasos con la salida crítica ya resuelta.
+     * Los pasos con la salida crítica ya resuelta y la mención del
+     * expediente técnico ya decidida.
      *
      * `salida` no se escribe a mano en las opciones críticas: se deduce de
      * `Catalogo::esCritico()`, que es donde vive la regla 5. Escribirla a
      * mano crearía dos listas de casos críticos, y el día que alguien
      * añadiera una a `Catalogo` el diagnóstico seguiría preguntándole la
      * cuantía a quien tiene la POLFA en la puerta.
+     *
+     * `expediente` se normaliza aquí por la misma razón, y con una regla
+     * dura encima: **una opción que sale del cuestionario nunca menciona a
+     * la consultora**. Eso cubre de una vez los dos casos en los que la
+     * mención estaría mal y que, escritos a mano, alguien acabaría
+     * olvidando:
+     *
+     *  · quien marca «todavía nada: quiero prevenir» sale por
+     *    `fuera_alcance` — ahí la revisión técnica sería la protagonista y
+     *    no un apoyo, y es una línea de servicio que el despacho todavía no
+     *    vende (decisión del PO pendiente: precio y facturación);
+     *  · quien marca «operativo de la POLFA en curso» sale por `urgente` —
+     *    ahí lo único sensato es escribir ya, y hablar de subpartidas sería
+     *    contestar otra pregunta.
+     *
+     * Y vale para cualquier salida que se añada después, sin tocar esto.
      *
      * @return list<array<string,mixed>>
      */
@@ -323,6 +391,10 @@ final class Cuestionario
                 ) {
                     $pasos[$i]['opciones'][$j]['salida'] = self::SALIDA_URGENTE;
                 }
+
+                $pasos[$i]['opciones'][$j]['expediente'] =
+                    ($opcion['expediente'] ?? false)
+                    && $pasos[$i]['opciones'][$j]['salida'] === null;
             }
         }
 

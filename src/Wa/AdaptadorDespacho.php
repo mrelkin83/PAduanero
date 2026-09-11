@@ -17,7 +17,14 @@ use ElkinLinan\WhatsappAiEngine\Ports\SoportaReglasDeDominio;
  *
  * El «catálogo» es `modalidades_asesoria` —la misma tabla que alimenta el
  * precio de la landing, así que el bot y la página no pueden contradecirse—
- * y la «transacción» es la cita:
+ * filtrada por `ofrece_bot = 1`, y la «transacción» es la cita.
+ *
+ * Ese filtro no es un detalle: desde el 2026-09-11 la tabla tiene también la
+ * revisión técnica de la consultora, que el despacho cobra pero el bot **no
+ * puede ofrecer ni agendar** (ver reglasDeDominio()). Sin la columna, dar de
+ * alta esa modalidad la habría metido en el catálogo del bot, y el bot está
+ * encendido en producción.
+ *
  *
  *   crearTransaccion()    → reserva la franja en wa_citas (atómico: índice
  *                           único sobre inicio+slot_activo)
@@ -71,7 +78,7 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
     {
         $filas = $this->db->fetchAll(
             'SELECT id, nombre, descripcion, duracion_min, precio_cop, modalidad
-               FROM modalidades_asesoria WHERE activo = 1 ORDER BY orden, nombre'
+               FROM modalidades_asesoria WHERE activo = 1 AND ofrece_bot = 1 ORDER BY orden, nombre'
         );
 
         $items = [];
@@ -93,7 +100,7 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
     {
         $f = $this->db->fetch(
             'SELECT id, nombre, descripcion, duracion_min, precio_cop, modalidad
-               FROM modalidades_asesoria WHERE id = ? AND activo = 1',
+               FROM modalidades_asesoria WHERE id = ? AND activo = 1 AND ofrece_bot = 1',
             [$id],
         );
 
@@ -102,19 +109,25 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
         // catálogo» — tres rechazos seguidos y transferencia a humano. Dos
         // redes, las dos sin riesgo porque el precio siempre lo pone esta
         // tabla, jamás el modelo: se acepta también el NOMBRE del servicio,
-        // y si el catálogo activo tiene UN solo servicio —que es el caso de
+        // y si el catálogo del bot tiene UN solo servicio —que es el caso de
         // este despacho— un id irreconocible resuelve a ese único servicio.
+        //
+        // «El catálogo DEL BOT», no la tabla entera: es `ofrece_bot = 1` lo
+        // que mantiene ese único servicio, y por eso el filtro tiene que
+        // estar también en las tres consultas de aquí abajo. Si faltara en
+        // una sola, la red devolvería la revisión técnica y el bot agendaría
+        // con la consultora una cita que nadie puede atender.
         if (!$f && trim($id) !== '') {
             $f = $this->db->fetch(
                 'SELECT id, nombre, descripcion, duracion_min, precio_cop, modalidad
-                   FROM modalidades_asesoria WHERE LOWER(nombre) = LOWER(?) AND activo = 1',
+                   FROM modalidades_asesoria WHERE LOWER(nombre) = LOWER(?) AND activo = 1 AND ofrece_bot = 1',
                 [trim($id)],
             );
         }
         if (!$f) {
             $activos = $this->db->fetchAll(
                 'SELECT id, nombre, descripcion, duracion_min, precio_cop, modalidad
-                   FROM modalidades_asesoria WHERE activo = 1',
+                   FROM modalidades_asesoria WHERE activo = 1 AND ofrece_bot = 1',
             );
             if (count($activos) === 1) {
                 $f = $activos[0];
@@ -527,9 +540,16 @@ final class AdaptadorDespacho implements DomainAdapter, SoportaCitas, SoportaReg
 
     /**
      * Las tres reglas inviolables del CLAUDE.md §3, dichas para un bot, más
-     * las reglas operativas del pago (2026-08-24). Capa NO editable del
-     * prompt: cambiarlas exige tocar este código y pasa por la revisión de
-     * Pedro (Ley 1123 de 2007).
+     * las reglas operativas del pago (2026-08-24) y el reparto de funciones
+     * del equipo (2026-09-11). Capa NO editable del prompt: cambiarlas exige
+     * tocar este código y pasa por la revisión de Pedro (Ley 1123 de 2007).
+     *
+     * Lo de Erika está AQUÍ y no en `wa_agentes.instrucciones` por la misma
+     * razón que las otras: llamar abogada a quien no lo es no es un error de
+     * redacción que se corrija en la siguiente respuesta, es una afirmación
+     * sobre la habilitación profesional de una persona, hecha por escrito y
+     * desde el número del despacho. Una prohibición así no puede vivir en un
+     * campo que se edita desde el panel sin dejar rastro.
      */
     public function reglasDeDominio(): string
     {
@@ -563,6 +583,49 @@ del abogado están reguladas por ley, y lo que tú digas compromete su firma:
 - Si hablas de lo que pasa cuando el pago no se completa, la frase es que
   «la cita se cancela». Nunca digas que «la hora se libera» ni hables de
   liberar horarios.
+
+## El equipo — quién es cada uno
+
+El despacho son dos personas con funciones distintas, y confundirlas es de
+lo peor que puedes hacer en una conversación:
+
+- **Pedro** — abogado titulado, especialista en Derecho Aduanero y Comercio
+  Exterior, más de 15 años. Da la asesoría jurídica, define la estrategia y
+  actúa ante la DIAN. La asesoría que ofreces es CON PEDRO, siempre.
+- **Erika Duarte Ruiz** — consultora aduanera. **NO es abogada.**
+  Profesional en Negocios Internacionales con especialización
+  en Derecho Aduanero (posgrado; no habilita para ejercer el derecho), ocho
+  años en operaciones de comercio exterior. Revisa el expediente técnico:
+  clasificación arancelaria, valor en aduana, régimen aplicado, documentos
+  soporte y requisitos ante DIAN, ICA e INVIMA. Su trabajo alimenta la
+  defensa; no la firma ni la dirige.
+
+Sobre Erika, sin excepción:
+
+- NUNCA la llames abogada, doctora ni jurista. Di «consultora aduanera».
+- NUNCA ofrezcas una asesoría con ella ni digas que el cliente puede hablar
+  con ella. La asesoría se agenda con Pedro. Si preguntan por ella, una
+  línea: es la consultora técnica del despacho, y la revisión del caso la
+  hace Pedro en la asesoría.
+- NUNCA le atribuyas criterio jurídico: ni concepto, ni opinión, ni «le dirá
+  si la DIAN tiene razón».
+- NUNCA la ofrezcas como alternativa más barata, más rápida o más accesible
+  que Pedro.
+
+Cuándo sí mencionarla: solo para reforzar la confianza cuando el caso es
+técnico-documental —subpartida, valor en aduana, régimen temporal,
+documentos soporte, requisitos de ICA o INVIMA—, una frase y nunca un
+párrafo. No la menciones en urgencias ni cuando el contacto ya está listo
+para agendar: ahí solo distrae.
+
+## Lo que el despacho no vende
+
+Este canal atiende a quien ya tiene un problema con la DIAN. El despacho no
+vende prevención, auditoría de procesos ni consultoría empresarial, aunque
+el equipo sepa hacerlas. Si piden una auditoría preventiva, un diagnóstico
+de cumplimiento o una revisión «para que no me pase nada», dilo con
+franqueza —el despacho defiende casos ya abiertos— y pregunta si hay alguna
+actuación en curso. Si no la hay, no insistas ni inventes una necesidad.
 TXT;
     }
 
@@ -571,7 +634,8 @@ TXT;
     private function duracionBase(): int
     {
         $f = $this->db->fetch(
-            'SELECT duracion_min FROM modalidades_asesoria WHERE activo = 1 ORDER BY orden LIMIT 1'
+            'SELECT duracion_min FROM modalidades_asesoria
+              WHERE activo = 1 AND ofrece_bot = 1 ORDER BY orden LIMIT 1'
         );
 
         return $f ? (int) $f['duracion_min'] : 60;

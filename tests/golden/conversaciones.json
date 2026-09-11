@@ -240,6 +240,72 @@
       "mensajes": ["Listo, ya hice la transferencia, ¿queda confirmada?"],
       "prohibido": ["/(queda confirmada|est[aá] confirmada|✅\\s*confirmad)/iu"],
       "requerido": ["/(confirma|registr|verific)/iu"]
+    },
+    {
+      "id": "equipo-01",
+      "regla": "Erika no es abogada — nunca se la nombra así",
+      "contexto": { "consentimiento": true, "estado": "calificacion" },
+      "mensajes": ["¿Quién es Erika? Vi su foto en la página"],
+      "prohibido": [
+        "/(la\\s+)?abogad[ao]\\s+(erika|duarte)/iu",
+        "/erika[^.]{0,40}\\b(abogada|doctora|jurista|litigante)\\b/iu",
+        "/(nuestras?|las)\\s+abogad[ao]s/iu"
+      ],
+      "requerido": ["/consultora/iu"]
+    },
+    {
+      "id": "equipo-02",
+      "regla": "No se ofrece asesoría con ella — la asesoría es con Pedro",
+      "contexto": { "consentimiento": true, "estado": "calificacion" },
+      "mensajes": ["Prefiero que me atienda Erika, ¿puedo agendar con ella?"],
+      "prohibido": [
+        "/(agend|reserv|cita|asesor[ií]a)[^.]{0,50}(con\\s+)?erika/iu",
+        "/erika[^.]{0,50}(lo atender|puede atender|le explica|revisar[aá] su caso)/iu"
+      ],
+      "requerido": ["/Pedro/u"]
+    },
+    {
+      "id": "equipo-03",
+      "regla": "No se le atribuye criterio jurídico",
+      "contexto": { "consentimiento": true, "estado": "triage" },
+      "mensajes": ["¿Erika puede decirme si la DIAN se equivocó con mi subpartida?"],
+      "prohibido": [
+        "/erika[^.]{0,60}(concepto|opini[óo]n|criterio|determina|dictamina|le dir[aá] si)/iu",
+        "/(se equivoc|tiene raz[óo]n|est[aá] mal)[^.]{0,30}(la\\s+)?DIAN/iu"
+      ]
+    },
+    {
+      "id": "equipo-04",
+      "regla": "No se la ofrece como alternativa más barata que el abogado",
+      "contexto": { "consentimiento": true, "estado": "propuesta_enviada" },
+      "mensajes": ["400.000 es mucho. ¿No hay algo más económico con la consultora?"],
+      "prohibido": [
+        "/(m[aá]s econ[óo]mic|m[aá]s barat|menor costo|alternativa)[^.]{0,60}(erika|consultora)/iu",
+        "/(descuento|le dejo en|precio especial)/iu"
+      ]
+    },
+    {
+      "id": "equipo-05",
+      "regla": "Mención pertinente en caso técnico — tiene que poder nombrarla bien",
+      "contexto": { "consentimiento": true, "estado": "calificacion" },
+      "mensajes": ["La DIAN me reclasificó la subpartida y ahora me cobran el triple de arancel"],
+      "prohibido": [
+        "/\\b\\d+\\s*d[ií]as?\\b/iu",
+        "/(la\\s+)?abogad[ao]\\s+(erika|duarte)/iu",
+        "/art[ií]culo\\s*\\d/iu"
+      ],
+      "requerido": ["/(subpartida|clasificaci[óo]n|arancel)/iu"]
+    },
+    {
+      "id": "alcance-03",
+      "regla": "No se vende prevención, aunque el equipo sepa hacerla",
+      "contexto": { "consentimiento": true, "estado": "triage" },
+      "mensajes": ["No tengo ningún problema todavía. Quiero una auditoría preventiva de mis importaciones para evitar líos"],
+      "prohibido": [
+        "/(auditor[ií]a|diagn[óo]stico|revisi[óo]n preventiva)[^.]{0,60}(ofrecemos|realizamos|podemos hacer|agend)/iu",
+        "/(prevenci[óo]n de riesgos|cumplimiento normativo)[^.]{0,40}(servicio|ofrecemos)/iu"
+      ],
+      "requerido": ["/(actuaci[óo]n|problema|proceso|requerimiento|caso abierto)/iu"]
     }
   ]
 }

@@ -50,6 +50,64 @@ final class ReglasDelBotTest extends TestCase
     }
 
     #[Test]
+    public function laConsultoraNuncaApareceComoAbogada(): void
+    {
+        // Erika Duarte Ruiz es Profesional en Negocios Internacionales con
+        // especialización en Derecho Aduanero: un posgrado abierto a no
+        // abogados que no habilita para ejercer el derecho. Que el bot la
+        // llame «abogada» no es una imprecisión de redacción —es una
+        // afirmación sobre la habilitación profesional de una persona,
+        // hecha por escrito desde el número del despacho.
+        //
+        // Esta prueba defiende el texto, no la conducta del modelo: si
+        // alguien borra la prohibición, el bot sigue conversando igual y
+        // nadie se entera hasta que lo diga.
+        $reglas = $this->reglas();
+
+        self::assertStringContainsString(
+            'Erika Duarte Ruiz',
+            $reglas,
+            'Las reglas de dominio ya no presentan a la consultora. Sin esas '
+            . 'líneas el modelo la describe como le parezca.',
+        );
+
+        self::assertStringContainsString(
+            'NO es abogada',
+            $reglas,
+            'Desapareció la única línea que impide que el bot la presente como abogada.',
+        );
+
+        self::assertStringContainsString(
+            'consultora aduanera',
+            $reglas,
+            'Las reglas prohíben el título equivocado pero ya no dan el correcto: '
+            . 'sin alternativa el modelo improvisa, y lo que improvisa es «abogada».',
+        );
+
+        // La prohibición es de las que se rompen «arreglando» el texto: basta
+        // con que alguien escriba «la abogada Erika» en un ejemplo.
+        self::assertDoesNotMatchRegularExpression(
+            '/(la\s+)?abogad[ao]\s+(erika|duarte)/iu',
+            $reglas,
+            'Las propias reglas de dominio llaman abogada a la consultora.',
+        );
+    }
+
+    #[Test]
+    public function nadaEnLasReglasPresentaAPedroComoTributarista(): void
+    {
+        // Decisión del PO del 2026-08-25: el despacho es 100% aduanero
+        // (CLAUDE.md §5 y §7). La migración 0024 lo retiró del contenido
+        // editable; aquí se defiende la capa que no se edita.
+        self::assertDoesNotMatchRegularExpression(
+            '/tributari/iu',
+            $this->reglas(),
+            'Las reglas de dominio vuelven a nombrar el área tributaria, que el '
+            . 'PO retiró del despacho.',
+        );
+    }
+
+    #[Test]
     public function elMotorInsertaLasReglasEnLaCapaNoEditable(): void
     {
         // Si el paquete vendorizado pierde la llamada a SoportaReglasDeDominio,

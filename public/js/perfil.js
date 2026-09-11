@@ -520,7 +520,8 @@
             salida.push({
                 etiqueta: paso.dataset.resumen || '',
                 texto: input.dataset.mensaje || '',
-                tecnico: input.dataset.tecnico || ''
+                tecnico: input.dataset.tecnico || '',
+                expediente: input.hasAttribute('data-expediente')
             });
         });
 
@@ -539,6 +540,21 @@
         // mejor dónde está el caso que el documento con el que empezó.
         var tecnico = '';
         datos.forEach(function (d) { if (d.tecnico) { tecnico = d.tecnico; } });
+
+        // La mención de la consultora del despacho. Aparece solo si alguna
+        // de las respuestas marcadas trae `data-expediente`, que lo pone
+        // `Cuestionario::definicion()` en las situaciones donde el
+        // expediente técnico decide el caso —y lo quita en cualquier opción
+        // que salga del cuestionario, así que aquí no hay que volver a
+        // excluir la rama preventiva ni el operativo de la POLFA.
+        //
+        // El texto está en el HTML, no aquí: es copy que Pedro revisa bajo
+        // la Ley 1123, y componerlo en JavaScript lo sacaría de la página
+        // que se lee sin script.
+        var expediente = document.getElementById('bloque-expediente');
+        if (expediente) {
+            expediente.hidden = !datos.some(function (d) { return d.expediente; });
+        }
 
         var etiquetaTecnica = document.getElementById('resultado-tecnico');
         if (etiquetaTecnica) {

@@ -246,7 +246,34 @@ de que alguien contestó cinco preguntas es peor que no preguntar.
 El puntaje de lead medía en parte capacidad de pago y no puede llegar a quien
 acaba de perder su mercancía. El diagnóstico ni siquiera lo calcula.
 
-### 4.5 La página funciona sin JavaScript
+### 4.5 La mención del expediente técnico — 2026-09-11
+
+El resultado incluye un bloque que nombra a la consultora del despacho
+(§7.1), y **solo aparece en las situaciones donde el expediente decide el
+caso**: subpartida, valor en aduana, régimen aplicado, documentos soporte.
+
+La condición no está escrita a mano en el JavaScript ni duplicada en una
+lista: las opciones que la encienden llevan `'expediente' => true` en
+`Cuestionario::pasos()`, y **`definicion()` la apaga en cualquier opción con
+`salida`**. Eso cubre de una vez los dos casos en los que la mención estaría
+mal, sin enumerarlos:
+
+- «todavía nada: quiero prevenir» sale por `fuera_alcance` — ahí la revisión
+  técnica sería el servicio principal y no un apoyo, y esa línea todavía no
+  se vende (§7, pendientes);
+- «operativo de la POLFA en curso» sale por `urgente` — ahí lo único sensato
+  es escribir ya.
+
+Y seguirá valiendo para la próxima salida que alguien añada.
+`CuestionarioTest::ningunaSalidaDelCuestionarioMencionaElExpediente()` lo
+defiende, y `algunaOpcionMencionaElExpediente()` impide lo contrario: que el
+bloque quede en el HTML sin nadie que lo encienda.
+
+El bloque va **oculto de salida**. Sin JavaScript el resultado se ve entero
+y no hay forma de saber qué contestó nadie, así que la mención no se emite:
+es un refuerzo, no parte del cierre (§4.6).
+
+### 4.6 La página funciona sin JavaScript
 
 Los seis pasos y las dos ramas se emiten **enteros** desde el servidor, como
 un formulario de radios corriente. El script solo esconde lo que no toca.
@@ -333,9 +360,10 @@ Cerradas. Ya están sembradas en la base; no hay que preguntarlas de nuevo.
 |---|---|
 | Modalidad de asesoría | Virtual, 60 minutos |
 | Precio | **$400.000 COP** |
-| WhatsApp del negocio | `573159923676` |
+| WhatsApp del negocio | **`573112335405`** — único número; decisión del PO del 2026-09-11 |
 | Imágenes | Disco `public/img/` · URL `/img` |
 | Perfil | Especialista en Derecho Aduanero y Comercio Exterior · más de 15 años de experiencia |
+| Equipo | Pedro (abogado titular) y Erika Duarte Ruiz (consultora, §7.1) |
 | Áreas de práctica | Aduanero (2026-08-25: se retiró tributario — decisión del PO, despacho 100% aduanero) |
 | Marca | **«Pedro.»** — no «ADUANA ELITE», que es lo que rotula la maqueta |
 
@@ -348,6 +376,78 @@ Nombres de archivo de las fotos:
 | `pedro-documentos.jpg` | Revisión documental en escritorio | `proceso` |
 | `pedro-comercio-exterior.jpg` | Oficina, globo terráqueo | `cta_final` |
 
+### 7.1 Erika Duarte Ruiz — consultora, no abogada (2026-09-11)
+
+El despacho pasa a ser dos personas. La distinción es la única parte de esto
+que no admite matices:
+
+**Erika Duarte Ruiz NO es abogada.** Es Profesional en Negocios
+Internacionales con especialización en Derecho Aduanero y Comercio Exterior
+—un posgrado abierto a no abogados, que no habilita para ejercer el derecho—
+y ocho años en operaciones de comercio exterior. Su título es **«Consultora
+Aduanera y de Comercio Exterior»**. Llamarla abogada en la página, en una
+migración o en el prompt del bot no es una imprecisión de redacción: es una
+afirmación sobre la habilitación profesional de una persona, publicada por un
+despacho de abogados.
+
+Qué hace: revisa el expediente técnico —clasificación arancelaria, valor en
+aduana, régimen aplicado, documentos soporte, requisitos ante DIAN, ICA e
+INVIMA—. **Su trabajo alimenta la defensa; no la firma ni la dirige.** La
+asesoría paga se agenda con Pedro, siempre, y desde el diagnóstico el botón
+sigue siendo uno solo.
+
+Dónde vive esto, y por qué en cada sitio:
+
+| Pieza | Qué hace |
+|---|---|
+| `landing_bloques.equipo` (migración 0041) | La sección pública. Contenido editable: el rol se pinta del campo, nunca de una constante de la plantilla |
+| `plantillas/landing/bloques/equipo.php` | Va detrás de `credenciales`, y hay que añadirlo **también** a la lista de `pagina.php` — un bloque que no esté en esa lista no se pinta y no da error (§8) |
+| `AdaptadorDespacho::reglasDeDominio()` | Las prohibiciones del bot. Capa **no editable** del prompt, por la misma razón que las tres reglas del §3 |
+| `TitulosDelEquipoTest` | Recorre `plantillas/`, `db/migraciones/` y `src/` buscando que alguien la haya llamado abogada. Ignora los comentarios: explicar la regla exige poder escribir la palabra |
+| `tests/golden/conversaciones.json` | Casos `equipo-01` a `equipo-05`. Quedan fuera del escaneo de arriba: su trabajo es contener esos patrones |
+
+Lo que el despacho **no** vende, aunque ella sepa hacerlo: prevención,
+auditoría de procesos y optimización de costos. Este canal atiende a quien ya
+tiene un problema con la DIAN. La rama preventiva del diagnóstico sigue
+saliendo por `fuera_alcance` (§4.5) hasta que el PO decida lo de abajo, y el
+bot no la menciona nunca como servicio agendable (§7.2).
+
+### 7.2 La revisión técnica y el interruptor `ofrece_bot` (2026-09-11)
+
+Decisión del PO: la revisión técnica vale **$400.000 por ahora**, y «cada
+valor se configura en el panel». La fila vive en `modalidades_asesoria`
+(migración 0043) y se edita entera desde `/panel/tarifas`, como la otra.
+
+Lo que no era obvio: **el catálogo del bot ES esa tabla.**
+`AdaptadorDespacho::buscarItems()` lee `modalidades_asesoria WHERE activo = 1`,
+así que sembrar la revisión técnica activa habría hecho que el bot empezara a
+ofrecerla y a agendarla — con el bot encendido en producción, y contra sus
+propias reglas de dominio, que dicen que la cita es con el abogado.
+
+Y habría roto algo más callado: la red de `detalleItem()` que resuelve un id
+irreconocible al único servicio activo. Existe por el fallo del 2026-08-22 —el
+modelo mutiló el UUID al confirmar, la venta murió en «no está en el catálogo»
+y la conversación acabó transferida— y **deja de aplicar en cuanto hay dos
+filas activas**.
+
+De ahí la columna `ofrece_bot`, que separa dos cosas que la tabla confundía:
+
+| | `activo` | `ofrece_bot` |
+|---|---|---|
+| Asesoría jurídica virtual | 1 | 1 |
+| Revisión técnica de operación | 1 | **0** |
+
+El catálogo del bot pasa a ser `activo = 1 AND ofrece_bot = 1`: vuelve a tener
+un solo servicio, la red sigue en pie, y la revisión técnica existe, se cobra
+y se edita sin que el bot la nombre nunca. Lo defiende
+`AdaptadorDespachoTest::elBotNoOfreceLasModalidadesQueNoLeCorresponden()`, que
+comprueba los tres caminos de búsqueda —por id, por nombre y por la red— y no
+solo el listado.
+
+La casilla está en `/panel/tarifas`, en su propia fila y con su explicación:
+puesta al lado de «Activa» parece otra casilla de visibilidad de la página, y
+es la única de esa pantalla que cambia lo que el bot le dice a un cliente.
+
 ### Sobre el precio
 
 $400.000 por una hora es un ticket alto para un lead frío, y eso ordena el
@@ -358,7 +458,25 @@ técnico antes de nombrar el precio, nunca al revés.
 ### Lo que sigue pendiente y no es configuración
 
 - [ ] Revisión del copy de landing y diagnóstico bajo el marco de publicidad
-      del abogado (Ley 1123 de 2007).
+      del abogado (Ley 1123 de 2007). **Incluye el bloque `equipo` y la
+      mención del expediente técnico en el resultado** (§4.5, §7.1): son copy
+      nuevo del 2026-09-11 y ninguno lo ha visto Pedro todavía.
+- [ ] **La rama preventiva del diagnóstico.** Hoy sale por `fuera_alcance` —
+      se le dice a la persona que no hay nada que venderle— y con Erika deja
+      de ser cierto: revisión documental y de procesos no es ejercicio del
+      derecho, y es exactamente lo que esa opción pedía. La modalidad ya
+      existe y ya tiene precio (§7.2); lo que falta son dos decisiones que no
+      son de configuración:
+      1. **Si Erika factura al despacho o directamente.** Cambia quién emite
+         la factura y a quién llega el pago en Wompi.
+      2. **Si esa revisión puede derivar en caso jurídico.** Si ella detecta
+         algo que ya es un problema, el camino natural es Pedro — y eso es
+         una segunda venta, no un favor.
+      Y una advertencia sobre el precio: a $400.000 la revisión técnica vale
+      lo mismo que una hora del abogado defendiendo un caso abierto. Mientras
+      no haya camino público hacia ella da igual; el día que la rama
+      preventiva se encienda, conviene revisarlo — nadie paga por prevenir lo
+      mismo que por defenderse.
 - [ ] **Política de tratamiento de datos — ya no es hipotética.** El motor de
       WhatsApp (§0.2) persiste teléfono, nombre, correo y motivo de consulta.
       Es requisito para poner `wa_config.activo = 1`.
@@ -380,8 +498,18 @@ técnico antes de nombrar el precio, nunca al revés.
 - **CSS:** `npm run build:landing`. El CSS va **incrustado** en el HTML, así
   que un build tiene que invalidar la caché de páginas igual que editar un
   texto — de eso se encarga `CachePagina` mirando el mtime del archivo.
-- **Pruebas:** `vendor/bin/phpunit`. 200 pruebas, y se espera que estén todas
-  en verde.
+- **Pruebas:** `vendor/bin/phpunit`. Más de 500, y se espera que estén todas
+  en verde. Las de `tests/Unidad` no tocan MySQL y corren en segundos
+  (`--testsuite unidad`); las de integración recrean `pedro_pruebas` desde
+  `db/migraciones/` y tardan. **Nunca dos corridas a la vez contra la misma
+  base:** `CasoBaseBd::recrear()` la borra y la vuelve a crear, así que dos
+  procesos simultáneos se destruyen mutuamente y dejan un rastro de «table
+  doesn't exist» que no tiene nada que ver con el código.
+- **El conjunto dorado no tiene runner.** `tests/golden/conversaciones.json`
+  se mantiene al día —hoy 33 casos— pero `composer dorado` apunta a
+  `bin/correr-dorado.php`, que se fue con el gate dorado (migración 0010).
+  Se corre contra el LLM real, así que hace falta antes de encender el bot;
+  mientras tanto, lo que el archivo describe **no está comprobado por nada**.
 - **Auditoría de la landing:** `node bin/auditar-landing.mjs <url>` contra el
   servidor de desarrollo (`php -S 127.0.0.1:8000 bin/servidor-dev.php`).
 - **Capturas:** `node bin/capturar.mjs <url> <destino>`.

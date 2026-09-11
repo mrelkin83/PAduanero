@@ -115,9 +115,35 @@ final class PanelTest extends CasoBaseBd
         return new TarifasControlador($this->bd, $this->auditoria);
     }
 
+    /**
+     * La modalidad principal: la asesoría con el abogado.
+     *
+     * `ORDER BY orden` y no `LIMIT 1` a secas. Desde el 2026-09-11 la tabla
+     * tiene dos filas —la segunda es la revisión técnica de la consultora—
+     * y sin orden explícito MySQL puede devolver cualquiera: la prueba
+     * pasaría o fallaría según el plan de ejecución, que es la peor clase
+     * de prueba intermitente.
+     */
     private function modalidadId(): string
     {
-        return (string) $this->bd->pdo()->query('SELECT id FROM modalidades_asesoria LIMIT 1')->fetchColumn();
+        return (string) $this->bd->pdo()
+            ->query('SELECT id FROM modalidades_asesoria ORDER BY orden LIMIT 1')
+            ->fetchColumn();
+    }
+
+    private function ofreceBot(string $id): int
+    {
+        $st = $this->bd->pdo()->prepare('SELECT ofrece_bot FROM modalidades_asesoria WHERE id = ?');
+        $st->execute([$id]);
+
+        return (int) $st->fetchColumn();
+    }
+
+    private function precioDeLaModalidad(): int
+    {
+        return (int) $this->bd->pdo()
+            ->query('SELECT precio_cop FROM modalidades_asesoria ORDER BY orden LIMIT 1')
+            ->fetchColumn();
     }
 
     // ── Tablero ──────────────────────────────────────────────────────────
@@ -239,10 +265,60 @@ final class PanelTest extends CasoBaseBd
         ]));
 
         self::assertSame(302, $r->estado);
-        self::assertSame(
-            450000,
-            (int) $this->bd->pdo()->query('SELECT precio_cop FROM modalidades_asesoria')->fetchColumn(),
+        self::assertSame(450000, $this->precioDeLaModalidad());
+    }
+
+    #[Test]
+    public function laCasillaDelBotDecideQueVeElCatalogoDelBot(): void
+    {
+        // `ofrece_bot` separa «la modalidad existe y se cobra» de «el bot la
+        // ofrece» (migración 0043). La casilla es la única de esa pantalla
+        // que cambia lo que el bot le dice a un cliente, así que tiene que
+        // llegar de verdad a la columna — en los dos sentidos.
+        $id = $this->modalidadId();
+        $base = [
+            'id' => $id,
+            'nombre' => 'Asesoría jurídica virtual (1 hora)',
+            'precio_cop' => '400000',
+            'duracion_min' => '60',
+            'modalidad' => 'virtual',
+            'requiere_pago' => '1',
+            'activo' => '1',
+        ];
+
+        $r = $this->tarifas()->guardar($this->ctx('abogado', $base));
+        self::assertSame(302, $r->estado);
+        self::assertSame(0, $this->ofreceBot($id), 'Sin la casilla marcada, el bot no debe ofrecerla.');
+        self::assertStringContainsString(
+            'deja de ofrecerla',
+            urldecode((string) $r->cabeceras['Location']),
+            'El cambio afecta a lo que el bot dice y hay que avisarlo.',
         );
+
+        $r = $this->tarifas()->guardar($this->ctx('abogado', $base + ['ofrece_bot' => '1']));
+        self::assertSame(1, $this->ofreceBot($id));
+        self::assertStringContainsString(
+            'empieza a ofrecerla',
+            urldecode((string) $r->cabeceras['Location']),
+        );
+    }
+
+    #[Test]
+    public function laRevisionTecnicaExisteConPrecioYFueraDelBot(): void
+    {
+        // Decisión del PO (2026-09-11): la revisión técnica vale lo mismo
+        // que la asesoría por ahora, y cada valor se configura en el panel.
+        // Lo que NO puede pasar es que el bot la ofrezca: la cita que él
+        // agenda es con el abogado, no con la consultora.
+        $fila = $this->bd->pdo()->query(
+            "SELECT precio_cop, activo, ofrece_bot FROM modalidades_asesoria
+              WHERE nombre = 'Revisión técnica de operación'"
+        )->fetch();
+
+        self::assertNotFalse($fila, 'La semilla de la revisión técnica desapareció.');
+        self::assertSame(400000, (int) $fila['precio_cop']);
+        self::assertSame(1, (int) $fila['activo']);
+        self::assertSame(0, (int) $fila['ofrece_bot']);
     }
 
     #[Test]
@@ -257,10 +333,7 @@ final class PanelTest extends CasoBaseBd
         ]));
 
         self::assertStringContainsString('PESOS', urldecode($r->cabeceras['Location']));
-        self::assertSame(
-            400000,
-            (int) $this->bd->pdo()->query('SELECT precio_cop FROM modalidades_asesoria')->fetchColumn(),
-        );
+        self::assertSame(400000, $this->precioDeLaModalidad());
     }
 
     #[Test]

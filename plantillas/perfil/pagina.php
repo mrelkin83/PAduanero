@@ -226,7 +226,8 @@ window.__paRedRevelado = setTimeout(function () {
                                data-mensaje="<?= $e((string) $opcion['mensaje']) ?>"
                                <?= is_string($opcion['tecnico']) ? 'data-tecnico="' . $e($opcion['tecnico']) . '"' : '' ?>
                                <?= is_string($opcion['rama']) ? 'data-rama="' . $e($opcion['rama']) . '"' : '' ?>
-                               <?= is_string($opcion['salida']) ? 'data-salida="' . $e($opcion['salida']) . '"' : '' ?>>
+                               <?= is_string($opcion['salida']) ? 'data-salida="' . $e($opcion['salida']) . '"' : '' ?>
+                               <?= ($opcion['expediente'] ?? false) ? 'data-expediente="1"' : '' ?>>
 
                         <?php /* Letra de orden, no casilla. Una casilla vacía es el
                                  lenguaje del trámite; una letra es el del índice. */ ?>
@@ -389,6 +390,44 @@ window.__paRedRevelado = setTimeout(function () {
                 hacer con ellos se lo dice el abogado mirando sus documentos, no un
                 formulario.
             </p>
+
+            <?php /* ── El expediente técnico ────────────────────────────
+                     Solo aparece cuando la situación elegida lo pide: una
+                     controversia de subpartida, valor, régimen o documentos
+                     soporte. Lo enciende `perfil.js` mirando el
+                     `data-expediente` de la opción marcada, y ese atributo
+                     lo pone `Cuestionario::definicion()`, que además lo
+                     apaga en cualquier opción con salida — de modo que no
+                     puede salir ni en la rama preventiva ni en un operativo
+                     de la POLFA.
+
+                     Tres cosas que este bloque NO hace, y las tres son la
+                     misma: no la llama abogada, no ofrece agendar con ella
+                     y no le atribuye criterio jurídico. Erika es
+                     Profesional en Negocios Internacionales con
+                     especialización en Derecho Aduanero —un posgrado
+                     abierto a no abogados—, y el botón de esta página
+                     sigue siendo uno solo y lleva a Pedro.
+
+                     Va oculto de salida a propósito: sin JavaScript el
+                     resultado se ve entero y no hay forma de saber qué
+                     contestó nadie, así que la mención no se emite. Es un
+                     refuerzo, no parte del cierre. */ ?>
+            <div id="bloque-expediente" class="mt-8 border-l-2 border-oro/40 pl-5 md:pl-6" hidden>
+                <p class="rotulo text-acero">El expediente técnico</p>
+
+                <p class="entrada mt-4 max-w-[54ch]">
+                    En este tipo de caso el expediente pesa tanto como el argumento
+                    jurídico: la subpartida, el valor declarado y los documentos
+                    soporte.
+                </p>
+
+                <p class="entrada mt-4 max-w-[54ch]">
+                    El despacho cuenta con Erika Duarte Ruiz, consultora aduanera y de
+                    comercio exterior, que revisa esa parte del expediente. El análisis
+                    jurídico y la estrategia los define Pedro en la asesoría.
+                </p>
+            </div>
 
             <div class="ficha-asesoria mt-8">
                 <div class="flex flex-wrap items-baseline justify-between gap-4">

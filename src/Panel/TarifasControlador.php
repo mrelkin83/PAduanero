@@ -111,7 +111,7 @@ final class TarifasControlador extends ControladorBase
         $this->bd->pdo()->prepare(
             'UPDATE modalidades_asesoria
                 SET nombre = ?, descripcion = ?, duracion_min = ?, precio_cop = ?,
-                    modalidad = ?, requiere_pago = ?, activo = ?
+                    modalidad = ?, requiere_pago = ?, activo = ?, ofrece_bot = ?
               WHERE id = ?'
         )->execute([
             $ctx->campo('nombre', (string) $antes['nombre']),
@@ -123,20 +123,35 @@ final class TarifasControlador extends ControladorBase
                 : $antes['modalidad'],
             (int) ($ctx->campo('requiere_pago') === '1'),
             (int) ($ctx->campo('activo') === '1'),
+            (int) ($ctx->campo('ofrece_bot') === '1'),
             $id,
         ]);
+
+        $ofreceBot = (int) ($ctx->campo('ofrece_bot') === '1');
 
         $this->auditoria->registrar('modalidad', $id, 'actualizar', $ctx->actor(), [
             'precio_antes' => (int) $antes['precio_cop'],
             'precio_despues' => $precio,
             'duracion_antes' => (int) $antes['duracion_min'],
             'duracion_despues' => $duracion,
+            'ofrece_bot_antes' => (int) $antes['ofrece_bot'],
+            'ofrece_bot_despues' => $ofreceBot,
         ], $ctx->ip());
 
         $mensaje = 'Modalidad actualizada.';
 
         if ((int) $antes['precio_cop'] !== $precio) {
             $mensaje .= ' Las reservas ya creadas conservan su precio anterior.';
+        }
+
+        // Encender `ofrece_bot` es lo único de esta pantalla que cambia lo
+        // que el bot le DICE a un cliente, y lo hace en la siguiente
+        // conversación. Se avisa porque la casilla no lo parece: está entre
+        // otras dos que solo afectan a la página.
+        if ((int) $antes['ofrece_bot'] !== $ofreceBot) {
+            $mensaje .= $ofreceBot === 1
+                ? ' El bot de WhatsApp empieza a ofrecerla y a agendarla.'
+                : ' El bot de WhatsApp deja de ofrecerla.';
         }
 
         return $this->redirigirCon('/panel/tarifas', 'ok', $mensaje);
