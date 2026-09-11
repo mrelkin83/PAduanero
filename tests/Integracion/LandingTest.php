@@ -88,6 +88,50 @@ final class LandingTest extends CasoBaseBd
     }
 
     #[Test]
+    public function laPrecargaDelHeroApuntaAlMismoArchivoQueLaEtiqueta(): void
+    {
+        // La precarga del hero y el `<source>` que la usa tienen que pedir
+        // EXACTAMENTE las mismas URLs. Si difieren en un solo carácter, el
+        // navegador precarga una cosa y descarga otra: la foto viaja dos
+        // veces, y es la del camino crítico.
+        //
+        // Antes el riesgo era solo el `sizes`. Desde que `Vista::imagen()`
+        // versiona cada variante con `?v=<mtime>`, el riesgo es el `?v=`:
+        // una precarga escrita a mano se queda sin él en cuanto alguien
+        // regenera la imagen, y nada falla — solo se descarga dos veces.
+        $html = $this->landing->render();
+
+        self::assertMatchesRegularExpression(
+            '#<link rel="preload" as="image"[^>]*imagesrcset="([^"]+)"#u',
+            $html,
+            'Desapareció la precarga del hero.',
+        );
+
+        preg_match('#<link rel="preload" as="image"[^>]*imagesrcset="([^"]+)"#u', $html, $m);
+        $precarga = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
+
+        foreach (explode(',', $precarga) as $entrada) {
+            $url = trim(explode(' ', trim($entrada))[0]);
+
+            self::assertStringContainsString(
+                '?v=',
+                $url,
+                "La precarga pide «{$url}» sin versión; la etiqueta la pide con ella.",
+            );
+            // Cada entrada de un srcset es «URL 640w», así que basta con
+            // que la misma URL aparezca seguida de un espacio en el HTML ya
+            // sin entidades. Buscar `srcset="URL` solo habría comprobado la
+            // primera de las tres.
+            self::assertStringContainsString(
+                $url . ' ',
+                html_entity_decode($html, ENT_QUOTES, 'UTF-8'),
+                "«{$url}» se precarga pero ningún <source> la pide con esa misma URL: "
+                . 'el navegador descargaría la foto del hero dos veces.',
+            );
+        }
+    }
+
+    #[Test]
     public function elEnlaceDeWhatsappFuncionaSinJavascript(): void
     {
         // El JS añade los UTM, pero si no corre el enlace tiene que servir

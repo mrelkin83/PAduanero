@@ -153,10 +153,15 @@ final class Vista
         $base = pathinfo($archivo, PATHINFO_FILENAME);
         $e = self::e(...);
 
+        // Cada variante va versionada por la misma razón que los scripts
+        // (ver `activo()`): nginx las sirve `immutable` durante 30 días, así
+        // que regenerar una imagen y desplegarla NO la cambia para nadie.
+        // Pasó el 2026-09-11 con el hero y con el retrato de la consultora:
+        // archivos nuevos en el origen, los viejos en el navegador.
         $fuente = static function (string $formato, string $mime) use ($base, $anchos, $sizes, $e): string {
             $conjunto = [];
             foreach ($anchos as $w) {
-                $conjunto[] = "/img/{$base}-{$w}.{$formato} {$w}w";
+                $conjunto[] = self::activo("/img/{$base}-{$w}.{$formato}") . " {$w}w";
             }
 
             return sprintf(
@@ -177,8 +182,8 @@ final class Vista
             . $fuente('avif', 'image/avif')
             . $fuente('webp', 'image/webp')
             . sprintf(
-                '<img src="/img/%s" alt="%s" width="%d" height="%d" class="%s" %s>',
-                $e($archivo),
+                '<img src="%s" alt="%s" width="%d" height="%d" class="%s" %s>',
+                $e(self::activo('/img/' . $archivo)),
                 $e($alt),
                 $ancho,
                 $alto,

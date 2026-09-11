@@ -56,10 +56,25 @@ $waBase = 'https://wa.me/' . rawurlencode($whatsapp['numero'])
 
          El `imagesizes` tiene que ser IDÉNTICO al `sizes` del <img> de
          hero.php. Si difieren, el navegador elige un ancho para la precarga
-         y otro para la etiqueta, y descarga la foto dos veces. */ ?>
+         y otro para la etiqueta, y descarga la foto dos veces.
+
+         Y las URLs también: desde que `Vista::imagen()` versiona cada
+         variante con `?v=<mtime>`, una precarga sin versión apunta a una
+         URL DISTINTA de la que luego pide el `<img>` — mismo archivo, dos
+         descargas, y justo la del camino crítico. Por eso el srcset se
+         compone aquí con `Vista::activo()`, que es la misma función que usa
+         la etiqueta: no pueden separarse aunque alguien cambie una sola.
+         `LandingTest::laPrecargaDelHeroApuntaAlMismoArchivoQueLaEtiqueta()`
+         lo comprueba sobre el HTML ya renderizado. */ ?>
+<?php
+$heroSrcset = implode(', ', array_map(
+    static fn (int $w): string => Vista::activo("/img/pedro-hero-{$w}.avif") . " {$w}w",
+    [400, 640, 890],
+));
+?>
 <link rel="preload" as="image" fetchpriority="high"
-      href="/img/pedro-hero-400.avif"
-      imagesrcset="/img/pedro-hero-400.avif 400w, /img/pedro-hero-640.avif 640w, /img/pedro-hero-890.avif 890w"
+      href="<?= $e(Vista::activo('/img/pedro-hero-400.avif')) ?>"
+      imagesrcset="<?= $e($heroSrcset) ?>"
       imagesizes="(min-width: 768px) 54vw, 100vw"
       type="image/avif">
 
