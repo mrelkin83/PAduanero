@@ -69,11 +69,24 @@ $invitacion = $bloque->texto('invitacion');
             <?php endif; ?>
         </div>
 
+        <?php /* UNA sola rejilla para las dos clases de tarjeta —los datos
+                 verificables y las oficinas— y no dos rejillas apiladas.
+                 Hasta el 2026-09-11 eran dos, y con un dato y una oficina
+                 —que es lo que hay— cada tarjeta ocupaba la columna
+                 izquierda de su propia fila y dejaba la derecha vacía: dos
+                 medias filas en vez de una llena. La sección que tiene que
+                 demostrar solidez se veía a medio construir.
+
+                 Cada dato verificable va en su PROPIO `<dl>`, no todos en
+                 uno: dentro de un `<dl>` solo caben `<dt>` y `<dd>`, así que
+                 una tarjeta de oficina —que lleva `<address>`— no puede
+                 compartirlo. Un `<dl>` por término es HTML perfectamente
+                 válido y es lo que permite mezclarlas en la misma rejilla. */ ?>
+        <div class="mt-12 md:mt-24 grid gap-6 md:gap-8 md:grid-cols-2">
         <?php if ($verificables !== []): ?>
         <?php /* Cada dato con su camino de comprobación al lado. El enlace es
                  la mitad del mensaje: decirle a alguien dónde verificarte es
                  justo lo que un estafador nunca hace. */ ?>
-        <dl class="mt-12 md:mt-24 grid gap-6 md:gap-8 md:grid-cols-2">
             <?php foreach ($verificables as $i => $dato): ?>
                 <?php
                 $etiqueta = (string) ($dato['etiqueta'] ?? '');
@@ -88,7 +101,7 @@ $invitacion = $bloque->texto('invitacion');
                          <div>: dentro de un grupo del <dl> solo caben <dt> y
                          <dd>, y ese div de adorno era lo que tenía la
                          accesibilidad en 96 en vez de 100. */ ?>
-                <div class="doble-bisel p-6 md:p-12 md:hover:bg-white/5 transition-colors duration-500 revelar group before:pointer-events-none before:absolute before:inset-0 before:bg-gradient-to-tr before:from-oro/5 before:to-transparent before:opacity-0 before:transition-opacity before:duration-700 md:hover:before:opacity-100" style="--retardo: <?= $delay ?>ms">
+                <dl class="doble-bisel p-6 md:p-12 md:hover:bg-white/5 transition-colors duration-500 revelar group before:pointer-events-none before:absolute before:inset-0 before:bg-gradient-to-tr before:from-oro/5 before:to-transparent before:opacity-0 before:transition-opacity before:duration-700 md:hover:before:opacity-100" style="--retardo: <?= $delay ?>ms">
                     <dt class="rotulo text-acero mb-4 md:mb-6 relative z-10"><?= $e($etiqueta) ?></dt>
 
                     <dd class="relative z-10 flex flex-col h-full">
@@ -113,9 +126,8 @@ $invitacion = $bloque->texto('invitacion');
                         </div>
                         <?php endif; ?>
                     </dd>
-                </div>
+                </dl>
             <?php endforeach; ?>
-        </dl>
         <?php endif; ?>
 
         <?php if ($sedes !== []): ?>
@@ -124,14 +136,13 @@ $invitacion = $bloque->texto('invitacion');
                  Franca dice además algo que ningún texto puede decir igual de
                  bien: nadie pone oficina ahí por casualidad, y quien tiene la
                  mercancía retenida en una lo sabe. */ ?>
-        <div class="mt-6 md:mt-8 grid gap-6 md:gap-8 md:grid-cols-2">
             <?php foreach ($sedes as $i => $sede): ?>
                 <?php
                 $nombre = (string) ($sede['nombre'] ?? '');
                 $direccion = (string) ($sede['direccion'] ?? '');
                 $detalle = (string) ($sede['detalle'] ?? '');
                 $horario = (string) ($sede['horario'] ?? '');
-                $delay = 200 + ($i * 100);
+                $delay = 100 + ((count($verificables) + $i) * 100);
                 ?>
                 <?php $pendiente = ($sede['pendiente'] ?? null) === true; ?>
                 <div class="tarjeta p-6 md:p-12 md:hover:bg-white/5 transition-colors duration-500 flex flex-col justify-between revelar group" style="--retardo: <?= $delay ?>ms">
@@ -161,8 +172,8 @@ $invitacion = $bloque->texto('invitacion');
                     </div>
                 </div>
             <?php endforeach; ?>
-        </div>
         <?php endif; ?>
+        </div>
 
         <?php
         $sedesReales = array_filter($sedes, static fn (array $s): bool => ($s['pendiente'] ?? null) !== true);
